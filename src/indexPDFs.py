@@ -7,7 +7,7 @@ import urllib.parse
 
 
 def getPDFFolders():
-    pdfFolders = getConfig()["indexedPDFFolders"]
+    pdfFolders = getConfig()["pdfFolders"]
     indexFolders = [
         folder.split("/")[-1]
         for folder in glob.glob(
