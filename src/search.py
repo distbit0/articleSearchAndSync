@@ -90,7 +90,8 @@ def sendToAtVoice(pdfPaths):
     utils.mkdirAndParents(getConfig()["atVoiceURLFileFolder"] + "tmpPdfs/")
     oldFiles = glob.glob(getConfig()["atVoiceURLFileFolder"] + "tmpPdfs/*")
     for f in oldFiles:
-        os.remove(f)
+        pass
+        # os.remove(f)
     for pdfPath in pdfPaths:
         pdfName = pdfPath.split("/")[-1]
         targetPdfPath = getConfig()["atVoiceURLFileFolder"] + "tmpPdfs/" + pdfName
