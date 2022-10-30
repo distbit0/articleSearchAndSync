@@ -86,17 +86,7 @@ def getCMDArguments():
     return args
 
 
-def sendToAtVoice(pdfPaths):
-    utils.mkdirAndParents(getConfig()["atVoiceURLFileFolder"] + "tmpPdfs/")
-    oldFiles = glob.glob(getConfig()["atVoiceURLFileFolder"] + "tmpPdfs/*")
-    for f in oldFiles:
-        pass
-        # os.remove(f)
-    for pdfPath in pdfPaths:
-        pdfName = pdfPath.split("/")[-1]
-        targetPdfPath = getConfig()["atVoiceURLFileFolder"] + "tmpPdfs/" + pdfName
-        shutil.copyfile(pdfPath, targetPdfPath)
-
+def sendToAtVoice():
     atVoiceUrlOutputFile = (
         getConfig()["atVoiceURLFileFolder"] + getConfig()["atVoiceURLTmpFile"]
     )
@@ -109,10 +99,6 @@ def sendToAtVoice(pdfPaths):
 if __name__ == "__main__":
     args = getCMDArguments()
     articleUrls, articlePaths = searchArticlesForQuery(args.query, args.subject)
-
-    if args.atVoice:
-        pdfPaths = [path for path in articlePaths if ".pdf" in path]
-        articleUrls = [url for url in articleUrls if ".pdf" not in url]
 
     utils.addUrlToUrlFile(
         articleUrls, utils.getAbsPath("../output/searchResultUrls.txt"), True
@@ -137,4 +123,4 @@ if __name__ == "__main__":
         print("\n\nCopied article URLs to clipboard")
 
     if args.atVoice:
-        sendToAtVoice(pdfPaths)
+        sendToAtVoice()
