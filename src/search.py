@@ -48,14 +48,7 @@ def searchArticlesForQuery(query, subject=""):
         for path in matchingArticlePaths
     ]  # include actual pdf paths instead of pdf text file paths
 
-    articlePathsAndUrls = [
-        [finalPaths[i], matchingArticleUrls[i]] for i in range(0, len(finalPaths))
-    ]
-    articlePathsAndUrls = sorted(articlePathsAndUrls, key=lambda x: x[1])
-    matchingArticleUrls = [article[1] for article in articlePathsAndUrls]
-    matchingArticlePaths = [article[0] for article in articlePathsAndUrls]
-
-    return matchingArticleUrls, matchingArticlePaths
+    return matchingArticleUrls, finalPaths
 
 
 def getCMDArguments():
@@ -88,6 +81,12 @@ def getCMDArguments():
         help="Send URL file to @Voice",
         dest="atVoice",
     )
+    parser.add_argument(
+        "-s",
+        action="store_true",
+        help="Sort article URLs alphabetically",
+        dest="sort",
+    )
     args = parser.parse_args()
 
     return args
@@ -106,6 +105,9 @@ def sendToAtVoice():
 if __name__ == "__main__":
     args = getCMDArguments()
     articleUrls, articlePaths = searchArticlesForQuery(args.query, args.subject)
+
+    if args.sort:
+        articleUrls = sorted(articleUrls)
 
     utils.addUrlToUrlFile(
         articleUrls, utils.getAbsPath("../output/searchResultUrls.txt"), True
