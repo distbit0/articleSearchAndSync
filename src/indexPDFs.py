@@ -2,7 +2,6 @@ import utils
 from utils import getConfig
 import glob
 import PyPDF2
-from pathlib import Path
 import urllib.parse
 
 
