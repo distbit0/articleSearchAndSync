@@ -48,7 +48,14 @@ def searchArticlesForQuery(query, subject=""):
         for path in matchingArticlePaths
     ]  # include actual pdf paths instead of pdf text file paths
 
-    return matchingArticleUrls, finalPaths
+    articlePathsAndUrls = [
+        [finalPaths[i], matchingArticleUrls[i]] for i in range(0, len(finalPaths))
+    ]
+    articlePathsAndUrls = sorted(articlePathsAndUrls, key=lambda x: x[1])
+    matchingArticleUrls = [article[1] for article in articlePathsAndUrls]
+    matchingArticlePaths = [article[0] for article in articlePathsAndUrls]
+
+    return matchingArticleUrls, matchingArticlePaths
 
 
 def getCMDArguments():
