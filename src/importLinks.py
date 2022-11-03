@@ -4,12 +4,23 @@ import utils
 from utils import getConfig
 
 
-def formatUrlFromBookMarks(url):
-    if "ethresear.ch/t/" in url:
-        if url.count("/") == 5:
-            url += "/"
-        url = re.sub(r"(https:\/\/ethresear.ch\/t\/.*\/.*)(/.*)", r"\1/print", url)
-    return url
+def makeDiscoursePrintable(url):
+    tempUrl = str(url)
+    if tempUrl[-1] != "/":
+        tempUrl += "/"
+    if re.search("(\/t\/[^\/]*\/\d+\/)", tempUrl):
+        # print(1, tempUrl)
+        if re.search("(t\/[^\/]*\/\d+\/)$", tempUrl):
+            tempUrl += "print"
+            # print(2, tempUrl)
+        if re.search("(t\/[^\/]*\/\d+\/)(([a-z]+|\d+)\/)$", tempUrl):
+            tempUrl = re.sub(
+                r"(t\/[^\/]*\/\d+\/)(([a-z]+|\d+)\/)$", r"\1print", tempUrl
+            )
+            # print(3, tempUrl)
+
+        # print("\n\n\n")
+    return tempUrl
 
 
 def getBookmarks():
@@ -35,7 +46,7 @@ def calcUrlsToAdd():
                 for link in folder["children"]:
                     url = link["url"]
                     url = utils.formatUrl(url)
-                    url = formatUrlFromBookMarks(url)
+                    url = makeDiscoursePrintable(url)
                     if url.lower() not in "\n".join(allAddedUrls).lower():
                         urlsToAdd[subject].append(url)
 
