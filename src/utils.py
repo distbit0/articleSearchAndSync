@@ -49,7 +49,7 @@ def getUrlsInLists(subject=""):
 def getUrlsFromFile(urlFile):
     allUrls = []
     with open(urlFile, "r") as allUrlsFile:
-        fileText = allUrlsFile.read()
+        fileText = allUrlsFile.read().strip()
         for url in fileText.strip().split("\n"):
             url = formatUrl(url)
             allUrls.append(url)
