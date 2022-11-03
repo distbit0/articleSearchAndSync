@@ -4,25 +4,6 @@ import utils
 from utils import getConfig
 
 
-def makeDiscoursePrintable(url):
-    tempUrl = str(url)
-    if tempUrl[-1] != "/":
-        tempUrl += "/"
-    if re.search("(\/t\/[^\/]*\/\d+\/)", tempUrl):
-        # print(1, tempUrl)
-        if re.search("(t\/[^\/]*\/\d+\/)$", tempUrl):
-            tempUrl += "print"
-            # print(2, tempUrl)
-        if re.search("(t\/[^\/]*\/\d+\/)(([a-z]+|\d+)\/)$", tempUrl):
-            tempUrl = re.sub(
-                r"(t\/[^\/]*\/\d+\/)(([a-z]+|\d+)\/)$", r"\1print", tempUrl
-            )
-            # print(3, tempUrl)
-
-        # print("\n\n\n")
-    return tempUrl
-
-
 def getBookmarks():
     bookmarksFilePath = getConfig()["bookmarksFilePath"]
     with open(bookmarksFilePath) as f:
@@ -46,7 +27,7 @@ def calcUrlsToAdd():
                 for link in folder["children"]:
                     url = link["url"]
                     url = utils.formatUrl(url)
-                    url = makeDiscoursePrintable(url)
+                    url = utils.makeDiscoursePrintable(url)
                     if url.lower() not in "\n".join(allAddedUrls).lower():
                         urlsToAdd[subject].append(url)
 

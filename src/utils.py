@@ -6,6 +6,27 @@ import json
 from pathlib import Path
 
 
+def makeDiscoursePrintable(url):
+    if not url:
+        return ""
+    tempUrl = str(url)
+    if tempUrl[-1] != "/":
+        tempUrl += "/"
+    if re.search("(\/t\/[^\/]*\/\d+\/)", tempUrl):
+        # print(1, tempUrl)
+        if re.search("(t\/[^\/]*\/\d+\/)$", tempUrl):
+            tempUrl += "print"
+            # print(2, tempUrl)
+        if re.search("(t\/[^\/]*\/\d+\/)(([a-z]+|\d+)\/)$", tempUrl):
+            tempUrl = re.sub(
+                r"(t\/[^\/]*\/\d+\/)(([a-z]+|\d+)\/)$", r"\1print", tempUrl
+            )
+            # print(3, tempUrl)
+
+        # print("\n\n\n")
+    return tempUrl
+
+
 def formatUrl(url):
     if "t.co/" in url:
         url = urlexpander.expand(url)
