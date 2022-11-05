@@ -22,6 +22,8 @@ def makeDiscoursePrintable(url):
                 r"(t\/[^\/]*\/\d+\/)(([a-z]+|\d+)\/)$", r"\1print", tempUrl
             )
             # print(3, tempUrl)
+    else:
+        tempUrl == str(url)
 
         # print("\n\n\n")
     return tempUrl
@@ -32,6 +34,8 @@ def formatUrl(url):
         url = urlexpander.expand(url)
     if ".medium.com" not in url:
         url = url.replace("medium.com", "scribe.rip").strip()
+    else:
+        url = "https://scribe.rip" + url.split("medium.com")[1].strip()
     url = re.sub(r"\?gi=.*", r"", url)
     url = re.sub(r"\&gi=.*", r"", url)
     return url

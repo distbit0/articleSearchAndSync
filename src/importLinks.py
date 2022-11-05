@@ -1,5 +1,4 @@
 import json
-import re
 import utils
 from utils import getConfig
 
@@ -35,7 +34,7 @@ def calcUrlsToAdd():
 
 
 def addUrlsToFiles(urlsToAdd):
-    articleFileFolder = getConfig()["articleFileFolder"]
+    articleFileFolder = getConfig()["atVoiceURLFileFolder"]
     for subject in urlsToAdd:
         with open(articleFileFolder + subject + ".txt", "w") as f:
             f.write("\n".join(urlsToAdd[subject]))
