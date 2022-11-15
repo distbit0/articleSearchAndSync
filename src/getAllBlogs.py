@@ -24,8 +24,8 @@ def getOnlyNewBlogs(blogs):
 if __name__ == "__main__":
     blogs = getBlogs(subject)
     newBlogs = getOnlyNewBlogs(blogs)
-    blogs = [blog.replace("scribe.rip", "medium.com") for blog in newBlogs]
-    print("\n".join(sorted(list(set(blogs)))))
+    newBlogs = [blog.replace("scribe.rip", "medium.com") for blog in newBlogs]
+    print("\n".join(sorted(list(set(newBlogs)))))
     addBlogs = input("Add blogs to reviewed? (default=no): ")
     if addBlogs.lower() in ["y", "yes"]:
         utils.addUrlToUrlFile(

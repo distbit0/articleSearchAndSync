@@ -23,7 +23,7 @@ def makeDiscoursePrintable(url):
             )
             # print(3, tempUrl)
     else:
-        tempUrl == str(url)
+        tempUrl = str(url)
 
         # print("\n\n\n")
     return tempUrl
@@ -32,10 +32,7 @@ def makeDiscoursePrintable(url):
 def formatUrl(url):
     if "t.co/" in url:
         url = urlexpander.expand(url)
-    if ".medium.com" not in url:
-        url = url.replace("medium.com", "scribe.rip").strip()
-    else:
-        url = "https://scribe.rip" + url.split("medium.com")[1].strip()
+    url = url.replace("medium.com", "scribe.rip").strip()
     url = re.sub(r"\?gi=.*", r"", url)
     url = re.sub(r"\&gi=.*", r"", url)
     return url
@@ -110,14 +107,28 @@ def removeDupeUrlsInFile(urlFile):
 
 
 def getBlogFromUrl(url):
+    if "https://scribe.rip" in url and url.count("/") < 4:
+        print(url)
     if "gist.github.com" in url:
-        blog = re.search(r"(https:\/\/gist.github.com\/.*)\/", url).group(1).strip()
+        matches = re.search(r"(https:\/\/gist.github.com\/.*)\/", url)
     elif "https://scribe.rip" in url:
-        blog = re.search(r"(https:\/\/scribe.rip\/.*)\/", url).group(1).strip()
+        matches = re.search(r"(https:\/\/scribe.rip\/[^\/]*)\/", url)
+    elif "https://medium.com" in url:
+        matches = re.search(r"(https:\/\/medium.com\/[^\/]*)\/", url)
+    elif ".scribe.rip" in url:
+        matches = re.search(r"(https:\/\/.*\.scribe.rip\/)", url)
+    elif ".medium.com" in url:
+        matches = re.search(r"(https:\/\/.*\.medium.com\/)", url)
     elif "https://mirror.xyz" in url:
-        blog = re.search(r"(https:\/\/mirror.xyz\/.*?)\/", url + "/").group(1).strip()
+        matches = re.search(r"(https:\/\/mirror.xyz\/.*?)\/", url + "/")
     else:
-        blog = re.search(r"^(?:http[s]*://[^/]+)", url).group(0).strip()
+        matches = re.search(r"^(?:http[s]*://[^\/]+)", url)
+
+    if matches:
+        blog = matches.group(0).strip()
+    else:
+        blog = url
+    blog = blog.rstrip("/")
 
     return blog
 
