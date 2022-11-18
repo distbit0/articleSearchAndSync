@@ -5,3 +5,4 @@
 - [ ] Support file formats other than mhtml
 - [ ] Support specifying output list in importList.py according to subject(s) + filter pairs, allowing for creation of arbitrary filter lists
 - [ ] create one alreadyAddedArticles.txt for each output folder
+- [ ] parse threadreaderapp links using twitter api to return twitter account in list of blogs
