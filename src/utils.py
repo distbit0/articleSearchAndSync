@@ -121,6 +121,8 @@ def getBlogFromUrl(url):
         matches = re.search(r"(https:\/\/.*\.medium.com\/)", url)
     elif "https://mirror.xyz" in url:
         matches = re.search(r"(https:\/\/mirror.xyz\/.*?)\/", url + "/")
+    elif "https://write.as" in url:
+        matches = re.search(r"(https:\/\/write.as\/.*?)\/", url + "/")
     else:
         matches = re.search(r"^(?:http[s]*://[^\/]+)", url)
 
