@@ -40,7 +40,7 @@ def formatUrl(url):
 
 def getUrlOfArticle(articleFilePath):
     extractedUrl = ""
-    with open(articleFilePath) as _file:
+    with open(articleFilePath, errors="ignore") as _file:
         fileText = _file.read()
         urlPatterns = getConfig()["urlPatterns"]
         for urlPattern in urlPatterns:

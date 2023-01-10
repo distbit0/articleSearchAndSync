@@ -29,8 +29,9 @@ def indexAllPDFFolders(pdfFolders, indexFolders):
             ]
         else:
             utils.mkdirAndParents(indexSubjectPath)
-        pdfFiles = glob.glob(folder + "/**.pdf", recursive=True)
+        pdfFiles = glob.glob(folder + "/**/*.pdf", recursive=True)
         for pdf in pdfFiles:
+            print(pdf)
             pdfFileName = pdf.split("/")[-1].replace(".pdf", "")
             if pdfFileName not in alreadyIndexedPDFs:
                 indexPDF(pdf, baseUrl, pdfFileName, indexSubjectPath)

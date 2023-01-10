@@ -35,7 +35,7 @@ def searchArticlesForQuery(query, subject=""):
         articleSubject = articlePath.split("/")[-2:-1][0]
         if subject.lower() not in articleSubject.lower() and subject:
             continue
-        articleText = open(articlePath).read().strip()
+        articleText = open(articlePath, errors="ignore").read().strip()
         matchInAricle = searchFilter(articleText)
         if matchInAricle:
             articleUrl = utils.getUrlOfArticle(articlePath)
