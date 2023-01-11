@@ -113,12 +113,12 @@ def sendToAtVoice():
 if __name__ == "__main__":
     args = getCMDArguments()
     ###################################
-    profiler = cProfile.Profile()
-    profiler.enable()
+    # profiler = cProfile.Profile()
+    # profiler.enable()
     articleUrls, articlePaths = searchArticlesForQuery(args.query, args.subject)
-    profiler.disable()
-    stats = pstats.Stats(profiler).sort_stats("cumtime")
-    stats.print_stats()
+    # profiler.disable()
+    # stats = pstats.Stats(profiler).sort_stats("cumtime")
+    # stats.print_stats()
     if args.sort:
         articleUrls = sorted(articleUrls)
 
