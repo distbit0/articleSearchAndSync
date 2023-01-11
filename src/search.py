@@ -7,6 +7,7 @@ import subprocess
 import os
 import shutil
 import re
+import cProfile, pstats
 
 
 def getPDFPathMappings():
@@ -21,8 +22,15 @@ def getPDFPathMappings():
     return pdfToTextFileMap
 
 
+def checkArticleSubject(articlePath, subject):
+    articleSubject = articlePath.split("/")[-2:-1][0]
+    if subject.lower() not in articleSubject.lower() and subject:
+        return False
+    return True
+
+
 def searchArticlesForQuery(query, subject=""):
-    searchFilter = Query(query, ignore_case=True, match_word=False)
+    searchFilter = Query(query, ignore_case=True, match_word=False, ignore_accent=False)
     matchingArticleUrls = []
     matchingArticlePaths = []
     articleFilePattern = getConfig()["articleFilePattern"]
@@ -31,10 +39,10 @@ def searchArticlesForQuery(query, subject=""):
     allArticlesPaths = glob.glob(articlePathPattern, recursive=True)
     textToPdfFileMap = getPDFPathMappings()
     allArticlesPaths.extend(textToPdfFileMap)
-    for articlePath in allArticlesPaths:
-        articleSubject = articlePath.split("/")[-2:-1][0]
-        if subject.lower() not in articleSubject.lower() and subject:
+    for i, articlePath in enumerate(allArticlesPaths):
+        if not checkArticleSubject(articlePath, subject):
             continue
+
         articleText = open(articlePath, errors="ignore").read().strip()
         matchInAricle = searchFilter(articleText)
         if matchInAricle:
@@ -104,8 +112,13 @@ def sendToAtVoice():
 
 if __name__ == "__main__":
     args = getCMDArguments()
+    ###################################
+    profiler = cProfile.Profile()
+    profiler.enable()
     articleUrls, articlePaths = searchArticlesForQuery(args.query, args.subject)
-
+    profiler.disable()
+    stats = pstats.Stats(profiler).sort_stats("cumtime")
+    stats.print_stats()
     if args.sort:
         articleUrls = sorted(articleUrls)
 
