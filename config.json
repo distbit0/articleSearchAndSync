@@ -1,6 +1,6 @@
 {
     "atVoiceURLTmpFile": "Temp.txt",
-    "atVoiceURLFileFolder": "/home/pimania/Syncs/URLSync/",
+    "atVoiceURLFileFolder": "/home/pimania/Syncs/misc/URLSync/",
     "articleFilePattern": "*/*html",
     "articleFileFolder": "/home/pimania/Syncs/@Voice/",
     "bookmarksFilePath": "/home/pimania/.config/BraveSoftware/Brave-Browser/Default/Bookmarks",
