@@ -1,8 +1,8 @@
 {
     "atVoiceURLTmpFile": "Temp.txt",
     "atVoiceURLFileFolder": "/home/pimania/Syncs/misc/URLSync/",
-    "articleFilePattern": "*/*html",
-    "articleFileFolder": "/home/pimania/Syncs/@Voice/",
+    "articleFilePattern": "**/*html",
+    "articleFileFolder": "/home/pimania/Syncs/Ebooks/",
     "bookmarksFilePath": "/home/pimania/.config/BraveSoftware/Brave-Browser/Default/Bookmarks",
     "invalidBlogSubstrings": [
         "threadreader",

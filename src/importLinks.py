@@ -34,9 +34,9 @@ def calcUrlsToAdd():
 
 
 def addUrlsToFiles(urlsToAdd):
-    articleFileFolder = getConfig()["atVoiceURLFileFolder"]
+    atVoiceURLFileFolder = getConfig()["atVoiceURLFileFolder"]
     for subject in urlsToAdd:
-        with open(articleFileFolder + subject + ".txt", "w") as f:
+        with open(atVoiceURLFileFolder + subject + ".txt", "w") as f:
             f.write("\n".join(urlsToAdd[subject]))
 
 

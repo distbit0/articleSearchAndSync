@@ -33,6 +33,7 @@ def formatUrl(url):
     if "t.co/" in url:
         url = urlexpander.expand(url)
     url = url.replace("medium.com", "scribe.rip").strip()
+    url = url.replace("en.m.wikipedia.org", "en.wikipedia.org").strip()
     url = re.sub(r"\?gi=.*", r"", url)
     url = re.sub(r"\&gi=.*", r"", url)
     return url
