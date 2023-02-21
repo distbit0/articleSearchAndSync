@@ -23,8 +23,8 @@ def getPDFPathMappings():
 
 
 def checkArticleSubject(articlePath, subject):
-    articleSubject = articlePath.split("/")[-2:-1][0]
-    if subject.lower() not in articleSubject.lower() and subject:
+    articlePath = "/".join(articlePath.split("/")[:-1])
+    if subject.lower() not in articlePath.lower() and subject:
         return False
     return True
 
@@ -40,7 +40,8 @@ def searchArticlesForQuery(query, subject=""):
     textToPdfFileMap = getPDFPathMappings()
     allArticlesPaths.extend(textToPdfFileMap)
     for i, articlePath in enumerate(allArticlesPaths):
-        if not checkArticleSubject(articlePath, subject):
+        originalArticlePath = textToPdfFileMap[articlePath] if articlePath in textToPdfFileMap else articlePath
+        if not checkArticleSubject(originalArticlePath, subject):
             continue
 
         articleText = open(articlePath, errors="ignore").read().strip()
@@ -49,14 +50,14 @@ def searchArticlesForQuery(query, subject=""):
             articleUrl = utils.getUrlOfArticle(articlePath)
             if articleUrl not in matchingArticleUrls:
                 matchingArticleUrls.append(articleUrl)
-                matchingArticlePaths.append(articlePath)
+                matchingArticlePaths.append(originalArticlePath)
 
-    finalPaths = [
-        textToPdfFileMap[path] if path in textToPdfFileMap else path
-        for path in matchingArticlePaths
-    ]  # include actual pdf paths instead of pdf text file paths
+    # finalPaths = [
+    #     textToPdfFileMap[path] if path in textToPdfFileMap else path
+    #     for path in matchingArticlePaths
+    # ]  # include actual pdf paths instead of pdf text file paths
 
-    return matchingArticleUrls, finalPaths
+    return matchingArticleUrls, matchingArticlePaths
 
 
 def getCMDArguments():

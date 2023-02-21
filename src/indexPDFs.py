@@ -3,7 +3,7 @@ from utils import getConfig
 import glob
 import PyPDF2
 import urllib.parse
-
+import traceback
 
 def getPDFFolders():
     pdfFolders = getConfig()["pdfFolders"]
@@ -34,7 +34,7 @@ def indexAllPDFFolders(pdfFolders, indexFolders):
             fullFileName = pdf.split("/")[-1]
             pdfFileName = fullFileName.replace(".pdf", "")
             pathBelowBaseFolder = pdf.split(folder)[-1].replace(fullFileName, "")
-            newBaseUrl = baseUrl + pathBelowBaseFolder[1:]
+            newBaseUrl = baseUrl + pathBelowBaseFolder
 
             if pdfFileName not in alreadyIndexedPDFs:
                 indexPDF(pdf, newBaseUrl, pdfFileName, indexSubjectPath)
@@ -42,12 +42,18 @@ def indexAllPDFFolders(pdfFolders, indexFolders):
 
 def indexPDF(pdf, baseUrl, pdfFileName, indexFolderPath):
     pdfText = []
-    pdfFileObj = open(pdf, "rb")
-    pdfReader = PyPDF2.PdfFileReader(pdfFileObj)
-    for pageNumber in range(0, pdfReader.numPages):
-        pageObj = pdfReader.getPage(pageNumber)
-        pdfText.append(pageObj.extractText())
-    pdfFileObj.close()
+    print("INDEXING: ", pdf)
+    try:
+        pdfFileObj = open(pdf, "rb")
+        pdfReader = PyPDF2.PdfFileReader(pdfFileObj)
+        for pageNumber in range(0, pdfReader.numPages):
+            pageObj = pdfReader.getPage(pageNumber)
+            pdfText.append(pageObj.extractText())
+        pdfFileObj.close()
+    except PyPDF2.errors.PdfReadError:
+        traceback.print_exc()
+        print("Error in pdf: ", pdf)
+        return
     urlString = (
         "Snapshot-Content-Location: "
         + baseUrl
