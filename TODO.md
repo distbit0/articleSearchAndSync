@@ -9,3 +9,5 @@
 - [ ] Rename articles in either read rlst file or readDownload folder as filename-READ
   - [ ] Share unread version of ebooks folder to phone
 - [ ] create script to assist in categorising files to correct folders
+- [ ] allow specifying subject as a regex/substring of the file path
+- [ ]
