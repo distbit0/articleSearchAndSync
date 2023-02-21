@@ -34,7 +34,7 @@ def indexAllPDFFolders(pdfFolders, indexFolders):
             fullFileName = pdf.split("/")[-1]
             pdfFileName = fullFileName.replace(".pdf", "")
             pathBelowBaseFolder = pdf.split(folder)[-1].replace(fullFileName, "")
-            newBaseUrl = baseUrl + pathBelowBaseFolder
+            newBaseUrl = baseUrl.strip("/") + pathBelowBaseFolder
 
             if pdfFileName not in alreadyIndexedPDFs:
                 indexPDF(pdf, newBaseUrl, pdfFileName, indexSubjectPath)

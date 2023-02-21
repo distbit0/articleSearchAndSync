@@ -24,9 +24,9 @@
         "Snapshot-Content-Location: (.*)\n"
     ],
     "pdfFolders": {
-        "/home/pimania/Syncs/Ebooks/": {
-            "pdfBaseURL": "http://192.168.0.28:8887/",
-            "subject": "Ebooks"
+        "/home/pimania/Syncs/Ebooks/Decentralised Finance": {
+            "pdfBaseURL": "http://192.168.0.28:8887/Decentralised%20Finance/",
+            "subject": "Defi"
         }
     }
 }
