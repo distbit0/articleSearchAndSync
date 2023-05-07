@@ -4,6 +4,21 @@ import urlexpander
 from os import path
 import json
 from pathlib import Path
+import os
+
+
+def delete_files_with_name(folder, file_name):
+    # Find all files with the file name in the folder using glob
+    searchString = os.path.join(folder, "**", file_name)
+    matching_files = glob.glob(searchString, recursive=True)
+
+    # Delete all found files
+    for f in matching_files:
+        try:
+            os.remove(f)
+            print(f"Deleted {f}")
+        except OSError as e:
+            print(f"Error deleting {f}: {e}")
 
 
 def makeDiscoursePrintable(url):
@@ -50,8 +65,8 @@ def getUrlOfArticle(articleFilePath):
                 extractedUrl = formatUrl(match.group(1).strip())
                 break
 
-        if not extractedUrl:
-            extractedUrl = articleFilePath
+        # if not extractedUrl:
+        #     extractedUrl = articleFilePath
 
     return extractedUrl
 
@@ -62,7 +77,7 @@ def getUrlsInLists(subject=""):
     articleFileFolder = getConfig()["articleFileFolder"]
     articlePathPattern = articleFileFolder + articleFilePattern
     for f in glob.glob(articlePathPattern, recursive=True):
-        articleSubject = f.split("/")[-2:-1][0]
+        articleSubject = str(f)
         if subject.lower() not in articleSubject.lower() and subject:
             continue
         extractedUrls.append(getUrlOfArticle(f))
@@ -109,7 +124,7 @@ def removeDupeUrlsInFile(urlFile):
 
 def getBlogFromUrl(url):
     if "https://scribe.rip" in url and url.count("/") < 4:
-        print(url)
+        pass
     if "gist.github.com" in url:
         matches = re.search(r"(https:\/\/gist.github.com\/.*)\/", url)
     elif "https://scribe.rip" in url:

@@ -48,14 +48,9 @@ def searchArticlesForQuery(query, subject=""):
         matchInAricle = searchFilter(articleText)
         if matchInAricle:
             articleUrl = utils.getUrlOfArticle(articlePath)
-            if articleUrl not in matchingArticleUrls:
+            if articleUrl not in matchingArticleUrls and articleUrl:
                 matchingArticleUrls.append(articleUrl)
                 matchingArticlePaths.append(originalArticlePath)
-
-    # finalPaths = [
-    #     textToPdfFileMap[path] if path in textToPdfFileMap else path
-    #     for path in matchingArticlePaths
-    # ]  # include actual pdf paths instead of pdf text file paths
 
     return matchingArticleUrls, matchingArticlePaths
 

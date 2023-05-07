@@ -2,5 +2,6 @@
 - [ ] convert threadreaderapp articles into twitter convo articles
 - [ ] Rename articles in either read rlst file or readDownload folder as filename-READ
   - [ ] Share unread version of ebooks folder to phone
-- [ ] create script to assist in categorising files to correct folders
-- [x] allow specifying subject as a regex/substring of the file path
+- [ ] auto mark read articles
+- [ ] add list of urls of articles to each folder
+- [ ] 

@@ -40,7 +40,19 @@ def addUrlsToFiles(urlsToAdd):
             f.write("\n".join(urlsToAdd[subject]))
 
 
+def deleteFilesMarkedToDelete():
+    atVoiceFolder = getConfig()["atVoiceFolderPath"]
+    articleFileFolder = getConfig()["articleFileFolder"]
+    markedAsDeletedFile = atVoiceFolder + "/.config/marked as deleted.rlst"
+    markedAsDeletedText = open(markedAsDeletedFile).read().strip()
+    markedAsDeletedFiles = markedAsDeletedText.split("\n:")[-1].split("\n")[1:]
+    for file_path in markedAsDeletedFiles:
+        fileName = file_path.split("/")[-1]
+        utils.delete_files_with_name(articleFileFolder, fileName)
+
+
 if __name__ == "__main__":
+    deleteFilesMarkedToDelete()
     extractedUrls = utils.getUrlsInLists()
     utils.addUrlToUrlFile(
         extractedUrls, utils.getAbsPath("../storage/alreadyAddedArticles.txt")

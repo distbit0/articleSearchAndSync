@@ -1,6 +1,6 @@
 import utils
 
-subject = "_Ethereum"
+subject = "machine and human"
 
 
 def getBlogs(subject):

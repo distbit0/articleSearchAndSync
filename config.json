@@ -4,6 +4,7 @@
     "articleFilePattern": "**/*html",
     "articleFileFolder": "/home/pimania/Syncs/Ebooks/",
     "bookmarksFilePath": "/home/pimania/.config/BraveSoftware/Brave-Browser/Default/Bookmarks",
+    "atVoiceFolderPath": "/home/pimania/Syncs/@Voice",
     "invalidBlogSubstrings": [
         "threadreader",
         "hackmd.io",
