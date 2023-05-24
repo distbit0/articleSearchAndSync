@@ -122,7 +122,12 @@ def removeDupeUrlsInFile(urlFile):
             allUrlsFile.write(url + "\n")
 
 
+def getTwitterAccountFromTweet(tweetId):
+    pass
+
+
 def getBlogFromUrl(url):
+    url = url.replace("nitter.com", "twitter.com")
     if "https://scribe.rip" in url and url.count("/") < 4:
         pass
     if "gist.github.com" in url:
@@ -136,14 +141,26 @@ def getBlogFromUrl(url):
     elif ".medium.com" in url:
         matches = re.search(r"(https:\/\/.*\.medium.com\/)", url)
     elif "https://mirror.xyz" in url:
-        matches = re.search(r"(https:\/\/mirror.xyz\/.*?)\/", url + "/")
+        matches = re.search(r"(https:\/\/mirror.xyz\/.*?)", url)
     elif "https://write.as" in url:
-        matches = re.search(r"(https:\/\/write.as\/.*?)\/", url + "/")
+        matches = re.search(r"(https:\/\/write.as\/.*?)", url)
+    elif "twitter.com" in url and "/status/" in url:
+        url = url.strip("/")
+        matches = re.search(r"(https:\/\/twitter.com\/.*?)\/status\/.*", url)
+    elif "twitter.com" in url and "/status/" not in url:
+        url = url.strip("/")
+        matches = re.search(r"(https:\/\/twitter.com\/.*)", url)
+    # elif "threadreaderapp" in url:
+    #     tweetId = re.search(r"https:\/\/threadreaderapp.com\/thread\/(.*?).html", url)
+    #     if tweetId:
+    #         twitterAccount = getTwitterAccountFromTweet(tweetId.group(1))
+    #         twitterAccountUrl = "https://twitter.com/" + twitterAccount
+    #         matches = re.search(r"(.*)", twitterAccountUrl)
     else:
-        matches = re.search(r"^(?:http[s]*://[^\/]+)", url)
+        matches = re.search(r"^(http[s]*:\/\/[^\/]+)", url)
 
     if matches:
-        blog = matches.group(0).strip()
+        blog = matches.group(1).strip()
     else:
         blog = url
     blog = blog.rstrip("/")

@@ -40,7 +40,11 @@ def searchArticlesForQuery(query, subject=""):
     textToPdfFileMap = getPDFPathMappings()
     allArticlesPaths.extend(textToPdfFileMap)
     for i, articlePath in enumerate(allArticlesPaths):
-        originalArticlePath = textToPdfFileMap[articlePath] if articlePath in textToPdfFileMap else articlePath
+        originalArticlePath = (
+            textToPdfFileMap[articlePath]
+            if articlePath in textToPdfFileMap
+            else articlePath
+        )
         if not checkArticleSubject(originalArticlePath, subject):
             continue
 

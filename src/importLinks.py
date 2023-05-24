@@ -1,6 +1,8 @@
 import json
 import utils
 from utils import getConfig
+import os
+import glob
 
 
 def getBookmarks():
@@ -51,7 +53,31 @@ def deleteFilesMarkedToDelete():
         utils.delete_files_with_name(articleFileFolder, fileName)
 
 
+def updateUrlListFiles(folder_path):
+    # Loop over all subdirectories using os.walk
+    for dirpath, dirs, files in os.walk(folder_path):
+        # Filter out the html and mhtml files
+        html_files = [f for f in files if f.endswith((".html", ".mhtml"))]
+        urls = []
+
+        # If there are html or mhtml files in the directory
+        if html_files:
+            # Loop over each file
+            for file in html_files:
+                # Full file path
+                file_path = os.path.join(dirpath, file)
+                # Get url of file
+                url = utils.getUrlOfArticle(file_path)
+                urls.append(url)
+
+            # Write the urls to a text file in the directory
+            with open(os.path.join(dirpath, "articleUrls.txt"), "w") as f:
+                for url in urls:
+                    f.write(f"{url}\n")
+
+
 if __name__ == "__main__":
+    updateUrlListFiles(getConfig()["articleFileFolder"])
     deleteFilesMarkedToDelete()
     extractedUrls = utils.getUrlsInLists()
     utils.addUrlToUrlFile(

@@ -1,7 +1,0 @@
-- [ ] parse threadreaderapp links using twitter api to return twitter account in list of blogs
-- [ ] convert threadreaderapp articles into twitter convo articles
-- [ ] Rename articles in either read rlst file or readDownload folder as filename-READ
-  - [ ] Share unread version of ebooks folder to phone
-- [ ] auto mark read articles
-- [ ] add list of urls of articles to each folder
-- [ ] 
