@@ -1,6 +1,6 @@
 import utils
 
-subject = "machine and human"
+subject = "decentralised finance"
 
 
 def getBlogs(subject):

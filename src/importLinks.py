@@ -45,11 +45,11 @@ def addUrlsToFiles(urlsToAdd):
 def deleteFilesMarkedToDelete():
     atVoiceFolder = getConfig()["atVoiceFolderPath"]
     articleFileFolder = getConfig()["articleFileFolder"]
-    markedAsDeletedFile = atVoiceFolder + "/.config/marked as deleted.rlst"
+    markedAsDeletedFile = atVoiceFolder + "/.config/_markedAsDeleted.rlst"
     markedAsDeletedText = open(markedAsDeletedFile).read().strip()
     markedAsDeletedFiles = markedAsDeletedText.split("\n:")[-1].split("\n")[1:]
     for file_path in markedAsDeletedFiles:
-        fileName = file_path.split("/")[-1]
+        fileName = file_path.split("/")[-1].split("\t")[0]
         utils.delete_files_with_name(articleFileFolder, fileName)
 
 
