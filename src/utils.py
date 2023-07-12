@@ -7,13 +7,14 @@ from pathlib import Path
 import os
 import snscrape.modules.twitter as sntwitter
 import snscrape
+import shutil
 
 
 def handle_cache(file_name, key, value=None):
     # Load existing cache or initialize an empty cache if the file does not exist
     cache = {}
     if os.path.exists(file_name):
-        with open(file_name, 'r') as f:
+        with open(file_name, "r") as f:
             cache = json.load(f)
 
     if value is None:
@@ -22,7 +23,7 @@ def handle_cache(file_name, key, value=None):
     else:
         # Write value to cache
         cache[key] = value
-        with open(file_name, 'w') as f:
+        with open(file_name, "w") as f:
             json.dump(cache, f)
 
 
@@ -38,6 +39,28 @@ def delete_files_with_name(folder, file_name):
             print(f"Deleted {f}")
         except OSError as e:
             print(f"Error deleting {f}: {e}")
+
+
+def moveFilesWithNameToRootDir(folder, file_name):
+    # Find all files with the file name in the folder using glob
+    searchString = os.path.join(folder, "**", file_name)
+    matching_files = glob.glob(searchString, recursive=True)
+
+    # Move all found files to the root of the directory
+    for f in matching_files:
+        try:
+            # Determine the new file path
+            new_path = os.path.join(folder, os.path.basename(f))
+
+            # # If file with the same name exists at the destination, we delete it before moving.
+            # if os.path.isfile(new_path) and os.path.exists(f):
+            #     print("deleted root file", new_path)
+            # #     os.remove(new_path)
+            # Move the file
+            shutil.move(f, new_path)
+            print(f"Moved {f} to {new_path}")
+        except OSError as e:
+            print(f"Error moving {f}: {e}")
 
 
 def makeDiscoursePrintable(url):
@@ -91,7 +114,7 @@ def getUrlOfArticle(articleFilePath):
 
 
 def getUrlsInLists(subject=""):
-    extractedUrls = []
+    extractedUrls = {}
     articleFilePattern = getConfig()["articleFilePattern"]
     articleFileFolder = getConfig()["articleFileFolder"]
     articlePathPattern = articleFileFolder + articleFilePattern
@@ -99,7 +122,7 @@ def getUrlsInLists(subject=""):
         articleSubject = str(f)
         if subject.lower() not in articleSubject.lower() and subject:
             continue
-        extractedUrls.append(getUrlOfArticle(f))
+        extractedUrls[f] = getUrlOfArticle(f)
     return extractedUrls
 
 
@@ -119,16 +142,16 @@ def removeDupesPreserveOrder(seq):
     return [x for x in seq if not (x in seen or seen_add(x))]
 
 
-def addUrlToUrlFile(urlsOrUrls, urlFile, overwrite=False):
+def addUrlToUrlFile(urlOrUrls, urlFile, overwrite=False):
     mode = "w" if overwrite else "a"
     with open(urlFile, mode) as allUrlsFile:
-        if type(urlsOrUrls) == type([]):
-            for url in urlsOrUrls:
+        if type(urlOrUrls) == type([]):
+            for url in urlOrUrls:
                 url = formatUrl(url)
                 allUrlsFile.write(url + "\n")
         else:
-            urlsOrUrls = formatUrl(urlsOrUrls)
-            allUrlsFile.write(urlsOrUrls + "\n")
+            urlOrUrls = formatUrl(urlOrUrls)
+            allUrlsFile.write(urlOrUrls + "\n")
 
     removeDupeUrlsInFile(urlFile)
 
@@ -146,7 +169,7 @@ def getTwitterAccountFromTweet(tweet_id):
     username = handle_cache(getAbsPath("./../storage/twitter_handles.json"), tweet_id)
     if username != None:
         return username
-    
+
     scraper = sntwitter.TwitterTweetScraper(tweet_id)
 
     # Use the get_items method to get the tweet
@@ -160,7 +183,9 @@ def getTwitterAccountFromTweet(tweet_id):
 
     # Access the 'user' attribute of the tweet, which is a User object,
     # and then access the 'username' attribute of the User object
-    handle_cache(getAbsPath("./../storage/twitter_handles.json"), tweet_id, tweet.user.username)
+    handle_cache(
+        getAbsPath("./../storage/twitter_handles.json"), tweet_id, tweet.user.username
+    )
     return tweet.user.username
 
 

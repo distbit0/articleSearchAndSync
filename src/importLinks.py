@@ -45,6 +45,17 @@ def addUrlsToFiles(urlsToAdd):
 def deleteFilesMarkedToDelete():
     atVoiceFolder = getConfig()["atVoiceFolderPath"]
     articleFileFolder = getConfig()["articleFileFolder"]
+    markedToMoveFile = atVoiceFolder + "/.config/_markedToMove.rlst"
+    markedToMoveText = open(markedToMoveFile).read().strip()
+    markedToMoveFiles = markedToMoveText.split("\n:")[-1].split("\n")[1:]
+    for file_path in markedToMoveFiles:
+        fileName = file_path.split("/")[-1].split("\t")[0]
+        utils.moveFilesWithNameToRootDir(articleFileFolder, fileName)
+
+
+def moveFilesMarkedToMove():
+    atVoiceFolder = getConfig()["atVoiceFolderPath"]
+    articleFileFolder = getConfig()["articleFileFolder"]
     markedAsDeletedFile = atVoiceFolder + "/.config/_markedAsDeleted.rlst"
     markedAsDeletedText = open(markedAsDeletedFile).read().strip()
     markedAsDeletedFiles = markedAsDeletedText.split("\n:")[-1].split("\n")[1:]
@@ -76,12 +87,38 @@ def updateUrlListFiles(folder_path):
                     f.write(f"{url}\n")
 
 
+def deleteDuplicateArticleFiles(urls_to_filenames):
+    # Dictionary to store seen URLs in each directory
+    dir_seen_urls = {}
+
+    for fileName in urls_to_filenames:
+        url = urls_to_filenames[fileName]
+        url = utils.formatUrl(url)
+
+        # Get directory of the file
+        directory = os.path.dirname(fileName)
+
+        if directory not in dir_seen_urls:
+            # If directory is not in the dictionary, add it with the current url
+            dir_seen_urls[directory] = {url}
+        elif url in dir_seen_urls[directory] and url:
+            # If url has been seen in this directory, delete the file
+            print(fileName, url)
+            os.remove(fileName)
+        else:
+            # If url has not been seen in this directory, add it to the set
+            dir_seen_urls[directory].add(url)
+
+
 if __name__ == "__main__":
     updateUrlListFiles(getConfig()["articleFileFolder"])
     deleteFilesMarkedToDelete()
-    extractedUrls = utils.getUrlsInLists()
+    moveFilesMarkedToMove()
+    articlesAndUrls = utils.getUrlsInLists()
+    deleteDuplicateArticleFiles(articlesAndUrls)
     utils.addUrlToUrlFile(
-        extractedUrls, utils.getAbsPath("../storage/alreadyAddedArticles.txt")
+        list(articlesAndUrls.values()),
+        utils.getAbsPath("../storage/alreadyAddedArticles.txt"),
     )
     urlsToAdd = calcUrlsToAdd()
     addUrlsToFiles(urlsToAdd)
