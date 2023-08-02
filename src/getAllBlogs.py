@@ -4,7 +4,7 @@ subject = "decentralised finance"
 
 
 def getBlogs(subject):
-    urls = utils.getUrlsInLists(subject)
+    urls = utils.getUrlsInLists(subject).values()
     blogs = utils.getBlogsFromUrls(urls)
     return blogs
 

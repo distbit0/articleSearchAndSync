@@ -122,7 +122,8 @@ def getUrlsInLists(subject=""):
         articleSubject = str(f)
         if subject.lower() not in articleSubject.lower() and subject:
             continue
-        extractedUrls[f] = getUrlOfArticle(f)
+        url = getUrlOfArticle(f)
+        extractedUrls[f] = url
     return extractedUrls
 
 
