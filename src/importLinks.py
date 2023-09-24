@@ -127,7 +127,7 @@ def calculate_file_hash(file_path):
     return hasher.hexdigest()
 
 
-def find_and_remove_duplicate_files(directory_path):
+def deleteDuplicateFiles(directory_path):
     duplicate_size_files = defaultdict(list)
 
     for root, _, filenames in os.walk(directory_path):
@@ -163,7 +163,7 @@ if __name__ == "__main__":
     moveFilesMarkedToMove()
     articlesAndUrls = utils.getUrlsInLists()
     deleteDuplicateArticleFiles(articlesAndUrls)
-    find_and_remove_duplicate_files(getConfig()["articleFileFolder"])
+    deleteDuplicateFiles(getConfig()["articleFileFolder"])
     utils.addUrlToUrlFile(
         list(articlesAndUrls.values()),
         utils.getAbsPath("../storage/alreadyAddedArticles.txt"),
