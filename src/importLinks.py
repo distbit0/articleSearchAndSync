@@ -145,13 +145,30 @@ def deleteDuplicateFiles(directory_path):
     for unique_key, file_paths in duplicate_size_files.items():
         if len(file_paths) > 1:
             root_files = [
-                path for path in file_paths if os.path.dirname(path) == directory_path
+                path
+                for path in file_paths
+                if os.path.dirname(path).strip("/") == directory_path.strip("/")
             ]
             non_root_files = [
-                path for path in file_paths if os.path.dirname(path) != directory_path
+                path
+                for path in file_paths
+                if os.path.dirname(path).strip("/") != directory_path.strip("/")
             ]
 
-            files_to_remove = root_files if root_files else non_root_files[:-1]
+            if root_files:
+                files_to_remove = (
+                    root_files[:-1] if len(non_root_files) == 0 else root_files
+                )
+            else:
+                files_to_remove = non_root_files[:-1]
+            print(
+                "files_to_remove",
+                files_to_remove,
+                "root files",
+                root_files,
+                "non_root_files",
+                non_root_files,
+            )
             for file_path in files_to_remove:
                 print("removed", file_path)
                 os.remove(file_path)
