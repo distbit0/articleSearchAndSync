@@ -21,7 +21,7 @@
         "\\<\\!\\-\\- Hyperionics-SimpleHtml (.*?)-->",
         "Snapshot-Content-Location: (.*)\n"
     ],
-    "pdfFolders": {
+    "pdfSourceFolders": {
         "/home/pimania/Syncs/Ebooks/Decentralised Finance": {
             "pdfBaseURL": "http://192.168.0.28:8887/Decentralised%20Finance/",
             "subject": "Defi"
@@ -29,7 +29,6 @@
     },
     "PDFSourceFolders": [
         "/home/pimania/Downloads",
-        "/home/pimania/Syncs/Downloads",
         "/home/pimania/Syncs/@Voice/_articleDownload"
     ],
     "docFormatsToMove": [

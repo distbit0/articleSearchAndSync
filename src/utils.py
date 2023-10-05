@@ -249,7 +249,7 @@ def getBlogsFromUrls(urls):
 
 def getInvalidBlogSubstrings():
     invalidBlogSubstrings = getConfig()["invalidBlogSubstrings"]
-    pdfFolders = getConfig()["pdfFolders"]
+    pdfFolders = getConfig()["pdfSourceFolders"]
     pdfExcludedBlogs = []
     for folder in pdfFolders.values():
         pdfExcludedBlogs.append(getBlogFromUrl(folder["pdfBaseURL"]))

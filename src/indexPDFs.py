@@ -5,8 +5,9 @@ import PyPDF2
 import urllib.parse
 import traceback
 
+
 def getPDFFolders():
-    pdfFolders = getConfig()["pdfFolders"]
+    pdfFolders = getConfig()["pdfSourceFolders"]
     indexFolders = [
         folder.split("/")[-1]
         for folder in glob.glob(
