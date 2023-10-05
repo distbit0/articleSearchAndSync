@@ -92,7 +92,7 @@ def getCMDArguments():
     parser.add_argument(
         "-s",
         action="store_true",
-        help="Sort article URLs alphabetically",
+        help="Sort article urls alphabetically",
         dest="sort",
     )
     args = parser.parse_args()
