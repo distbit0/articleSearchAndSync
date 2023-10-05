@@ -85,8 +85,3 @@ def moveDocsToTargetFolder():
         docName = docPath.split("/")[-1]
         print("Moving", docName, "to", targetFolder, " derived from", docPath)
         shutil.move(docPath, targetFolder + "/" + docName)
-
-
-if __name__ == "__main__":
-    retitleAllPDFs()
-    moveDocsToTargetFolder()

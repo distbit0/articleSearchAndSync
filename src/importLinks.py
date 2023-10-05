@@ -4,6 +4,7 @@ from utils import getConfig
 import os
 from collections import defaultdict
 import hashlib
+import reTitlePDFs
 
 
 def getBookmarks():
@@ -175,6 +176,8 @@ def deleteDuplicateFiles(directory_path):
 
 
 if __name__ == "__main__":
+    reTitlePDFs.retitleAllPDFs()
+    reTitlePDFs.moveDocsToTargetFolder()
     updateUrlListFiles(getConfig()["articleFileFolder"])
     deleteFilesMarkedToDelete()
     moveFilesMarkedToMove()
