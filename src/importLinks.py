@@ -39,9 +39,9 @@ def calcUrlsToAdd():
 
 def addUrlsToFiles(urlsToAdd):
     atVoiceURLFileFolder = getConfig()["atVoiceURLFileFolder"]
-    for subject in urlsToAdd:
-        with open(atVoiceURLFileFolder + subject + ".txt", "w") as f:
-            f.write("\n".join(urlsToAdd[subject]))
+    linkText = "\n".join(["\n".join(urlsToAdd[subject]) for subject in urlsToAdd])
+    with open(atVoiceURLFileFolder + "links" + ".txt", "w") as f:
+        f.write(linkText)
 
 
 def deleteFilesMarkedToDelete():
