@@ -7,7 +7,7 @@ import traceback
 
 
 def getPDFFolders():
-    pdfFolders = getConfig()["pdfSourceFolders"]
+    pdfFolders = getConfig()["pdfSearchFolders"]
     indexFolders = [
         folder.split("/")[-1]
         for folder in glob.glob(

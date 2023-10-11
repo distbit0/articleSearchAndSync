@@ -44,7 +44,7 @@ def addUrlsToFiles(urlsToAdd):
         f.write(linkText)
 
 
-def deleteFilesMarkedToDelete():
+def moveFilesMarkedToMove():
     atVoiceFolder = getConfig()["atVoiceFolderPath"]
     articleFileFolder = getConfig()["articleFileFolder"]
     markedToMoveFile = atVoiceFolder + "/.config/_markedToMove.rlst"
@@ -55,7 +55,7 @@ def deleteFilesMarkedToDelete():
         utils.moveFilesWithNameToRootDir(articleFileFolder, fileName)
 
 
-def moveFilesMarkedToMove():
+def deleteFilesMarkedToDelete():
     atVoiceFolder = getConfig()["atVoiceFolderPath"]
     articleFileFolder = getConfig()["articleFileFolder"]
     markedAsDeletedFile = atVoiceFolder + "/.config/_markedAsDeleted.rlst"

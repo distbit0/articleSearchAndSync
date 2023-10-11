@@ -58,8 +58,9 @@ def moveFilesWithNameToRootDir(folder, file_name):
             #     print("deleted root file", new_path)
             # #     os.remove(new_path)
             # Move the file
-            shutil.move(f, new_path)
-            print(f"Moved {f} to {new_path}")
+            if f != new_path:
+                shutil.move(f, new_path)
+                print(f"Moved {f} to {new_path}")
         except OSError as e:
             print(f"Error moving {f}: {e}")
 
@@ -249,9 +250,9 @@ def getBlogsFromUrls(urls):
 
 def getInvalidBlogSubstrings():
     invalidBlogSubstrings = getConfig()["invalidBlogSubstrings"]
-    pdfFolders = getConfig()["pdfSourceFolders"]
+    pdfSearchFolders = getConfig()["pdfSearchFolders"]
     pdfExcludedBlogs = []
-    for folder in pdfFolders.values():
+    for folder in pdfSearchFolders.values():
         pdfExcludedBlogs.append(getBlogFromUrl(folder["pdfBaseURL"]))
     invalidBlogSubstrings.extend(pdfExcludedBlogs)
 

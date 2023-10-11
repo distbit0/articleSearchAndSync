@@ -65,7 +65,7 @@ def retitlePDFsInFolder(folderPath):
 
 
 def retitleAllPDFs():
-    PDFFolders = getConfig()["PDFSourceFolders"]
+    PDFFolders = getConfig()["pdfSourceFolders"]
     for folderPath in PDFFolders:
         retitlePDFsInFolder(folderPath)
 
@@ -74,7 +74,7 @@ def retitleAllPDFs():
 
 def moveDocsToTargetFolder():
     docPaths = []
-    PDFFolders = getConfig()["PDFSourceFolders"]
+    PDFFolders = getConfig()["pdfSourceFolders"]
     docFormatsToMove = getConfig()["docFormatsToMove"]
     targetFolder = getConfig()["articleFileFolder"]
     for folderPath in PDFFolders:
