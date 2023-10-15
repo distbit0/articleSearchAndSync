@@ -19,13 +19,13 @@ def calcUrlsToAdd(onlyRead=False):
     urlsToAdd = {}
 
     if onlyRead:
-        allAddedUrls = utils.getUrlsFromFile(
+        markedAsReadUrls = utils.getUrlsFromFile(
             utils.getAbsPath("../storage/markedAsReadArticles.txt")
         )
-    else:
-        allAddedUrls = utils.getUrlsFromFile(
-            utils.getAbsPath("../storage/alreadyAddedArticles.txt")
-        )
+
+    allAddedUrls = utils.getUrlsFromFile(
+        utils.getAbsPath("../storage/alreadyAddedArticles.txt")
+    )
     bmBar = bookmarks["roots"]["bookmark_bar"]["children"]
     for folder in bmBar:
         if folder["type"] == "folder" and folder["name"] == "@Voice":
@@ -38,8 +38,15 @@ def calcUrlsToAdd(onlyRead=False):
                     url = link["url"]
                     url = utils.formatUrl(url)
                     url = utils.makeDiscoursePrintable(url)
-                    if url.lower() not in "\n".join(allAddedUrls).lower():
-                        urlsToAdd[subject].append(url)
+                    if onlyRead:
+                        if (
+                            url.lower() not in "\n".join(markedAsReadUrls).lower()
+                            and url.lower() in "\n".join(allAddedUrls).lower()
+                        ):
+                            urlsToAdd[subject].append(url)
+                    else:
+                        if url.lower() not in "\n".join(allAddedUrls).lower():
+                            urlsToAdd[subject].append(url)
 
     return urlsToAdd
 
