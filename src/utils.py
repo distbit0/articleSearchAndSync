@@ -49,15 +49,19 @@ def hideFilesWithName(folder, file_name):
 
     # Delete all found files
     for f in matching_files:
-        fileName = f.split("/")[-1]
-        hiddenFileName = "." + fileName
-        if hiddenFileName == ".":
-            continue
-        hiddenFilePath = f.split("/")[:-1]
-        hiddenFilePath.append(hiddenFileName)
-        hiddenFilePath = "/".join(hiddenFilePath)
-        print("moving", f, "to", hiddenFilePath)
-        shutil.move(f, hiddenFilePath)
+        hideFile(f)
+
+
+def hideFile(f):
+    fileName = f.split("/")[-1]
+    hiddenFileName = "." + fileName
+    if hiddenFileName == "." or fileName[0] == ".":
+        return
+    hiddenFilePath = f.split("/")[:-1]
+    hiddenFilePath.append(hiddenFileName)
+    hiddenFilePath = "/".join(hiddenFilePath)
+    print("HIDING", f, "  >>  ", hiddenFilePath)
+    shutil.move(f, hiddenFilePath)
 
 
 def moveFilesWithNameToRootDir(folder, file_name):
@@ -133,10 +137,10 @@ def getUrlOfArticle(articleFilePath):
     return extractedUrl
 
 
-def getUrlsInLists(subject=""):
+def getUrlsInLists(folder="", subject="", pattern=""):
     extractedUrls = {}
-    articleFilePattern = getConfig()["articleFilePattern"]
-    articleFileFolder = getConfig()["articleFileFolder"]
+    articleFilePattern = getConfig()["articleFilePattern"] if pattern == "" else pattern
+    articleFileFolder = getConfig()["articleFileFolder"] if folder == "" else folder
     articlePathPattern = articleFileFolder + articleFilePattern
     for f in glob.glob(articlePathPattern, recursive=True):
         articleSubject = str(f)
@@ -145,6 +149,15 @@ def getUrlsInLists(subject=""):
         url = getUrlOfArticle(f)
         extractedUrls[f] = url
     return extractedUrls
+
+
+def markArticlesWithUrlsAsRead(readUrls, articleFolder):
+    articleUrls = getUrlsInLists(folder=articleFolder)
+    articleUrls = {v: k for k, v in articleUrls.items()}
+    for url in readUrls:
+        if url in articleUrls:
+            hideFile(articleUrls[url])
+        addUrlToUrlFile(url, getAbsPath("./../storage/markedAsReadArticles.txt"))
 
 
 def getUrlsFromFile(urlFile):
@@ -304,10 +317,6 @@ def getConfig():
         config = json.loads(config.read())
 
     return config
-
-
-def mkdirAndParents(directory):
-    Path(directory).mkdir(parents=True, exist_ok=True)
 
 
 def get_id_type(paper_id):

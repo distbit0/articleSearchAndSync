@@ -14,18 +14,25 @@ def getBookmarks():
         return bookmarks
 
 
-def calcUrlsToAdd():
+def calcUrlsToAdd(onlyRead=False):
     bookmarks = getBookmarks()
     urlsToAdd = {}
 
-    allAddedUrls = utils.getUrlsFromFile(
-        utils.getAbsPath("../storage/alreadyAddedArticles.txt")
-    )
+    if onlyRead:
+        allAddedUrls = utils.getUrlsFromFile(
+            utils.getAbsPath("../storage/markedAsReadArticles.txt")
+        )
+    else:
+        allAddedUrls = utils.getUrlsFromFile(
+            utils.getAbsPath("../storage/alreadyAddedArticles.txt")
+        )
     bmBar = bookmarks["roots"]["bookmark_bar"]["children"]
     for folder in bmBar:
         if folder["type"] == "folder" and folder["name"] == "@Voice":
             for folder in folder["children"]:
                 subject = folder["name"]
+                if onlyRead and subject.lower() == "unread":
+                    continue
                 urlsToAdd[subject] = []
                 for link in folder["children"]:
                     url = link["url"]
@@ -37,7 +44,7 @@ def calcUrlsToAdd():
     return urlsToAdd
 
 
-def addUrlsToFiles(urlsToAdd):
+def generateUrlImportFilesForAtVoice(urlsToAdd):
     atVoiceURLFileFolder = getConfig()["atVoiceURLFileFolder"]
     linkText = "\n".join(["\n".join(urlsToAdd[subject]) for subject in urlsToAdd])
     with open(atVoiceURLFileFolder + "links" + ".txt", "w") as f:
@@ -53,6 +60,11 @@ def moveFilesMarkedToMove():
     for file_path in markedToMoveFiles:
         fileName = file_path.split("/")[-1].split("\t")[0]
         utils.moveFilesWithNameToRootDir(articleFileFolder, fileName)
+
+
+def markReadBookmarksAsRead():
+    readUrls = calcUrlsToAdd(onlyRead=True)["AlreadyRead"]
+    utils.markArticlesWithUrlsAsRead(readUrls, getConfig()["articleFileFolder"])
 
 
 def deleteFilesMarkedToDelete():
@@ -189,12 +201,17 @@ def deleteDuplicateFiles(directory_path):
 
 
 if __name__ == "__main__":
+    # import new documents and give them readable filenames
     reTitlePDFs.retitleAllPDFs()
     reTitlePDFs.moveDocsToTargetFolder()
+    # update urlList files
     updateUrlListFiles(getConfig()["articleFileFolder"])
+    # act on requests to delete/move/hide articles from atVoice app
     deleteFilesMarkedToDelete()
     moveFilesMarkedToMove()
     hideArticlesMarkedAsRead()
+    markReadBookmarksAsRead()
+    # delete duplicate files
     articlesAndUrls = utils.getUrlsInLists()
     deleteDuplicateArticleFiles(articlesAndUrls)
     deleteDuplicateFiles(getConfig()["articleFileFolder"])
@@ -203,4 +220,4 @@ if __name__ == "__main__":
         utils.getAbsPath("../storage/alreadyAddedArticles.txt"),
     )
     urlsToAdd = calcUrlsToAdd()
-    addUrlsToFiles(urlsToAdd)
+    generateUrlImportFilesForAtVoice(urlsToAdd)
