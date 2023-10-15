@@ -66,6 +66,19 @@ def deleteFilesMarkedToDelete():
         utils.delete_files_with_name(articleFileFolder, fileName)
 
 
+def hideArticlesMarkedAsRead():
+    atVoiceFolder = getConfig()["atVoiceFolderPath"]
+    articleFileFolder = getConfig()["articleFileFolder"]
+    markedAsDeletedFile = atVoiceFolder + "/.config/_markedAsRead.rlst"
+    markedAsDeletedText = open(markedAsDeletedFile).read().strip()
+    markedAsDeletedFiles = markedAsDeletedText.split("\n:")[-1].split("\n")[1:]
+    for file_path in markedAsDeletedFiles:
+        if "articleUrls" in file_path:
+            continue
+        fileName = file_path.split("\t")[0].split("/")[-1]
+        utils.hideFilesWithName(articleFileFolder, fileName)
+
+
 def updateUrlListFiles(folder_path):
     # Loop over all subdirectories using os.walk
     for dirpath, dirs, files in os.walk(folder_path):
@@ -181,6 +194,7 @@ if __name__ == "__main__":
     updateUrlListFiles(getConfig()["articleFileFolder"])
     deleteFilesMarkedToDelete()
     moveFilesMarkedToMove()
+    hideArticlesMarkedAsRead()
     articlesAndUrls = utils.getUrlsInLists()
     deleteDuplicateArticleFiles(articlesAndUrls)
     deleteDuplicateFiles(getConfig()["articleFileFolder"])

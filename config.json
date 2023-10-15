@@ -1,10 +1,10 @@
 {
     "atVoiceURLTmpFile": "Temp.txt",
-    "atVoiceURLFileFolder": "/home/pimania/Syncs/@Voice/.config/",
+    "atVoiceURLFileFolder": "/home/pimania/atVoice/.config/",
     "articleFilePattern": "**/*html",
-    "articleFileFolder": "/home/pimania/Syncs/Ebooks/",
+    "articleFileFolder": "/home/pimania/ebooks/",
     "bookmarksFilePath": "/home/pimania/.config/BraveSoftware/Brave-Browser/Default/Bookmarks",
-    "atVoiceFolderPath": "/home/pimania/Syncs/@Voice",
+    "atVoiceFolderPath": "/home/pimania/atVoice",
     "invalidBlogSubstrings": [
         "hackmd.io",
         "https://github.com/",
@@ -22,14 +22,14 @@
         "Snapshot-Content-Location: (.*)\n"
     ],
     "pdfSearchFolders": {
-        "/home/pimania/Syncs/Ebooks/Decentralised Finance": {
+        "/home/pimania/Ebooks/Decentralised Finance": {
             "pdfBaseURL": "http://192.168.0.28:8887/Decentralised%20Finance/",
             "subject": "Defi"
         }
     },
     "pdfSourceFolders": [
         "/home/pimania/Downloads",
-        "/home/pimania/Syncs/@Voice/_articleDownload"
+        "/home/pimania/atVoice/_articleDownload"
     ],
     "docFormatsToMove": [
         "pdf",
