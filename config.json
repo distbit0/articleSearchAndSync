@@ -3,7 +3,7 @@
     "atVoiceURLFileFolder": "/home/pimania/atVoice/.config/",
     "articleFilePattern": "**/*html",
     "articleFileFolder": "/home/pimania/ebooks/",
-    "bookmarksFilePath": "/home/pimania/.config/BraveSoftware/Brave-Browser/Default/Bookmarks",
+    "bookmarksFilePath": "/home/pimania/miscSyncs/bookmarks/Bookmarks",
     "atVoiceFolderPath": "/home/pimania/atVoice",
     "invalidBlogSubstrings": [
         "hackmd.io",
