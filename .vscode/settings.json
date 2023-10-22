@@ -2,7 +2,6 @@
     "[python]": {
         "editor.defaultFormatter": "ms-python.black-formatter"
     },
-    "python.formatting.provider": "none",
     "python.analysis.extraPaths": [
         "/home/pimania/.vscode/extensions/continue.continue-0.1.26-linux-x64",
         "/home/pimania/.vscode/extensions/continue.continue-0.1.27-linux-x64",
@@ -16,5 +15,6 @@
         "/home/pimania/.vscode/extensions/continue.continue-0.1.28-linux-x64",
         "/home/pimania/.vscode/extensions/continue.continue-0.1.29-linux-x64",
         "/home/pimania/.vscode/extensions/continue.continue-0.0.412-linux-x64"
-    ]
+    ],
+    "editor.parameterHints.enabled": false
 }

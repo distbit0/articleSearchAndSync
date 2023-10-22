@@ -14,6 +14,7 @@ def getPDFFolders():
             utils.getAbsPath("../storage/indexedPDFs") + "/**", recursive=True
         )
     ]
+    print("INDEX FOLDERS: ", indexFolders, "\nPDF FOLDERS: ", pdfFolders)
     return pdfFolders, indexFolders
 
 
@@ -46,10 +47,10 @@ def indexPDF(pdf, baseUrl, pdfFileName, indexFolderPath):
     print("INDEXING: ", pdf)
     try:
         pdfFileObj = open(pdf, "rb")
-        pdfReader = PyPDF2.PdfFileReader(pdfFileObj)
-        for pageNumber in range(0, pdfReader.numPages):
-            pageObj = pdfReader.getPage(pageNumber)
-            pdfText.append(pageObj.extractText())
+        pdfReader = PyPDF2.PdfReader(pdfFileObj)
+        for pageNumber in range(0, len(pdfReader.pages)):
+            pageObj = pdfReader.pages[pageNumber]
+            pdfText.append(pageObj.extract_text())
         pdfFileObj.close()
     except PyPDF2.errors.PdfReadError:
         traceback.print_exc()
