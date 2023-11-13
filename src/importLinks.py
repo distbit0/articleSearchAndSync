@@ -54,6 +54,7 @@ def calcUrlsToAdd(onlyRead=False):
 def generateUrlImportFilesForAtVoice(urlsToAdd):
     atVoiceURLFileFolder = getConfig()["atVoiceURLFileFolder"]
     linkText = "\n".join(["\n".join(urlsToAdd[subject]) for subject in urlsToAdd])
+    print(atVoiceURLFileFolder + "links" + ".txt")
     with open(atVoiceURLFileFolder + "links" + ".txt", "w") as f:
         f.write(linkText)
 

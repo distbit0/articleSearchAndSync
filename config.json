@@ -16,6 +16,7 @@
         "gitbook",
         "reddit.com"
     ],
+    "openaiApiKey": "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",
     "urlPatterns": [
         "\\<\\!\\-\\- Hyperionics-OriginHtml(.*?)-->",
         "\\<\\!\\-\\- Hyperionics-SimpleHtml (.*?)-->",

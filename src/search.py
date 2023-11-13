@@ -1,13 +1,15 @@
 from utils import getConfig
 from eldar import Query
+from markdownify import markdownify as md
 import glob
 import utils
 import argparse
 import subprocess
-import os
 import shutil
 import re
-import cProfile, pstats
+import os
+
+# import semanticSearch
 
 
 def getPDFPathMappings():
@@ -110,7 +112,7 @@ def sendToAtVoice():
     print("\n\nSent article URLs to @Voice (" + atVoiceUrlOutputFile + ")")
 
 
-if __name__ == "__main__":
+def main():
     args = getCMDArguments()
     ###################################
     # profiler = cProfile.Profile()
@@ -146,3 +148,7 @@ if __name__ == "__main__":
 
     if args.atVoice:
         sendToAtVoice()
+
+
+if __name__ == "__main__":
+    main()
