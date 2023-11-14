@@ -16,7 +16,7 @@
         "gitbook",
         "reddit.com"
     ],
-    "openaiApiKey": "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",
+    "openaiApiKey": "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",
     "urlPatterns": [
         "\\<\\!\\-\\- Hyperionics-OriginHtml(.*?)-->",
         "\\<\\!\\-\\- Hyperionics-SimpleHtml (.*?)-->",
@@ -46,5 +46,6 @@
         "?",
         "/",
         ","
-    ]
+    ],
+    "maxChunkWordCount": 300
 }
