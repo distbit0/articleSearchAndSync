@@ -9,8 +9,9 @@ from inscriptis import get_text
 import search
 import tiktoken
 
-### todo: add substring matching after semantic matching
+### todo: add substring matching after semantic matching. i.e. allow a word to be enforced via being quoted in the search querys
 #  support pdfs, epub and mobi without including html or pdf metadata and tags
+### why isn't config file able to be excluded from articlesearchandsync...?
 
 
 client = chromadb.PersistentClient(path=utils.getAbsPath("../data/chroma"))
@@ -133,14 +134,13 @@ def find_similar_articles(query, nResults=20):
         query_embeddings=query_vector,
         n_results=nResults * 50,
     )
-    fileNames = set()
 
     # Sort the result ids by distance in ascending order
     sorted_ids = sorted(
         results["ids"][0],
         key=lambda x: results["distances"][0][results["ids"][0].index(x)],
     )
-
+    fileNames = set()
     for id in sorted_ids:
         # Split the id to get the actual id
         fileName = id.split("---++---")[0]
