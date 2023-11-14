@@ -8,17 +8,22 @@ import chromadb
 from inscriptis import get_text
 import search
 import tiktoken
+import openai
+import time
 
 ### todo: add substring matching after semantic matching. i.e. allow a word to be enforced via being quoted in the search querys
-#  support pdfs, epub and mobi without including html or pdf metadata and tags
-### why isn't config file able to be excluded from articlesearchandsync...?
+##### kind of like how google search works
+## exclude chunks which contain no or very low english content
+## perhaps only chunk on double new line
+## display % of articles processed so far
+#### remove data folder from git history
 
-
-client = chromadb.PersistentClient(path=utils.getAbsPath("../data/chroma"))
+modelName = "text-embedding-ada-002"
+client = chromadb.PersistentClient(path=utils.getAbsPath("../storage/chroma"))
 openai_ef = chromadb.utils.embedding_functions.OpenAIEmbeddingFunction(
-    api_key=getConfig()["openaiApiKey"], model_name="text-embedding-ada-002"
+    api_key=getConfig()["openaiApiKey"], model_name=modelName
 )
-tokenEncoding = tiktoken.encoding_for_model("text-embedding-ada-002")
+tokenEncoding = tiktoken.encoding_for_model(modelName)
 
 
 def chunkText(input_string, max_length):
@@ -59,25 +64,8 @@ def html_to_markdown(html_content):
     return text
 
 
-def create_openai_embeddings(file_path):
-    # Load the OpenAIEmbeddings class
-
-    # Read the contents of the file
-    with open(file_path, "r") as file:
-        content = file.read()
-
-    # Convert HTML to text
-    if "htm" in file_path.split(".")[-1]:
-        content = html_to_markdown(content)
-
-    # Split the content into 100-word chunks
-    chunks = chunkText(content, getConfig()["maxChunkWordCount"])
-
-    embeddings = openai_ef(chunks)
-    return embeddings
-
-
-def read_processed_files(processed_files_path):
+def read_processed_files():
+    processed_files_path = utils.getAbsPath("../storage/embeddedFileNames.txt")
     if not os.path.exists(processed_files_path):
         return set()
 
@@ -86,40 +74,88 @@ def read_processed_files(processed_files_path):
     return processed_files
 
 
-def update_processed_files(processed_files_path, file_name):
+def update_processed_files(file_name):
+    processed_files_path = utils.getAbsPath("../storage/embeddedFileNames.txt")
     with open(utils.getAbsPath(processed_files_path), "a") as file:
         file.write(file_name + "\n")
 
 
+def process_batch(batch_chunks, collection):
+    chunks = [chunk[2] for chunk in batch_chunks]
+
+    while True:
+        try:
+            batch_embeddings = openai_ef(chunks)
+        except openai.error.RateLimitError as e:
+            print(e)
+            print("Rate limit reached. Waiting 10 seconds...")
+            time.sleep(10)
+        else:
+            break
+
+    current_file_name = None
+    ids = []
+    embeddings = []
+
+    for chunk_info, embedding in zip(batch_chunks, batch_embeddings):
+        file_name, chunk_id, chunk = chunk_info
+        if file_name != current_file_name:
+            if current_file_name is not None:
+                collection.upsert(ids=ids, embeddings=embeddings)
+                update_processed_files(current_file_name)
+
+            current_file_name = file_name
+            ids = []
+            embeddings = []
+
+        ids.append(f"{file_name}---++---{chunk_id}")
+        embeddings.append(embedding)
+
+    if current_file_name is not None:
+        collection.upsert(ids=ids, embeddings=embeddings)
+        update_processed_files(current_file_name)
+
+
 def store_embeddings(file_paths):
-    try:
-        client.delete_collection(name="articles")
-    except:
-        pass
+    # try:
+    #     client.delete_collection(name="articles")
+    # except:
+    #     pass
     collection = client.get_or_create_collection(
         name="articles", embedding_function=openai_ef
     )
-    processed_files_path = utils.getAbsPath("../data/embeddedFileNames.txt")
-    processed_files = read_processed_files(processed_files_path)
+    processed_files = read_processed_files()
 
-    for file_path in file_paths[:25]:
-        ids = []
+    batch_size = 2000
+    batch_chunks = []
+
+    for file_path in file_paths:
         file_name = os.path.basename(file_path)
         if file_name in processed_files:
-            pass  # continue  # Skip already processed files
+            print(f"Skipping {file_name}")
+            continue
+        print(f"Processing {file_name}")
+        with open(file_path, "r") as file:
+            try:
+                content = file.read()
+            except:
+                print("Error reading file", file_path)
+                continue
 
-        print(file_path)
-        embeddings = create_openai_embeddings(file_path)
+        if "htm" in file_path.split(".")[-1]:
+            content = html_to_markdown(content)
 
-        # Store each embedding in Qdrant, linking them to the file name
+        chunks = chunkText(content, getConfig()["maxChunkWordCount"])
 
-        for i, embedding in enumerate(embeddings):
-            ids.append(file_name + "---++---" + str(i))
+        for i, chunk in enumerate(chunks):
+            batch_chunks.append((file_name, i, chunk))
 
-        collection.upsert(ids=ids, embeddings=embeddings)
+            if len(batch_chunks) >= batch_size:
+                process_batch(batch_chunks, collection)
+                batch_chunks = []
 
-        # Update the list of processed files
-        update_processed_files(processed_files_path, file_name)
+    if batch_chunks:
+        process_batch(batch_chunks, collection)
 
 
 def find_similar_articles(query, nResults=20):
@@ -163,7 +199,7 @@ def test():
     textToPdfFileMap = search.getPDFPathMappings()
     allArticlesPaths.extend(textToPdfFileMap)
     # store_embeddings(allArticlesPaths)
-    print(find_similar_articles("perpetual swaps", 10))
+    print(find_similar_articles("defi privacy mechanisms", 10))
 
 
 test()
