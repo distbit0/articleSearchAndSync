@@ -15,7 +15,7 @@ import time
 ##### kind of like how google search works
 ## exclude chunks which contain no or very low english content
 ## perhaps only chunk on double new line
-## display % of articles processed so far
+## integrate into search.py and indexPdfs.py
 
 modelName = "text-embedding-ada-002"
 client = chromadb.PersistentClient(path=utils.getAbsPath("../storage/chroma"))
@@ -132,7 +132,7 @@ def store_embeddings(file_paths):
     batch_size = 2000
     batch_chunks = []
 
-    for i, file_path in enumerate(file_paths):
+    for x, file_path in enumerate(file_paths):
         file_name = os.path.basename(file_path)
         print(f"Processing {file_name}")
         with open(file_path, "r") as file:
@@ -151,11 +151,14 @@ def store_embeddings(file_paths):
             batch_chunks.append((file_name, i, chunk))
 
             if len(batch_chunks) >= batch_size:
-                print("PROGRESS: " + str(int(i / len(file_paths * 1000) / 10)) + "%")
+                print(
+                    "PROGRESS: " + str(int((x + 1) * 1000 / len(file_paths)) / 10) + "%"
+                )
                 process_batch(batch_chunks, collection)
                 batch_chunks = []
 
     if batch_chunks:
+        print("PROGRESS: " + str(int((x + 1) * 1000 / len(file_paths)) / 10) + "%")
         process_batch(batch_chunks, collection)
 
 
@@ -199,7 +202,7 @@ def test():
     allArticlesPaths = glob.glob(articlePathPattern, recursive=True)
     textToPdfFileMap = search.getPDFPathMappings()
     allArticlesPaths.extend(textToPdfFileMap)
-    # store_embeddings(allArticlesPaths)
+    store_embeddings(allArticlesPaths)
     print(find_similar_articles("defi privacy mechanisms", 10))
 
 
