@@ -16,7 +16,6 @@ import time
 ## exclude chunks which contain no or very low english content
 ## perhaps only chunk on double new line
 ## display % of articles processed so far
-#### remove data folder from git history
 
 modelName = "text-embedding-ada-002"
 client = chromadb.PersistentClient(path=utils.getAbsPath("../storage/chroma"))
@@ -126,14 +125,15 @@ def store_embeddings(file_paths):
     )
     processed_files = read_processed_files()
 
+    file_paths = [
+        path for path in file_paths if os.path.basename(path) not in processed_files
+    ]
+
     batch_size = 2000
     batch_chunks = []
 
-    for file_path in file_paths:
+    for i, file_path in enumerate(file_paths):
         file_name = os.path.basename(file_path)
-        if file_name in processed_files:
-            print(f"Skipping {file_name}")
-            continue
         print(f"Processing {file_name}")
         with open(file_path, "r") as file:
             try:
@@ -151,6 +151,7 @@ def store_embeddings(file_paths):
             batch_chunks.append((file_name, i, chunk))
 
             if len(batch_chunks) >= batch_size:
+                print("PROGRESS: " + str(int(i / len(file_paths * 1000) / 10)) + "%")
                 process_batch(batch_chunks, collection)
                 batch_chunks = []
 
