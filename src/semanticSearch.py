@@ -70,7 +70,7 @@ def create_openai_embeddings(file_path):
         content = html_to_markdown(content)
 
     # Split the content into 100-word chunks
-    chunks = chunkText(content, 200)
+    chunks = chunkText(content, getConfig()["maxChunkWordCount"])
 
     embeddings = openai_ef(chunks)
     return embeddings
