@@ -10,19 +10,13 @@ import search
 import tiktoken
 import openai
 import time
+import json
 
 ### todo: add substring matching after semantic matching. i.e. allow a word to be enforced via being quoted in the search querys
 ##### kind of like how google search works
 ## exclude chunks which contain no or very low english content
 ## perhaps only chunk on double new line
 ## integrate into search.py and indexPdfs.py
-
-modelName = "text-embedding-ada-002"
-client = chromadb.PersistentClient(path=utils.getAbsPath("../storage/chroma"))
-openai_ef = chromadb.utils.embedding_functions.OpenAIEmbeddingFunction(
-    api_key=getConfig()["openaiApiKey"], model_name=modelName
-)
-tokenEncoding = tiktoken.encoding_for_model(modelName)
 
 
 def chunkText(input_string, max_length):
@@ -64,19 +58,28 @@ def html_to_markdown(html_content):
 
 
 def read_processed_files():
-    processed_files_path = utils.getAbsPath("../storage/embeddedFileNames.txt")
+    processed_files_path = utils.getAbsPath("../storage/embeddedFileNames.json")
     if not os.path.exists(processed_files_path):
-        return set()
+        return {}
 
-    with open(utils.getAbsPath(processed_files_path), "r") as file:
-        processed_files = set(file.read().splitlines())
+    with open(processed_files_path, "r") as file:
+        processed_files = json.load(file)
+
     return processed_files
 
 
-def update_processed_files(file_name):
-    processed_files_path = utils.getAbsPath("../storage/embeddedFileNames.txt")
-    with open(utils.getAbsPath(processed_files_path), "a") as file:
-        file.write(file_name + "\n")
+def update_processed_files(file_name, chunks_for_current_file):
+    processed_files_path = utils.getAbsPath("../storage/embeddedFileNames.json")
+    processed_files = {}
+
+    if os.path.exists(processed_files_path):
+        with open(processed_files_path, "r") as file:
+            processed_files = json.load(file)
+
+    processed_files[file_name] = chunks_for_current_file
+
+    with open(processed_files_path, "w") as file:
+        json.dump(processed_files, file, indent=4)
 
 
 def process_batch(batch_chunks, collection):
@@ -97,11 +100,11 @@ def process_batch(batch_chunks, collection):
     embeddings = []
 
     for chunk_info, embedding in zip(batch_chunks, batch_embeddings):
-        file_name, chunk_id, chunk = chunk_info
+        file_name, chunk_id, chunk, chunksForCurrentFile = chunk_info
         if file_name != current_file_name:
             if current_file_name is not None:
                 collection.upsert(ids=ids, embeddings=embeddings)
-                update_processed_files(current_file_name)
+                update_processed_files(current_file_name, chunksForCurrentFile)
 
             current_file_name = file_name
             ids = []
@@ -112,21 +115,24 @@ def process_batch(batch_chunks, collection):
 
     if current_file_name is not None:
         collection.upsert(ids=ids, embeddings=embeddings)
-        update_processed_files(current_file_name)
+        update_processed_files(current_file_name, chunksForCurrentFile)
 
 
 def store_embeddings(file_paths):
     # try:
-    #     client.delete_collection(name="articles")
+    #     chromaClient.delete_collection(name="articles")
     # except:
     #     pass
-    collection = client.get_or_create_collection(
-        name="articles", embedding_function=openai_ef
+    collection = chromaClient.get_or_create_collection(
+        name="articles",
+        embedding_function=openai_ef,
     )
     processed_files = read_processed_files()
 
     file_paths = [
-        path for path in file_paths if os.path.basename(path) not in processed_files
+        path
+        for path in file_paths
+        if os.path.basename(path) not in list(processed_files.keys())
     ]
 
     batch_size = 2000
@@ -147,8 +153,9 @@ def store_embeddings(file_paths):
 
         chunks = chunkText(content, getConfig()["maxChunkWordCount"])
 
+        chunksForCurrentFile = len(chunks)
         for i, chunk in enumerate(chunks):
-            batch_chunks.append((file_name, i, chunk))
+            batch_chunks.append((file_name, i, chunk, chunksForCurrentFile))
 
             if len(batch_chunks) >= batch_size:
                 print(
@@ -162,11 +169,15 @@ def store_embeddings(file_paths):
         process_batch(batch_chunks, collection)
 
 
-def find_similar_articles(query, nResults=20):
+def find_similar_articles(query, includedFileNames=None, nResults=20):
     similar_articles = []
-    collection = client.get_or_create_collection(
-        name="articles", embedding_function=openai_ef
+    processed_files = read_processed_files()
+
+    collection = chromaClient.get_or_create_collection(
+        name="articles",
+        embedding_function=openai_ef,
     )
+    print("collection length " + str(collection.count()))
     # Embed the query
     query_vector = openai_ef([query])[0]
 
@@ -202,8 +213,54 @@ def test():
     allArticlesPaths = glob.glob(articlePathPattern, recursive=True)
     textToPdfFileMap = search.getPDFPathMappings()
     allArticlesPaths.extend(textToPdfFileMap)
-    store_embeddings(allArticlesPaths)
+    # store_embeddings(allArticlesPaths)
     print(find_similar_articles("defi privacy mechanisms", 10))
 
 
-test()
+if __name__ == "__main__":
+    modelName = "text-embedding-ada-002"
+    chromaClient = chromadb.PersistentClient(path=utils.getAbsPath("../storage/chroma"))
+    openai_ef = chromadb.utils.embedding_functions.OpenAIEmbeddingFunction(
+        api_key=getConfig()["openaiApiKey"], model_name=modelName
+    )
+    tokenEncoding = tiktoken.encoding_for_model(modelName)
+
+    # profiler = cProfile.Profile()
+    # profiler.enable()
+
+    startTime = time.time()
+    test()
+    print("Time taken: " + str(time.time() - startTime))
+
+    # profiler.disable()
+    # stats = pstats.Stats(profiler)
+    # stats.sort_stats(pstats.SortKey.CUMULATIVE)
+    # stats.print_stats(10)
+
+    # collectionOld = chromaClient.get_or_create_collection(
+    #     name="articles", embedding_function=openai_ef
+    # )
+    # collectionNew = chromaClient.get_or_create_collection(
+    #     name="articles2",
+    #     embedding_function=openai_ef,
+    #     metadata={"hnsw:search_ef": 1500},
+    # )
+    # length = collectionOld.count()
+
+    # for i in range(0, length, 100):
+    #     batch = collectionOld.get(
+    #         include=["metadatas", "documents", "embeddings"], limit=100, offset=i
+    #     )
+    #     collectionNew.add(
+    #         ids=batch["ids"],
+    #         documents=batch["documents"],
+    #         metadatas=batch["metadatas"],
+    #         embeddings=batch["embeddings"],
+    #     )
+    #     if i % 1000 == 0:
+    #         print("PROGRESS: " + str(int((i + 1) * 1000 / length) / 10) + "%")
+
+    # time.sleep(100)
+    # print("collection length " + str(collectionNew.count()))
+
+    ## delete the collection2 collection

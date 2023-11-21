@@ -178,6 +178,13 @@ def deleteDuplicateFiles(directory_path):
 
     for unique_key, file_paths in duplicate_size_files.items():
         if len(file_paths) > 1:
+            filesMarkedAsRead = [
+                path for path in file_paths if path.split("/")[-1][0] == "."
+            ]
+            if len(filesMarkedAsRead) < file_paths:
+                for path in filesMarkedAsRead:
+                    file_paths.remove(path)
+
             root_files = [
                 path
                 for path in file_paths
