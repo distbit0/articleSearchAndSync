@@ -124,7 +124,7 @@ def store_embeddings(file_paths):
     # except:
     #     pass
     collection = chromaClient.get_or_create_collection(
-        name="articles",
+        name=COLLECTION,
         embedding_function=openai_ef,
     )
     processed_files = read_processed_files()
@@ -174,7 +174,7 @@ def find_similar_articles(query, includedFileNames=None, nResults=20):
     processed_files = read_processed_files()
 
     collection = chromaClient.get_or_create_collection(
-        name="articles",
+        name=COLLECTION,
         embedding_function=openai_ef,
     )
     print("collection length " + str(collection.count()))
@@ -206,15 +206,54 @@ def find_similar_articles(query, includedFileNames=None, nResults=20):
     return similar_articles
 
 
-def test():
+def embedNewArticles():
     articleFilePattern = getConfig()["articleFilePattern"]
     articleFileFolder = getConfig()["articleFileFolder"]
     articlePathPattern = articleFileFolder + articleFilePattern
     allArticlesPaths = glob.glob(articlePathPattern, recursive=True)
     textToPdfFileMap = search.getPDFPathMappings()
     allArticlesPaths.extend(textToPdfFileMap)
-    # store_embeddings(allArticlesPaths)
-    print(find_similar_articles("defi privacy mechanisms", 10))
+    store_embeddings(allArticlesPaths)
+
+
+def printSearchResults(query, nResults=20):
+    articles = find_similar_articles(query, nResults)
+    maxLength = max([len(article[0]) for article in articles])
+    for article in articles:
+        print(
+            ".".join(article[0].split(".")[:-1])
+            + " " * (maxLength - len(article[0]))
+            + " "
+            + str(article[1])
+        )
+
+
+def duplicateCollection(oldCollectionName, newCollectionName, stepSize):
+    collectionOld = chromaClient.get_or_create_collection(
+        name=oldCollectionName, embedding_function=openai_ef
+    )
+    collectionNew = chromaClient.get_or_create_collection(
+        name=newCollectionName,
+        embedding_function=openai_ef,
+        metadata={"hnsw:search_ef": 1500},
+    )
+    length = collectionOld.count()
+
+    for i in range(0, length, stepSize):
+        batch = collectionOld.get(
+            include=["metadatas", "documents", "embeddings"], limit=stepSize, offset=i
+        )
+        collectionNew.add(
+            ids=batch["ids"],
+            documents=batch["documents"],
+            metadatas=batch["metadatas"],
+            embeddings=batch["embeddings"],
+        )
+        if int(time.time()) % 10 == 0:
+            print("PROGRESS: " + str(int((i + 1) * 1000 / length) / 10) + "%")
+
+    time.sleep(100)
+    print("collection length " + str(collectionNew.count()))
 
 
 if __name__ == "__main__":
@@ -228,39 +267,14 @@ if __name__ == "__main__":
     # profiler = cProfile.Profile()
     # profiler.enable()
 
-    startTime = time.time()
-    test()
-    print("Time taken: " + str(time.time() - startTime))
+    for COLLECTION in ["articles", "articles2"]:
+        startTime = time.time()
+        printSearchResults("oracle-free stablecoin", nResults=20)
+        print("Time taken: " + str(time.time() - startTime))
+
+    # duplicateCollection("articles", "articles2", 400)
 
     # profiler.disable()
     # stats = pstats.Stats(profiler)
     # stats.sort_stats(pstats.SortKey.CUMULATIVE)
     # stats.print_stats(10)
-
-    # collectionOld = chromaClient.get_or_create_collection(
-    #     name="articles", embedding_function=openai_ef
-    # )
-    # collectionNew = chromaClient.get_or_create_collection(
-    #     name="articles2",
-    #     embedding_function=openai_ef,
-    #     metadata={"hnsw:search_ef": 1500},
-    # )
-    # length = collectionOld.count()
-
-    # for i in range(0, length, 100):
-    #     batch = collectionOld.get(
-    #         include=["metadatas", "documents", "embeddings"], limit=100, offset=i
-    #     )
-    #     collectionNew.add(
-    #         ids=batch["ids"],
-    #         documents=batch["documents"],
-    #         metadatas=batch["metadatas"],
-    #         embeddings=batch["embeddings"],
-    #     )
-    #     if i % 1000 == 0:
-    #         print("PROGRESS: " + str(int((i + 1) * 1000 / length) / 10) + "%")
-
-    # time.sleep(100)
-    # print("collection length " + str(collectionNew.count()))
-
-    ## delete the collection2 collection
