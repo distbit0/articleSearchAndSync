@@ -354,3 +354,29 @@ if __name__ == "__main__":
     for filePath in filesInRootDir[0:10]:
         fileText = getTextOfFile(filePath)
         categoriseArticles(filePath, fileText)
+
+
+"categoryDescriptions": {
+        "Machine and human thought": "relates to epistemology, machine learning, agi, consciousness, memory, tools for thought and zettelkasten",
+        "Decentralised Finance": "Relates to on-chain/smart-contract based decentralised finance protocols and projects.",
+        "Cryptocurrency": "ONLY relates to cryptocurrencies/blockchains. Does not include defi/decentralised finance protocols.",
+        "Reputation arbitration and identity": "Does not include defi/decentralised finance protocols.",
+        "Futurism": "Relates to future/advanced technology speculation and sci fi.",
+        "Geopol and war": "",
+        "Business and entrepreneurship": "",
+        "Mathematics": "Does not include cryptography or machine learning/AI maths.",
+        "Law": "",
+        "Finance": "Does not include decentralised finance. Only content relating to finance itself.",
+        "Physics": "",
+        "Economics": "Relates to Economic theory. Not politics content.Does not include finance/or decentralised finance.",
+        "Political Philosophy": "Politics related. Does not include economic theory. Includes normative/ideological content. Does not include anarcho capitalist material.",
+        "Climate Change": "Relating to science and economics of climate change",
+        "Augmented reality": "Any content relating to augmented reality/AR/XR/VR",
+        "Cryptography & number theory": "Any maths or other content re: cryptography. Except for ZK which goes in decentralised finance.",
+        "Computer Science": "Does not include machine learning, smart contracts, blockchain, cryptography, decenralised finance.",
+        "distributed protocols": "Any decentralised protocols. Does not include decentralised finance protocols.",
+        "Biology": "",
+        "Survival": "Survival related material",
+        "Anarcho capitalism": "Anarcho capitalist material.",
+        "Philosophy (excl. epistemology)": "Any philosophy material except for that related to epistemology or otherwise in machine and human thought"
+    }

@@ -3,7 +3,6 @@ import shutil
 import utils
 from utils import getConfig
 import os
-import glob
 import re
 from prompt_toolkit.completion import FuzzyCompleter, WordCompleter
 from prompt_toolkit import PromptSession
@@ -25,22 +24,9 @@ def find_first_sentence_position(text):
     return match.start() if match else -1
 
 
-def getUncategorisedFiles():
-    filesInRootDir = []
-    articleFileFolder = getConfig()["articleFileFolder"]
-    docFormatsToCategorise = getConfig()["docFormatsToAutoCategorise"]
-    for format in docFormatsToCategorise:
-        articleFilePattern = "*." + format
-        articlePathPattern = articleFileFolder + articleFilePattern
-        filesInRootDir.extend(list(glob.glob(articlePathPattern)))
-
-    return filesInRootDir
-
-
 def getCategories(subCategory="", getSubDirs=True):
     categoryObject = {}
     subDirs = {}
-    categoryDescriptions = getConfig()["categoryDescriptions"]
     articleFileFolder = getConfig()["articleFileFolder"]
 
     def getDirsInDir(folderPath):
@@ -58,17 +44,11 @@ def getCategories(subCategory="", getSubDirs=True):
         folderName = category.split("/")[-1]
         if folderName.lower() in excludedDirs:
             continue
-        description = (
-            categoryDescriptions[relativePath]
-            if relativePath in categoryDescriptions
-            else ""
-        )
         if getSubDirs:
             subDirs = getCategories(subCategory=relativePath, getSubDirs=False)
         categoryObject[folderName] = {
             "fullPath": fullPath,
             "relativePath": relativePath,
-            "description": description,
             "subCategories": subDirs,
         }
 
@@ -119,10 +99,32 @@ def select_category(session, categories, prompt_message):
         return None
 
 
-def main():
-    filesInRootDir = getUncategorisedFiles()
-    categories = getCategories()
+# This function now recursively finds files in the articleFileFolder and its subfolders.
+def get_uncategorised_files():
+    article_file_folder = getConfig()["articleFileFolder"]
+    doc_formats_to_categorise = getConfig()["docFormatsToAutoCategorise"]
+    uncategorised_files = []
 
+    # Recursive function to find files in subdirectories.
+    def find_files_in_directory(directory):
+        for entry in os.scandir(directory):
+            if entry.is_dir():
+                # If a directory has subdirectories, process files in this directory.
+                if any(os.scandir(entry.path)):
+                    find_files_in_directory(entry.path)
+            elif (
+                entry.is_file()
+                and entry.name.split(".")[-1] in doc_formats_to_categorise
+            ):
+                uncategorised_files.append(entry.path)
+
+    find_files_in_directory(article_file_folder)
+
+    uncategorised_files = sorted(uncategorised_files)
+    return uncategorised_files
+
+
+def initPromptSession():
     key_bindings = KeyBindings()
     key_bindings.add("enter", filter=has_completions & ~completion_is_selected)(
         lambda event: (
@@ -152,37 +154,46 @@ def main():
         complete_style=CompleteStyle.MULTI_COLUMN,
         style=style,
     )
+    return session
 
-    for filePath in filesInRootDir:
-        fileText = getTextOfFile(filePath)
 
-        print(f"\n\n\n\n{filePath.split('/')[-1]}\n")
-        display_article_snippet(fileText)
-        category_input = select_category(
-            session,
-            categories,
-            "Category: ",
-        )
+# Main function to process each file.
+def main():
+    files_in_root_dir = get_uncategorised_files()
+    categories = getCategories()
+    session = initPromptSession()
 
-        selected_category = categories.get(category_input)
-        if not selected_category:
-            continue
+    for file_path in files_in_root_dir:
+        file_text = getTextOfFile(file_path)
+        print(f"\n\n\n\n{file_path.split('/')[-1]}\n")
+        display_article_snippet(file_text)
+        path_segments = file_path.split(os.sep)
+        for i in range(len(path_segments) - 1, 0, -1):
+            pathUpToCurrent = "/".join(path_segments[:i])
+            print(pathUpToCurrent)
+            isRootDir = os.path.normpath(pathUpToCurrent) == os.path.normpath(
+                getConfig()["articleFileFolder"]
+            )
 
-        subcategories = selected_category.get("subCategories", {})
-        subcategory_input = ""
-        if subcategories:
-            subcategory_input = select_category(session, subcategories, "Subcategory: ")
-
-        if subcategory_input:
-            choice = subcategories.get(subcategory_input)
-        elif len(subcategories) == 0 and selected_category:
-            choice = selected_category
-        else:
-            continue
-        source = filePath
-        destination = os.path.join(choice["fullPath"], filePath.split("/")[-1])
-        print(f"Moving {source} to {destination}")
-        shutil.move(source, destination)
+            if path_segments[i] in categories or isRootDir:
+                subcategories = (
+                    categories
+                    if isRootDir
+                    else categories[path_segments[i]].get("subCategories", {})
+                )
+                if subcategories:
+                    subcategory_input = select_category(
+                        session, subcategories, "Subcategory: "
+                    )
+                    if subcategory_input:
+                        choice = subcategories.get(subcategory_input)
+                        destination = os.path.join(
+                            choice["fullPath"], path_segments[-1]
+                        )
+                        print(f"Moving {file_path} to {destination}")
+                        shutil.move(file_path, destination)
+                        break
+                break
 
 
 if __name__ == "__main__":
