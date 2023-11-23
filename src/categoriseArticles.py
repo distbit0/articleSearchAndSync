@@ -57,14 +57,16 @@ def getCategories(subCategory="", getSubDirs=True):
 
 def getTextOfFile(filePath):
     fileText = ""
+    fileUrl = ""
     fileExtension = filePath.split(".")[-1].lower()
     if "html" in fileExtension:
         fileHtml = open(filePath).read()
         fileText = getHtmlText(fileHtml)
+        fileUrl = utils.getUrlOfArticle(filePath)
     if "pdf" in fileExtension:
         fileText = utils.getPdfText(filePath)
 
-    return fileText
+    return fileText, fileUrl
 
 
 def display_article_snippet(fileText):
@@ -164,8 +166,10 @@ def main():
     session = initPromptSession()
 
     for file_path in files_in_root_dir:
-        file_text = getTextOfFile(file_path)
-        print(f"\n\n\n\n{file_path.split('/')[-1]}\n")
+        file_text, fileUrl = getTextOfFile(file_path)
+        print(f"\n\n\n\n\n\n{file_path.split('/')[-1]}")
+        if fileUrl:
+            print(fileUrl, "\n")
         display_article_snippet(file_text)
         path_segments = file_path.split(os.sep)
         for i in range(len(path_segments) - 1, 0, -1):
