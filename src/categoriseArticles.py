@@ -11,6 +11,8 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.filters import has_completions, completion_is_selected
 from prompt_toolkit.styles import Style
 from prompt_toolkit.auto_suggest import AutoSuggest, Suggestion
+import threading
+import queue
 
 
 def find_first_sentence_position(text):
@@ -67,7 +69,8 @@ def getTextOfFile(filePath):
     if "pdf" in fileExtension:
         fileText = utils.getPdfText(filePath)
 
-    return fileText, fileUrl
+    fileSnippet = display_article_snippet(fileText)
+    return fileSnippet, fileUrl
 
 
 def display_article_snippet(fileText):
@@ -75,7 +78,7 @@ def display_article_snippet(fileText):
     snippet = fileText[indexOfFirstSentence:]
     maxLength = getConfig()["wordsUsedToCategorise"]
     words = " ".join(snippet.split()[:maxLength]) + "..."
-    print(words)
+    return words
 
 
 class TopCompletionAutoSuggest(AutoSuggest):
@@ -114,31 +117,6 @@ def select_category(session, categories, prompt_message):
         return None
 
 
-# This function now recursively finds files in the articleFileFolder and its subfolders.
-def get_uncategorised_files():
-    article_file_folder = getConfig()["articleFileFolder"]
-    doc_formats_to_categorise = getConfig()["docFormatsToAutoCategorise"]
-    uncategorised_files = []
-
-    # Recursive function to find files in subdirectories.
-    def find_files_in_directory(directory):
-        for entry in os.scandir(directory):
-            if entry.is_dir():
-                # If a directory has subdirectories, process files in this directory.
-                if any(os.scandir(entry.path)):
-                    find_files_in_directory(entry.path)
-            elif (
-                entry.is_file()
-                and entry.name.split(".")[-1] in doc_formats_to_categorise
-            ):
-                uncategorised_files.append(entry.path)
-
-    find_files_in_directory(article_file_folder)
-
-    uncategorised_files = sorted(uncategorised_files)
-    return uncategorised_files
-
-
 def initPromptSession():
     key_bindings = KeyBindings()
     key_bindings.add("enter", filter=has_completions & ~completion_is_selected)(
@@ -159,7 +137,8 @@ def initPromptSession():
             "completion-menu.completion": "bg:#000000 fg:#00ff00",  # black background, green text
             "completion-menu.completion.current": "bg:#000000 fg:#00ff00",  # green background, black text for selected completion
             "scrollbar.background": "#000000",  # black scrollbar background
-            "scrollbar.button": "#00ff00",  # green scrollbar button
+            "scrollbar.button": "#00ff00",  # green scrollbar button,
+            "suggestion": "#0000ff",
         }
     )
 
@@ -172,50 +151,123 @@ def initPromptSession():
     return session
 
 
-# Main function to process each file.
+def fetch_next_file_data(file_path, output_queue):
+    nextFile_text, nextFileUrl = getTextOfFile(file_path)
+    output_queue.put((nextFile_text, nextFileUrl))
+
+
+def getAllFiles():
+    # This function recursively finds files in the articleFileFolder and its subfolders.
+    article_file_folder = getConfig()["articleFileFolder"]
+    doc_formats_to_categorise = getConfig()["docFormatsToAutoCategorise"]
+    all_files = []
+
+    # Recursive function to find files in subdirectories.
+    def find_files_in_directory(directory):
+        for entry in os.scandir(directory):
+            if entry.is_dir():
+                # If a directory has subdirectories, process files in this directory.
+                if any(os.scandir(entry.path)):
+                    find_files_in_directory(entry.path)
+            elif (
+                entry.is_file()
+                and entry.name.split(".")[-1] in doc_formats_to_categorise
+            ):
+                all_files.append(entry.path)
+
+    find_files_in_directory(article_file_folder)
+
+    all_files = sorted(all_files)
+    return all_files
+
+
+def printArticleDetails(snippet, fileName, done, remaining, filePath, fileUrl):
+    articleSnippet += "\n\n"
+    textToPrint = "\n\n\n\n\n\n" + fileName
+    textToPrint += "(" + str(done) + "/" + str(remaining) + ")"
+    textToPrint += "\n" + filePath
+    textToPrint = (
+        textToPrint + "\n" + fileUrl + articleSnippet
+        if fileUrl
+        else textToPrint + articleSnippet
+    )
+    print(textToPrint)
+
+
+def getUncategorisedFileCount(files_in_root_dir, categories):
+    uncategorized_files = 0
+    for file_path in files_in_root_dir:
+        fileFolderName = file_path.split("/")[-2]
+        isRootDir = os.path.normpath(file_path.rsplit("/", 1)[0]) == os.path.normpath(
+            getConfig()["articleFileFolder"]
+        )
+        if fileFolderName in categories or isRootDir:
+            uncategorized_files += 1
+    return uncategorized_files
+
+
 def main():
-    files_in_root_dir = get_uncategorised_files()
+    files_in_root_dir = getAllFiles()
     categories = getCategories()
     session = initPromptSession()
+    next_file_data_queue = queue.Queue()
 
-    for file_path in files_in_root_dir:
-        file_text, fileUrl = getTextOfFile(file_path)
-        print(f"\n\n\n\n\n\n{file_path.split('/')[-1]}")
-        if fileUrl:
-            print(fileUrl, "\n")
-        display_article_snippet(file_text)
-        path_segments = file_path.split(os.sep)
-        for i in range(len(path_segments) - 1, 0, -1):
-            pathUpToCurrent = "/".join(path_segments[:i])
-            isRootDir = os.path.normpath(pathUpToCurrent) == os.path.normpath(
-                getConfig()["articleFileFolder"]
+    uncategorized_files = getUncategorisedFileCount(files_in_root_dir, categories)
+
+    if files_in_root_dir:
+        threading.Thread(
+            target=fetch_next_file_data,
+            args=(files_in_root_dir[0], next_file_data_queue),
+        ).start()
+
+    categorisedFiles = 0
+    for file_idx, file_path in enumerate(files_in_root_dir):
+        (
+            articleSnippet,
+            fileUrl,
+        ) = next_file_data_queue.get()
+
+        fileName = file_path.split("/")[-1]
+        filePath = "/".join(file_path.split("/")[:-1])
+        threading.Thread(
+            target=fetch_next_file_data,
+            args=(files_in_root_dir[file_idx + 1], next_file_data_queue),
+        ).start()
+
+        isRootDir = os.path.normpath(filePath) == os.path.normpath(
+            getConfig()["articleFileFolder"]
+        )
+        fileFolderName = filePath.split("/")[-1]
+        if fileFolderName in categories or isRootDir:
+            categorisedFiles += 1
+
+            printArticleDetails(
+                articleSnippet,
+                fileName,
+                categorisedFiles,
+                uncategorized_files,
+                filePath,
+                fileUrl,
             )
-
-            if path_segments[i] in categories or isRootDir:
-                subcategories = (
-                    categories
-                    if isRootDir
-                    else categories[path_segments[i]].get("subCategories", {})
+            subcategories = (
+                categories
+                if isRootDir
+                else categories[fileFolderName].get("subCategories", {})
+            )
+            subcategories["_DELETE"] = {}
+            if subcategories:
+                subcategory_input = select_category(
+                    session, subcategories, "Subcategory: "
                 )
-                subcategories["DELETE"] = {}
-                if subcategories:
-                    subcategory_input = select_category(
-                        session, subcategories, "Subcategory: "
-                    )
-                    if subcategory_input:
-                        if subcategory_input == "_DELETE":
-                            print(f"\nDeleting {file_path}")
-                            os.remove(file_path)
-                        else:
-                            choice = subcategories.get(subcategory_input)
-                            destination = os.path.join(
-                                choice["fullPath"], path_segments[-1]
-                            )
-                            print(f"\nMoving {file_path} to {destination}")
-                            shutil.move(file_path, destination)
-
-                            break
-                break
+                if subcategory_input:
+                    if subcategory_input == "_DELETE":
+                        print(f"\nDeleting {file_path}")
+                        os.remove(file_path)
+                    else:
+                        choice = subcategories.get(subcategory_input)
+                        destination = os.path.join(choice["fullPath"], fileName)
+                        print(f"\nMoving {file_path} to {destination}")
+                        shutil.move(file_path, destination)
 
 
 if __name__ == "__main__":
