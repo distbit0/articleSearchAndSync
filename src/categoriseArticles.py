@@ -170,7 +170,6 @@ def main():
         path_segments = file_path.split(os.sep)
         for i in range(len(path_segments) - 1, 0, -1):
             pathUpToCurrent = "/".join(path_segments[:i])
-            print(pathUpToCurrent)
             isRootDir = os.path.normpath(pathUpToCurrent) == os.path.normpath(
                 getConfig()["articleFileFolder"]
             )
@@ -190,7 +189,7 @@ def main():
                         destination = os.path.join(
                             choice["fullPath"], path_segments[-1]
                         )
-                        print(f"Moving {file_path} to {destination}")
+                        print(f"\nMoving {file_path} to {destination}")
                         shutil.move(file_path, destination)
                         break
                 break
