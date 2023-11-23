@@ -1,40 +1,15 @@
 from inscriptis import get_text as getHtmlText
+import shutil
 import utils
-from utils import getConfig, getPdfText
+from utils import getConfig
 import os
 import glob
-import openai
 import re
-import tiktoken
-import time
-
-openai.api_key = getConfig()["openaiApiKey"]
-
-
-topCategoriesInstructions = """
-________INSTRUCTIONS________
-
-Below is an article and a list of categories and their sub-categories.
-Chose the top two categories which are most relevant and most specific to the article.
-Do not include any sub-categories. Only a comma-separated list of the two most relevant categories.
-the sub categories are only provided to allow you to better understand each category.
-Do not create new categories. Only chose categories from the provided list.
-ONLY RESPOND WITH THE comma separated list of categories. NOTHING ELSE.
-E.g. "category1, category2"
-"""
-
-finalCategoryInstructions = """
-________INSTRUCTIONS________
-
-Below is an article and a list of categories.
-Chose the category and sub category which are most relevant and most specific to the article.
-Only select one category/sub category pair.
-Use the sub categories under each category to better understand each category.
-Do not create new categories or sub categories. Only chose categories/sub categories from the provided list.
-ONLY RESPOND WITH THE NAME OF THE category and sub category. NOTHING ELSE. Seperate them via a "/".
-E.g. "category/sub category"
-If no sub category exists under the most relevant category, just return the category without a "/" or a sub category.
-"""
+from prompt_toolkit.completion import FuzzyWordCompleter
+from prompt_toolkit import PromptSession
+from prompt_toolkit.shortcuts import CompleteStyle
+from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.filters import has_completions, completion_is_selected
 
 
 def find_first_sentence_position(text):
@@ -74,7 +49,7 @@ def getCategories(subCategory="", getSubDirs=True):
         directory.lower()
         for directory in getConfig()["foldersToExcludeFromCategorisation"]
     ]
-    subCategory = "/" + subCategory if subCategory else ""
+    subCategory = subCategory if subCategory else ""
     mainCategories = getDirsInDir(articleFileFolder + subCategory)
     for category in mainCategories:
         fullPath = category
@@ -106,251 +81,101 @@ def getTextOfFile(filePath):
         fileHtml = open(filePath).read()
         fileText = getHtmlText(fileHtml)
     if "pdf" in fileExtension:
-        fileText = getPdfText(filePath)
+        fileText = utils.getPdfText(filePath)
 
     return fileText
 
 
-def validateCategories(categories, top_categories):
-    categoriesAreValid = True
-    errorMessage = ""
-    outputCategories = []
-    for category in top_categories:
-        found = False
-        for cat in categories:
-            if category.lower() == cat.lower():
-                found = True
-                outputCategories.append(cat)
-                break
-        if not found:
-            errorMessage += (
-                "Category provided ("
-                + category
-                + ") not found. Chose another category from the list. "
-            )
-
-    if errorMessage != "":
-        categoriesAreValid = False
-        outputCategories = []
-    return categoriesAreValid, outputCategories, errorMessage
-
-
-def checkIfCategoryExists(categories, category, subcategory):
-    # Convert the input category and subcategory to lowercase for case-insensitive comparison
-    category_lower = category.lower()
-    subcategory_lower = subcategory.lower()
-    errorMessage = ""
-
-    for cat, details in categories.items():
-        # Check if the main category matches, case-insensitive
-        if cat.lower() == category_lower:
-            # Check if there are subcategories
-            if "subCategories" in details and len(details["subCategories"]) > 0:
-                for subcat in details["subCategories"]:
-                    # Check if the subcategory matches, case-insensitive
-                    if subcat.lower() == subcategory_lower:
-                        return True, [cat, subcat], errorMessage
-                errorMessage = (
-                    "Subcategory provided ("
-                    + subcategory
-                    + ") not found. Chose another subcategory from the list."
-                )
-                return False, [None, None], errorMessage
-            else:
-                # If no subcategories, return the main category
-                return True, [cat, ""], errorMessage
-    errorMessage = (
-        "Category provided ("
-        + category  # Convert the input category and subcategory to lowercase for case-insensitive comparison
-        + ") not found. Chose another category/subcategory pair from the list."
-    )
-    return False, [None, None], errorMessage
-
-
-def askGptForTopCategories(categories, combinedArticleText):
-    categoriesText = []
-    for category in categories:
-        description = categories[category]["description"]
-        categoryText = '"' + category + '"'
-        if description != "":
-            categoryText += " description: " + description
-        subCategories = categories[category]["subCategories"]
-        subCategoriesText = '\n   Subcategories: "' + '", "'.join(subCategories) + '"'
-        categoryText += subCategoriesText
-        categoriesText.append(categoryText)
-
-    categoryText = "\n\n".join(categoriesText)
-
-    prompt = (
-        topCategoriesInstructions
-        + "\n\n________ARTICLE________\n\n"
-        + combinedArticleText
-        + "\n\n________CATEGORIES________\n\n"
-        + categoryText
-    )
-    attempts = 0
-    max_attempts = 5
-    top_categories = []
-    conversation = [{"role": "user", "content": prompt}]
-    print(
-        "prompt tokens",
-        len(tiktoken.encoding_for_model(modelName).encode(prompt)),
-    )
-    while not top_categories and attempts < max_attempts:
-        try:
-            response = (
-                openai.ChatCompletion.create(
-                    model=modelName,
-                    messages=conversation,
-                )[
-                    "choices"
-                ][0]["message"]["content"]
-                .strip()
-                .replace('"', "")
-            )
-            conversation.append({"role": "assistant", "content": response})
-            top_categories = [cat.strip() for cat in response.split(",")]
-            if len(top_categories) != 2:
-                top_categories = []
-                errorMessage = (
-                    "Please provide exactly 2 categories, separated by commas."
-                )
-                conversation.append({"role": "user", "content": errorMessage})
-            else:
-                (
-                    categoriesAreValid,
-                    top_categories,
-                    errorMessage,
-                ) = validateCategories(categories, top_categories)
-                if not categoriesAreValid:
-                    conversation.append({"role": "user", "content": errorMessage})
-            if errorMessage:
-                print(errorMessage)
-
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            if "rate-limits" in str(e):
-                errorMessage = "OpenAI API rate limit exceeded. Please try again later."
-                time.sleep(12)
-                attempts -= 1
-            else:
-                break
-        attempts += 1
-
-    return top_categories
-
-
-def askGptToClassify(categories, combinedArticleText):
-    categoriesText = []
-    for category in categories:
-        description = categories[category]["description"]
-        categoryText = '"' + category + '"'
-        if description != "":
-            categoryText += " description: " + description
-        subCategories = categories[category]["subCategories"]
-        subCategoriesText = '\n   Subcategories: "' + '", "'.join(subCategories) + '"'
-        categoryText += subCategoriesText
-        categoriesText.append(categoryText)
-
-    categoryText = "\n\n".join(categoriesText)
-
-    prompt = (
-        finalCategoryInstructions
-        + "\n\n________ARTICLE________\n\n"
-        + combinedArticleText
-        + "\n\n________CATEGORIES________\n\n"
-        + categoryText
-    )
-    category = subcategory = ""
-    attempts = 0
-    max_attempts = 5  # Set a reasonable number of attempts
-    validOutput = False
-    errorMessage = ""
-    conversation = [{"role": "user", "content": prompt}]
-    while not validOutput and attempts < max_attempts:
-        try:
-            chosenCategory = (
-                openai.ChatCompletion.create(
-                    model=modelName,
-                    messages=conversation,
-                )[
-                    "choices"
-                ][0]["message"]["content"]
-                .strip()
-                .replace('"', "")
-            )
-            conversation.append({"role": "assistant", "content": chosenCategory})
-            print(f"Chosen category: {chosenCategory}")
-            if "/" in chosenCategory:
-                category, subcategory = chosenCategory.split("/")
-            else:
-                category = chosenCategory
-                subcategory = ""
-            validOutput, [category, subcategory], errorMessage = checkIfCategoryExists(
-                categories, category, subcategory
-            )
-            if not validOutput:
-                print(errorMessage)
-                conversation.append(
-                    {
-                        "role": "user",
-                        "content": errorMessage
-                        + " DO NOT RESPOND WITH ANYTHING EXCEPT THE CATEGORY and SUBCATEGORY (if any).",
-                    }
-                )
-            print(f"Valid output: {validOutput}", category, "||", subcategory)
-            print(
-                "prompt tokens",
-                len(tiktoken.encoding_for_model(modelName).encode(prompt)),
-            )
-        except Exception as e:
-            print(f"An error occurred: {e}")
-            if "rate-limits" in str(e):
-                errorMessage = "OpenAI API rate limit exceeded. Please try again later."
-                time.sleep(12)
-                attempts -= 1
-            else:
-                break
-        attempts += 1
-
-    return [category, subcategory] if validOutput else [None, None]
-
-
-def categoriseArticles(filePath, fileText):
-    lengthOfCategorisationSnippet = getConfig()["wordsUsedToCategorise"]
+def display_article_snippet(fileText):
     indexOfFirstSentence = find_first_sentence_position(fileText)
-    textFromSentence = fileText[indexOfFirstSentence:]
-    words = textFromSentence.split()
-    combinedArticleText = (
-        "Article title:"
-        + filePath.split("/")[-1]
-        + "\nArticle url:"
-        + utils.getUrlOfArticle(filePath)
-        + "\nArticle contents:\n"
-        + " ".join(words[:lengthOfCategorisationSnippet])
+    snippet = fileText[indexOfFirstSentence:]
+    maxLength = getConfig()["wordsUsedToCategorise"]
+    words = " ".join(snippet.split()[:maxLength]) + "..."
+    print(words)
+
+
+def select_category(session, categories, prompt_message):
+    """
+    Function to select a category or subcategory using fuzzy search.
+
+    :param session: PromptSession object for interactive prompt.
+    :param categories: Dictionary of categories or subcategories.
+    :param prompt_message: String, message to display on the prompt.
+    :return: Selected category name or 'read'.
+    """
+    category_names = list(categories.keys())
+    session.completer = FuzzyWordCompleter(category_names)
+
+    category_input = session.prompt(
+        prompt_message,
+        complete_while_typing=True,
+        pre_run=session.default_buffer.start_completion,
     )
-    print("\n\n\n\n\n\n" + combinedArticleText)
-    categoriesAndSubCategories = getCategories()
-    top_categories = askGptForTopCategories(
-        categoriesAndSubCategories, combinedArticleText
+    if category_input.lower() == "read" or category_input in category_names:
+        return category_input
+    else:
+        print("Invalid selection. Please try again.")
+        return None
+
+
+def main():
+    filesInRootDir = getUncategorisedFiles()
+    categories = getCategories()
+
+    key_bindings = KeyBindings()
+    key_bindings.add("enter", filter=has_completions & ~completion_is_selected)(
+        lambda event: (
+            event.current_buffer.go_to_completion(0),
+            event.current_buffer.validate_and_handle(),
+        )
     )
-    print("\n\n\nTOP CATEGORIES", top_categories)
-    categoriesAndSubCategories = {
-        category: categoriesAndSubCategories[category]
-        for category in categoriesAndSubCategories
-        if category in top_categories
-    }
-    if len(categoriesAndSubCategories) == 0:
-        print("Could not get top categories for article.")
-        return
-    category, subcategory = askGptToClassify(
-        categoriesAndSubCategories, combinedArticleText
+    key_bindings.add("backspace")(
+        lambda event: (
+            event.current_buffer.delete_before_cursor(1),
+            event.current_buffer.start_completion(select_first=False),
+        )
     )
+
+    @key_bindings.add("backspace")
+    def _(event):
+        buffer = event.current_buffer
+        buffer.delete_before_cursor(1)  # Delete the character before the cursor
+        buffer.start_completion(select_first=False)  # Start completion after deletion
+
+    session = PromptSession(
+        key_bindings=key_bindings, complete_style=CompleteStyle.MULTI_COLUMN
+    )
+
+    for filePath in filesInRootDir:
+        fileText = getTextOfFile(filePath)
+
+        print(f"\n\n\n\n{filePath.split('/')[-1]}\n")
+        display_article_snippet(fileText)
+        category_input = select_category(
+            session,
+            categories,
+            "Category: ",
+        )
+
+        selected_category = categories.get(category_input)
+        if not selected_category:
+            continue
+
+        subcategories = selected_category.get("subCategories", {})
+        subcategory_input = ""
+        if subcategories:
+            subcategory_input = select_category(session, subcategories, "Subcategory: ")
+
+        if subcategory_input:
+            choice = subcategories.get(subcategory_input)
+        else:
+            if selected_category:
+                choice = selected_category
+        source = filePath
+        destination = os.path.join(choice["fullPath"], filePath.split("/")[-1])
+        print(f"Moving {source} to {destination}")
+        shutil.move(source, destination)
 
 
 if __name__ == "__main__":
-    modelName = "gpt-4-1106-preview"
-    filesInRootDir = getUncategorisedFiles()
-    for filePath in filesInRootDir[0:10]:
-        fileText = getTextOfFile(filePath)
-        categoriseArticles(filePath, fileText)
+    main()
