@@ -105,7 +105,7 @@ def select_category(session, categories, prompt_message):
     :return: Selected category name or 'read'.
     """
     category_names = list(categories.keys())
-    session.completer = FuzzyWordCompleter(category_names)
+    session.completer = FuzzyWordCompleter(category_names, WORD=True)
 
     category_input = session.prompt(
         prompt_message,
@@ -175,9 +175,10 @@ def main():
 
         if subcategory_input:
             choice = subcategories.get(subcategory_input)
+        elif len(subcategories) == 0 and selected_category:
+            choice = selected_category
         else:
-            if selected_category:
-                choice = selected_category
+            continue
         source = filePath
         destination = os.path.join(choice["fullPath"], filePath.split("/")[-1])
         print(f"Moving {source} to {destination}")
