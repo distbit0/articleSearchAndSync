@@ -5,7 +5,7 @@ from utils import getConfig
 import os
 import glob
 import re
-from prompt_toolkit.completion import FuzzyWordCompleter
+from prompt_toolkit.completion import FuzzyCompleter, WordCompleter
 from prompt_toolkit import PromptSession
 from prompt_toolkit.shortcuts import CompleteStyle
 from prompt_toolkit.key_binding import KeyBindings
@@ -105,7 +105,7 @@ def select_category(session, categories, prompt_message):
     :return: Selected category name or 'read'.
     """
     category_names = list(categories.keys())
-    session.completer = FuzzyWordCompleter(category_names, WORD=True)
+    session.completer = FuzzyCompleter(WordCompleter(category_names, sentence=True))
 
     category_input = session.prompt(
         prompt_message,
