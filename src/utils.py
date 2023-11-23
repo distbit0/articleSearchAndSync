@@ -1,4 +1,5 @@
 import re
+import hashlib
 import glob
 import urlexpander
 from os import path
@@ -9,6 +10,8 @@ import snscrape.modules.twitter as sntwitter
 import snscrape
 import shutil
 import requests
+import PyPDF2
+import traceback
 
 
 def handle_cache(file_name, key, value=None):
@@ -364,3 +367,36 @@ def getArxivTitle(arxiv_id):
     # print(start, end)
     title = data[start:end]
     return title
+
+
+def calculate_file_hash(file_path):
+    hasher = hashlib.sha256()
+    file_size = os.path.getsize(file_path)
+
+    if file_size < 4096:
+        with open(file_path, "rb") as f:
+            hasher.update(f.read())
+    else:
+        offset = (file_size - 4096) // 2
+        with open(file_path, "rb") as f:
+            f.seek(offset)
+            hasher.update(f.read(4096))
+
+    return hasher.hexdigest()
+
+
+def getPdfText(pdf):
+    pdfText = []
+    try:
+        pdfFileObj = open(pdf, "rb")
+        pdfReader = PyPDF2.PdfReader(pdfFileObj)
+        for pageNumber in range(0, len(pdfReader.pages)):
+            pageObj = pdfReader.pages[pageNumber]
+            pdfText.append(pageObj.extract_text())
+        pdfFileObj.close()
+    except PyPDF2.errors.PdfReadError:
+        traceback.print_exc()
+        print("Error in pdf: ", pdf)
+        return
+    pdfText = "\n".join(pdfText)
+    return pdfText

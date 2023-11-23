@@ -45,17 +45,6 @@ def indexAllPDFFolders(pdfFolders, indexFolders):
 def indexPDF(pdf, baseUrl, pdfFileName, indexFolderPath):
     pdfText = []
     print("INDEXING: ", pdf)
-    try:
-        pdfFileObj = open(pdf, "rb")
-        pdfReader = PyPDF2.PdfReader(pdfFileObj)
-        for pageNumber in range(0, len(pdfReader.pages)):
-            pageObj = pdfReader.pages[pageNumber]
-            pdfText.append(pageObj.extract_text())
-        pdfFileObj.close()
-    except PyPDF2.errors.PdfReadError:
-        traceback.print_exc()
-        print("Error in pdf: ", pdf)
-        return
     urlString = (
         "Snapshot-Content-Location: "
         + baseUrl
@@ -63,7 +52,7 @@ def indexPDF(pdf, baseUrl, pdfFileName, indexFolderPath):
         + "\n"
     )
     pathString = "PdfFilePath: " + pdf + "\n"
-    pdfText = urlString + pathString + "\n".join(pdfText)
+    pdfText = urlString + pathString + utils.getPdfText(pdf)
     with open(indexFolderPath + "/" + pdfFileName + ".txt", "w") as pdfTextFile:
         pdfTextFile.write(pdfText)
 

@@ -3,7 +3,6 @@ import utils
 from utils import getConfig
 import os
 from collections import defaultdict
-import hashlib
 import reTitlePDFs
 
 
@@ -145,22 +144,6 @@ def deleteDuplicateArticleFiles(urls_to_filenames):
             dir_seen_urls[directory].add(url)
 
 
-def calculate_file_hash(file_path):
-    hasher = hashlib.sha256()
-    file_size = os.path.getsize(file_path)
-
-    if file_size < 4096:
-        with open(file_path, "rb") as f:
-            hasher.update(f.read())
-    else:
-        offset = (file_size - 4096) // 2
-        with open(file_path, "rb") as f:
-            f.seek(offset)
-            hasher.update(f.read(4096))
-
-    return hasher.hexdigest()
-
-
 def deleteDuplicateFiles(directory_path):
     duplicate_size_files = defaultdict(list)
 
@@ -171,7 +154,7 @@ def deleteDuplicateFiles(directory_path):
         for filename in filenames:
             full_path = os.path.join(root, filename)
             file_size = os.path.getsize(full_path)
-            file_hash = calculate_file_hash(full_path)
+            file_hash = utils.calculate_file_hash(full_path)
             unique_key = f"{file_size}_{file_hash}_{root}"
 
             duplicate_size_files[unique_key].append(full_path)
