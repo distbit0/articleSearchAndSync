@@ -10,6 +10,7 @@ from prompt_toolkit.shortcuts import CompleteStyle
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.filters import has_completions, completion_is_selected
 from prompt_toolkit.styles import Style
+from prompt_toolkit.auto_suggest import AutoSuggest, Suggestion
 
 
 def find_first_sentence_position(text):
@@ -77,23 +78,35 @@ def display_article_snippet(fileText):
     print(words)
 
 
+class TopCompletionAutoSuggest(AutoSuggest):
+    def __init__(self, completer):
+        self.completer = completer
+
+    def get_suggestion(self, buffer, document):
+        # Get the top completion (if any) from the completer
+        completions = list(self.completer.get_completions(document, None))
+        bufferLength = len(buffer.text)
+        if completions:
+            return Suggestion(completions[0].text[bufferLength:])
+        return None
+
+
 def select_category(session, categories, prompt_message):
-    """
-    Function to select a category or subcategory using fuzzy search.
-
-    :param session: PromptSession object for interactive prompt.
-    :param categories: Dictionary of categories or subcategories.
-    :param prompt_message: String, message to display on the prompt.
-    :return: Selected category name or 'read'.
-    """
     category_names = list(categories.keys())
-    session.completer = FuzzyCompleter(WordCompleter(category_names, sentence=True))
+    completer = FuzzyCompleter(WordCompleter(category_names, sentence=True))
+    auto_suggest = TopCompletionAutoSuggest(completer)
 
+    # Apply the completer, auto-suggest, and style to the session
+    session.completer = completer
+    session.auto_suggest = auto_suggest
+
+    # Get user input
     category_input = session.prompt(
         prompt_message,
         complete_while_typing=True,
         pre_run=session.default_buffer.start_completion,
     )
+
     if category_input.lower() == "read" or category_input in category_names:
         return category_input
     else:
@@ -184,18 +197,24 @@ def main():
                     if isRootDir
                     else categories[path_segments[i]].get("subCategories", {})
                 )
+                subcategories["DELETE"] = {}
                 if subcategories:
                     subcategory_input = select_category(
                         session, subcategories, "Subcategory: "
                     )
                     if subcategory_input:
-                        choice = subcategories.get(subcategory_input)
-                        destination = os.path.join(
-                            choice["fullPath"], path_segments[-1]
-                        )
-                        print(f"\nMoving {file_path} to {destination}")
-                        shutil.move(file_path, destination)
-                        break
+                        if subcategory_input == "_DELETE":
+                            print(f"\nDeleting {file_path}")
+                            os.remove(file_path)
+                        else:
+                            choice = subcategories.get(subcategory_input)
+                            destination = os.path.join(
+                                choice["fullPath"], path_segments[-1]
+                            )
+                            print(f"\nMoving {file_path} to {destination}")
+                            shutil.move(file_path, destination)
+
+                            break
                 break
 
 
