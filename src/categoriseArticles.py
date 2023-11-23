@@ -10,6 +10,7 @@ from prompt_toolkit import PromptSession
 from prompt_toolkit.shortcuts import CompleteStyle
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.filters import has_completions, completion_is_selected
+from prompt_toolkit.styles import Style
 
 
 def find_first_sentence_position(text):
@@ -136,14 +137,20 @@ def main():
         )
     )
 
-    @key_bindings.add("backspace")
-    def _(event):
-        buffer = event.current_buffer
-        buffer.delete_before_cursor(1)  # Delete the character before the cursor
-        buffer.start_completion(select_first=False)  # Start completion after deletion
+    style = Style.from_dict(
+        {
+            "completion-menu.completion": "bg:#000000 fg:#00ff00",  # black background, green text
+            "completion-menu.completion.current": "bg:#000000 fg:#00ff00",  # green background, black text for selected completion
+            "scrollbar.background": "#000000",  # black scrollbar background
+            "scrollbar.button": "#00ff00",  # green scrollbar button
+        }
+    )
 
+    # Create PromptSession with the custom style
     session = PromptSession(
-        key_bindings=key_bindings, complete_style=CompleteStyle.MULTI_COLUMN
+        key_bindings=key_bindings,
+        complete_style=CompleteStyle.MULTI_COLUMN,
+        style=style,
     )
 
     for filePath in filesInRootDir:
