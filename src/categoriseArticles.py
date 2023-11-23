@@ -182,9 +182,9 @@ def getAllFiles():
 
 
 def printArticleDetails(snippet, fileName, done, remaining, filePath, fileUrl):
-    snippet += "\n\n"
+    snippet = "\n\n" + snippet
     textToPrint = "\n\n\n\n\n\n" + fileName
-    textToPrint += "(" + str(done) + "/" + str(remaining) + ")"
+    textToPrint += "    (" + str(done) + "/" + str(remaining) + ")"
     textToPrint += "\n" + filePath
     textToPrint = (
         textToPrint + "\n" + fileUrl + snippet if fileUrl else textToPrint + snippet
