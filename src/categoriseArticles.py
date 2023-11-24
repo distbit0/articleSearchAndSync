@@ -276,8 +276,12 @@ def main():
                 if subcategory_input:
                     if subcategory_input == "_DELETE":
                         print(f"\n Moving to TRASH {file_path}")
-                        dest = "~/.local/share/Trash/files/" + fileName
-                        shutil.move(file_path, dest)
+                        destDir = "/home/pimania/.local/share/Trash/files/"
+                        homeDir = os.path.expanduser("~")
+                        dest = os.path.join(
+                            homeDir, "/.local/share/Trash/files/", fileName
+                        )
+                        shutil.move(file_path, destDir)
                         lastMoveDestination = dest
                         lastMoveOrigin = file_path
                     elif subcategory_input == "_UNDO":
