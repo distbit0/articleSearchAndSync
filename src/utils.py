@@ -385,12 +385,13 @@ def calculate_file_hash(file_path):
     return hasher.hexdigest()
 
 
-def getPdfText(pdf):
+def getPdfText(pdf, pages=None):
     pdfText = []
     try:
         pdfFileObj = open(pdf, "rb")
         pdfReader = PyPDF2.PdfReader(pdfFileObj)
-        for pageNumber in range(0, len(pdfReader.pages)):
+        pages = len(pdfReader.pages) if not pages else min(pages, len(pdfReader.pages))
+        for pageNumber in range(pages):
             pageObj = pdfReader.pages[pageNumber]
             pdfText.append(pageObj.extract_text())
         pdfFileObj.close()

@@ -68,7 +68,7 @@ def getTextOfFile(filePath):
         fileText = getHtmlText(fileHtml)
         fileUrl = utils.getUrlOfArticle(filePath)
     if "pdf" in fileExtension:
-        fileText = utils.getPdfText(filePath)
+        fileText = utils.getPdfText(filePath, pages=10)
 
     fileSnippet = display_article_snippet(fileText)
     return fileSnippet, fileUrl
@@ -238,23 +238,22 @@ def main():
         )
         fileFolderName = filePath.split("/")[-1]
         if fileFolderName in categories or isRootDir:
-            categorisedFiles += 1
-
-            printArticleDetails(
-                articleSnippet,
-                fileName,
-                categorisedFiles,
-                uncategorized_files,
-                filePath,
-                fileUrl,
-            )
             subcategories = (
                 categories
                 if isRootDir
                 else categories[fileFolderName].get("subCategories", {})
             )
-            subcategories["_DELETE"] = {}
             if subcategories:
+                categorisedFiles += 1
+                printArticleDetails(
+                    articleSnippet,
+                    fileName,
+                    categorisedFiles,
+                    uncategorized_files,
+                    filePath,
+                    fileUrl,
+                )
+                subcategories["_DELETE"] = {}
                 subcategory_input = select_category(
                     session, subcategories, "Subcategory: "
                 )
