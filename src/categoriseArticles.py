@@ -269,7 +269,7 @@ def main():
     categorisedFileCount = 0
     startTime = time.time()
     for file_idx, file_path in enumerate(allFiles):
-        fileName = (file_path.split("/")[-1],)
+        fileName = file_path.split("/")[-1]
 
         startProcessingNextFile(allFiles, next_file_data_queue, file_idx, categories)
         articleInfo = isArticleUncategorised(file_path, categories)
