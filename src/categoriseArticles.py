@@ -12,6 +12,7 @@ from prompt_toolkit.filters import has_completions, completion_is_selected
 from prompt_toolkit.styles import Style
 from prompt_toolkit.auto_suggest import AutoSuggest, Suggestion
 import threading
+import time
 import queue
 
 
@@ -138,7 +139,7 @@ def initPromptSession():
             "completion-menu.completion.current": "bg:#000000 fg:#00ff00",  # green background, black text for selected completion
             "scrollbar.background": "#000000",  # black scrollbar background
             "scrollbar.button": "#00ff00",  # green scrollbar button,
-            "suggestion": "#0000ff",
+            "auto-suggestion": "#0000ff",
         }
     )
 
