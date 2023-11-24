@@ -186,7 +186,7 @@ def getAllFiles():
 
 
 def printArticleDetails(
-    startTime, next_file_data_queue, fileName, done, remaining, filePath
+    startTime, next_file_data_queue, fileName, done, remaining, file_path
 ):
     (
         snippet,
@@ -194,7 +194,7 @@ def printArticleDetails(
     ) = next_file_data_queue.get()
     avgTimePerArticle = (time.time() - startTime) / done
     snippet = "\n\n" + snippet
-    textToPrint = "\n\n\n" + filePath.split("/")[-1] + "\n\n\n" + fileName
+    textToPrint = "\n\n\n" + file_path.split("/")[-2] + "\n\n\n" + fileName
     textToPrint += "    (" + str(done) + "/" + str(remaining) + ")"
     textToPrint += (
         "    (avg: "
@@ -269,8 +269,7 @@ def main():
     categorisedFileCount = 0
     startTime = time.time()
     for file_idx, file_path in enumerate(allFiles):
-        fileName = file_path.split("/")[-1]
-        filePath = "/".join(file_path.split("/")[:-1])
+        fileName = (file_path.split("/")[-1],)
 
         startProcessingNextFile(allFiles, next_file_data_queue, file_idx, categories)
         articleInfo = isArticleUncategorised(file_path, categories)
@@ -284,7 +283,7 @@ def main():
                 fileName,
                 categorisedFileCount,
                 uncategorized_files,
-                filePath,
+                file_path,
             )
             subcategories["_DELETE"] = subcategories["_UNDO"] = subcategories[
                 "_PARENT"
@@ -303,7 +302,7 @@ def main():
                     if lastMoveDest:
                         shutil.move(lastMoveDest, lastMoveOrigin)
                 elif subcategory_input == "_PARENT":
-                    parentFolderPath = filePath.split("/")[:-1]
+                    parentFolderPath = file_path.split("/")[:-2]
                     destPath = "/".join(parentFolderPath) + "/" + fileName
                     print(f"\nMoving {file_path} to {destPath}")
                     shutil.move(file_path, destPath)
