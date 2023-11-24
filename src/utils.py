@@ -401,3 +401,22 @@ def getPdfText(pdf, pages=None):
         return
     pdfText = "\n".join(pdfText)
     return pdfText
+
+
+def read_file_with_encoding(filePath):
+    encodings = [
+        "utf-8",
+        "latin-1",
+        "windows-1252",
+        "ascii",
+        "iso-8859-1",
+    ]  # Add more if needed
+
+    for encoding in encodings:
+        try:
+            with open(filePath, "r", encoding=encoding) as file:
+                return file.read()
+        except UnicodeDecodeError:
+            continue
+
+    return None

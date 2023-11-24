@@ -64,7 +64,7 @@ def getTextOfFile(filePath):
     fileUrl = ""
     fileExtension = filePath.split(".")[-1].lower()
     if "html" in fileExtension:
-        fileHtml = open(filePath).read()
+        fileHtml = open(filePath, errors="ignore").read()
         fileText = getHtmlText(fileHtml)
         fileUrl = utils.getUrlOfArticle(filePath)
     if "pdf" in fileExtension:
@@ -178,15 +178,24 @@ def getAllFiles():
 
     find_files_in_directory(article_file_folder)
 
-    all_files = sorted(all_files)
+    all_files = sorted(all_files, key=lambda path: path.split("/")[-2])
     return all_files
 
 
-def printArticleDetails(snippet, fileName, done, remaining, filePath, fileUrl):
+def printArticleDetails(
+    startTime, snippet, fileName, done, remaining, filePath, fileUrl
+):
+    avgTimePerArticle = (time.time() - startTime) / done
     snippet = "\n\n" + snippet
-    textToPrint = "\n\n\n\n\n\n" + fileName
+    textToPrint = "\n\n\n" + filePath.split("/")[-1] + "\n\n\n" + fileName
     textToPrint += "    (" + str(done) + "/" + str(remaining) + ")"
-    textToPrint += "\n" + filePath
+    textToPrint += (
+        "    (avg: "
+        + str(round(avgTimePerArticle, 2))
+        + "s rem: "
+        + str(round(avgTimePerArticle / 3600 * remaining, 1))
+        + "h)"
+    )
     textToPrint = (
         textToPrint + "\n" + fileUrl + snippet if fileUrl else textToPrint + snippet
     )
@@ -200,7 +209,9 @@ def getUncategorisedFileCount(files_in_root_dir, categories):
         isRootDir = os.path.normpath(file_path.rsplit("/", 1)[0]) == os.path.normpath(
             getConfig()["articleFileFolder"]
         )
-        if fileFolderName in categories or isRootDir:
+        if isRootDir:
+            uncategorized_files += 2
+        elif fileFolderName in categories:
             uncategorized_files += 1
     return uncategorized_files
 
@@ -210,6 +221,7 @@ def main():
     categories = getCategories()
     session = initPromptSession()
     next_file_data_queue = queue.Queue()
+    lastMoveDestination = None
 
     uncategorized_files = getUncategorisedFileCount(files_in_root_dir, categories)
 
@@ -220,6 +232,7 @@ def main():
         ).start()
 
     categorisedFiles = 0
+    startTime = time.time()
     for file_idx, file_path in enumerate(files_in_root_dir):
         (
             articleSnippet,
@@ -246,6 +259,7 @@ def main():
             if subcategories:
                 categorisedFiles += 1
                 printArticleDetails(
+                    startTime,
                     articleSnippet,
                     fileName,
                     categorisedFiles,
@@ -254,18 +268,37 @@ def main():
                     fileUrl,
                 )
                 subcategories["_DELETE"] = {}
+                subcategories["_UNDO"] = {}
+                subcategories["_PARENT"] = {}
                 subcategory_input = select_category(
                     session, subcategories, "Subcategory: "
                 )
                 if subcategory_input:
                     if subcategory_input == "_DELETE":
-                        print(f"\nDeleting {file_path}")
-                        os.remove(file_path)
+                        print(f"\n Moving to TRASH {file_path}")
+                        dest = "~/.local/share/Trash/files/" + fileName
+                        shutil.move(file_path, dest)
+                        lastMoveDestination = dest
+                        lastMoveOrigin = file_path
+                    elif subcategory_input == "_UNDO":
+                        print(
+                            f"\n\n\n\n\nMOVING BACK FROM {lastMoveDestination} TO {lastMoveOrigin}"
+                        )
+                        shutil.move(lastMoveDestination, lastMoveOrigin)
+                    elif subcategory_input == "_PARENT":
+                        parentFolderPath = filePath.split("/")[:-2]
+                        destPath = "/".join(parentFolderPath) + "/" + fileName
+                        print(f"\nMoving {file_path} to {destPath}")
+                        # shutil.move(file_path, filePath)
+                        lastMoveOrigin = file_path
+                        lastMoveDestination = destPath
                     else:
                         choice = subcategories.get(subcategory_input)
                         destination = os.path.join(choice["fullPath"], fileName)
                         print(f"\nMoving {file_path} to {destination}")
                         shutil.move(file_path, destination)
+                        lastMoveOrigin = file_path
+                        lastMoveDestination = destination
 
 
 if __name__ == "__main__":
