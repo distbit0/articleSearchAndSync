@@ -286,10 +286,10 @@ def main():
                         )
                         shutil.move(lastMoveDestination, lastMoveOrigin)
                     elif subcategory_input == "_PARENT":
-                        parentFolderPath = filePath.split("/")[:-2]
+                        parentFolderPath = filePath.split("/")[:-1]
                         destPath = "/".join(parentFolderPath) + "/" + fileName
                         print(f"\nMoving {file_path} to {destPath}")
-                        # shutil.move(file_path, filePath)
+                        shutil.move(file_path, destPath)
                         lastMoveOrigin = file_path
                         lastMoveDestination = destPath
                     else:
