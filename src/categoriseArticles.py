@@ -1,4 +1,5 @@
 from inscriptis import get_text as getHtmlText
+import cProfile
 import shutil
 import utils
 from utils import getConfig
@@ -69,8 +70,10 @@ def getTextOfFile(filePath):
         fileUrl = utils.getUrlOfArticle(filePath)
     if "pdf" in fileExtension:
         fileText = utils.getPdfText(filePath, pages=10)
-
-    fileSnippet = display_article_snippet(fileText)
+    if fileText == None:
+        fileSnippet = "Article could not be read!"
+    else:
+        fileSnippet = display_article_snippet(fileText)
     return fileSnippet, fileUrl
 
 
@@ -234,11 +237,6 @@ def main():
     categorisedFiles = 0
     startTime = time.time()
     for file_idx, file_path in enumerate(files_in_root_dir):
-        (
-            articleSnippet,
-            fileUrl,
-        ) = next_file_data_queue.get()
-
         fileName = file_path.split("/")[-1]
         filePath = "/".join(file_path.split("/")[:-1])
         threading.Thread(
@@ -257,6 +255,10 @@ def main():
                 else categories[fileFolderName].get("subCategories", {})
             )
             if subcategories:
+                (
+                    articleSnippet,
+                    fileUrl,
+                ) = next_file_data_queue.get()
                 categorisedFiles += 1
                 printArticleDetails(
                     startTime,
@@ -306,4 +308,11 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    profiler = cProfile.Profile()
+    profiler.enable()
+    try:
+        main()
+    except:
+        pass
+    profiler.disable()
+    profiler.print_stats(sort="cumtime")
