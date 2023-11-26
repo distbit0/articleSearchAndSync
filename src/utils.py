@@ -1,4 +1,5 @@
 import re
+from eldar import Query
 import hashlib
 import glob
 import urlexpander
@@ -140,7 +141,7 @@ def getUrlOfArticle(articleFilePath):
     return extractedUrl
 
 
-def getUrlsInLists(folder="", subject="", pattern=""):
+def getArticleUrlsInSubject(folder="", subject="", pattern=""):
     extractedUrls = {}
     articleFilePattern = getConfig()["articleFilePattern"] if pattern == "" else pattern
     articleFileFolder = getConfig()["articleFileFolder"] if folder == "" else folder
@@ -155,7 +156,7 @@ def getUrlsInLists(folder="", subject="", pattern=""):
 
 
 def markArticlesWithUrlsAsRead(readUrls, articleFolder):
-    articleUrls = getUrlsInLists(folder=articleFolder)
+    articleUrls = getArticleUrlsInSubject(folder=articleFolder)
     articleUrls = {v: k for k, v in articleUrls.items()}
     for url in readUrls:
         if url in articleUrls:
@@ -403,20 +404,74 @@ def getPdfText(pdf, pages=None):
     return pdfText
 
 
-def read_file_with_encoding(filePath):
-    encodings = [
-        "utf-8",
-        "latin-1",
-        "windows-1252",
-        "ascii",
-        "iso-8859-1",
-    ]  # Add more if needed
+def getArticlesFromList(listName):
+    listPath = os.path.join(
+        getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"
+    )
+    listText = open(listPath).read().strip()
+    listArticles = listText.split("\n:")[-1].split("\n")[1:]
+    articleFileNames = []
+    for articleLine in listArticles:
+        articleFileName = articleLine.split("\t")[0].split("/")[-1]
+        articleFileNames.append(articleFileName)
+    return articleFileNames
 
-    for encoding in encodings:
-        try:
-            with open(filePath, "r", encoding=encoding) as file:
-                return file.read()
-        except UnicodeDecodeError:
+
+def getPDFPathMappings():
+    pdfToTextFileMap = {}
+    indexFolderPath = getAbsPath("../storage/indexedPDFs")
+    PDFTextFilePaths = glob.glob(indexFolderPath + "/**/*.txt", recursive=True)
+    for file in PDFTextFilePaths:
+        fileText = open(file).read()
+        pdfPath = re.search("PdfFilePath: (.*)\n", fileText).group(1).strip()
+        pdfToTextFileMap[file] = pdfPath
+
+    return pdfToTextFileMap
+
+
+def checkArticleSubject(articlePath, subjects):
+    if not subjects:
+        return True
+    articlePath = "/".join(articlePath.split("/")[:-1])
+    for subject in subjects:
+        if subject.lower() in articlePath.lower():
+            return True
+    return False
+
+
+def searchArticlesForQuery(query, subjects=[], onlyUnread=False):
+    searchFilter = Query(query, ignore_case=True, match_word=False, ignore_accent=False)
+    matchingArticleUrls = []
+    matchingArticlePaths = []
+    articleFilePattern = getConfig()["articleFilePattern"]
+    articleFileFolder = getConfig()["articleFileFolder"]
+    articlePathPattern = articleFileFolder + articleFilePattern
+    allArticlesPaths = glob.glob(articlePathPattern, recursive=True)
+    textToPdfFileMap = getPDFPathMappings()
+    allArticlesPaths.extend(textToPdfFileMap)
+    for articlePath in allArticlesPaths:
+        originalArticlePath = (
+            textToPdfFileMap[articlePath]
+            if articlePath in textToPdfFileMap
+            else articlePath
+        )
+
+        skipBecauseRead = onlyUnread and originalArticlePath.split("/")[-1][0] == "."
+        invalidSubject = not checkArticleSubject(originalArticlePath, subjects)
+
+        if skipBecauseRead or invalidSubject:
             continue
 
-    return None
+        if query == "*":
+            matchInAricle = True
+        else:
+            articleText = open(articlePath, errors="ignore").read().strip()
+            matchInAricle = searchFilter(articleText)
+
+        if matchInAricle:
+            articleUrl = getUrlOfArticle(articlePath)
+            if articleUrl not in matchingArticleUrls and articleUrl:
+                matchingArticleUrls.append(articleUrl)
+                matchingArticlePaths.append(originalArticlePath)
+
+    return matchingArticleUrls, matchingArticlePaths

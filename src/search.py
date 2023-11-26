@@ -1,64 +1,11 @@
 from utils import getConfig
-from eldar import Query
-from markdownify import markdownify as md
-import glob
 import utils
 import argparse
 import subprocess
 import shutil
-import re
 import os
 
 # import semanticSearch
-
-
-def getPDFPathMappings():
-    pdfToTextFileMap = {}
-    indexFolderPath = utils.getAbsPath("../storage/indexedPDFs")
-    PDFTextFilePaths = glob.glob(indexFolderPath + "/**/*.txt", recursive=True)
-    for file in PDFTextFilePaths:
-        fileText = open(file).read()
-        pdfPath = re.search("PdfFilePath: (.*)\n", fileText).group(1).strip()
-        pdfToTextFileMap[file] = pdfPath
-
-    return pdfToTextFileMap
-
-
-def checkArticleSubject(articlePath, subject):
-    articlePath = "/".join(articlePath.split("/")[:-1])
-    if subject.lower() not in articlePath.lower() and subject:
-        return False
-    return True
-
-
-def searchArticlesForQuery(query, subject=""):
-    searchFilter = Query(query, ignore_case=True, match_word=False, ignore_accent=False)
-    matchingArticleUrls = []
-    matchingArticlePaths = []
-    articleFilePattern = getConfig()["articleFilePattern"]
-    articleFileFolder = getConfig()["articleFileFolder"]
-    articlePathPattern = articleFileFolder + articleFilePattern
-    allArticlesPaths = glob.glob(articlePathPattern, recursive=True)
-    textToPdfFileMap = getPDFPathMappings()
-    allArticlesPaths.extend(textToPdfFileMap)
-    for i, articlePath in enumerate(allArticlesPaths):
-        originalArticlePath = (
-            textToPdfFileMap[articlePath]
-            if articlePath in textToPdfFileMap
-            else articlePath
-        )
-        if not checkArticleSubject(originalArticlePath, subject):
-            continue
-
-        articleText = open(articlePath, errors="ignore").read().strip()
-        matchInAricle = searchFilter(articleText)
-        if matchInAricle:
-            articleUrl = utils.getUrlOfArticle(articlePath)
-            if articleUrl not in matchingArticleUrls and articleUrl:
-                matchingArticleUrls.append(articleUrl)
-                matchingArticlePaths.append(originalArticlePath)
-
-    return matchingArticleUrls, matchingArticlePaths
 
 
 def getCMDArguments():
@@ -103,8 +50,8 @@ def getCMDArguments():
 
 
 def sendToAtVoice():
-    atVoiceUrlOutputFile = (
-        getConfig()["atVoiceURLFileFolder"] + getConfig()["atVoiceURLTmpFile"]
+    atVoiceUrlOutputFile = os.path.join(
+        getConfig()["atVoiceFolderPath"], ".config", "Temp.txt"
     )
     shutil.copyfile(
         utils.getAbsPath("../output/searchResultUrls.txt"), atVoiceUrlOutputFile
@@ -117,7 +64,8 @@ def main():
     ###################################
     # profiler = cProfile.Profile()
     # profiler.enable()
-    articleUrls, articlePaths = searchArticlesForQuery(args.query, args.subject)
+    subjectList = [args.subject] if args.subject else []
+    articleUrls, articlePaths = utils.searchArticlesForQuery(args.query, subjectList)
     # profiler.disable()
     # stats = pstats.Stats(profiler).sort_stats("cumtime")
     # stats.print_stats()

@@ -1,5 +1,4 @@
 from inscriptis import get_text as getHtmlText
-import cProfile
 import shutil
 import utils
 from utils import getConfig
@@ -185,13 +184,9 @@ def getAllFiles():
     return all_files
 
 
-def printArticleDetails(
-    startTime, next_file_data_queue, fileName, done, remaining, file_path
-):
-    (
-        snippet,
-        fileUrl,
-    ) = next_file_data_queue.get()
+def printArticleDetails(startTime, next_file_data_queue, done, remaining, file_path):
+    snippet, fileUrl = next_file_data_queue.get()
+    fileName = file_path.split("/")[-1]
     avgTimePerArticle = (time.time() - startTime) / done
     snippet = "\n\n" + snippet
     textToPrint = "\n\n\n" + file_path.split("/")[-2] + "\n\n\n" + fileName
@@ -280,7 +275,6 @@ def main():
             printArticleDetails(
                 startTime,
                 next_file_data_queue,
-                fileName,
                 categorisedFileCount,
                 uncategorized_files,
                 file_path,

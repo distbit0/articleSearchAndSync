@@ -50,51 +50,39 @@ def calcUrlsToAdd(onlyRead=False):
     return urlsToAdd
 
 
-def generateUrlImportFilesForAtVoice(urlsToAdd):
-    atVoiceURLFileFolder = getConfig()["atVoiceURLFileFolder"]
-    linkText = "\n".join(["\n".join(urlsToAdd[subject]) for subject in urlsToAdd])
-    print(atVoiceURLFileFolder + "links" + ".txt")
-    with open(atVoiceURLFileFolder + "links" + ".txt", "w") as f:
-        f.write(linkText)
-
-
-def moveFilesMarkedToMove():
-    atVoiceFolder = getConfig()["atVoiceFolderPath"]
-    articleFileFolder = getConfig()["articleFileFolder"]
-    markedToMoveFile = atVoiceFolder + "/.config/_markedToMove.rlst"
-    markedToMoveText = open(markedToMoveFile).read().strip()
-    markedToMoveFiles = markedToMoveText.split("\n:")[-1].split("\n")[1:]
-    for file_path in markedToMoveFiles:
-        fileName = file_path.split("/")[-1].split("\t")[0]
-        utils.moveFilesWithNameToRootDir(articleFileFolder, fileName)
-
-
 def markReadBookmarksAsRead():
     readUrls = calcUrlsToAdd(onlyRead=True)["AlreadyRead"]
     utils.markArticlesWithUrlsAsRead(readUrls, getConfig()["articleFileFolder"])
 
 
-def deleteFilesMarkedToDelete():
-    atVoiceFolder = getConfig()["atVoiceFolderPath"]
+def generateUrlImportFilesForAtVoice(urlsToAdd):
+    atVoiceFolderPath = getConfig()["atVoiceFolderPath"]
+    linkText = "\n".join(["\n".join(urlsToAdd[subject]) for subject in urlsToAdd])
+    print(atVoiceFolderPath + "links" + ".txt")
+    with open(os.path.join(atVoiceFolderPath, ".config", "links.txt"), "w") as f:
+        f.write(linkText)
+
+
+def moveFilesMarkedToMove():
+    markedToMoveFiles = utils.getArticlesFromList("_markedToMove")
     articleFileFolder = getConfig()["articleFileFolder"]
-    markedAsDeletedFile = atVoiceFolder + "/.config/_markedAsDeleted.rlst"
-    markedAsDeletedText = open(markedAsDeletedFile).read().strip()
-    markedAsDeletedFiles = markedAsDeletedText.split("\n:")[-1].split("\n")[1:]
-    for file_path in markedAsDeletedFiles:
-        fileName = file_path.split("/")[-1].split("\t")[0]
+    for fileName in markedToMoveFiles:
+        utils.moveFilesWithNameToRootDir(articleFileFolder, fileName)
+
+
+def deleteFilesMarkedToDelete():
+    markedAsDeletedFiles = utils.getArticlesFromList("_markedAsDeleted")
+    articleFileFolder = getConfig()["articleFileFolder"]
+    for fileName in markedAsDeletedFiles:
         utils.delete_files_with_name(articleFileFolder, fileName)
 
 
 def hideArticlesMarkedAsRead():
-    atVoiceFolder = getConfig()["atVoiceFolderPath"]
+    markedAsReadFiles = utils.getArticlesFromList("_markedAsRead")
     articleFileFolder = getConfig()["articleFileFolder"]
-    markedAsDeletedFile = atVoiceFolder + "/.config/_markedAsRead.rlst"
-    markedAsDeletedText = open(markedAsDeletedFile).read().strip()
-    markedAsDeletedFiles = markedAsDeletedText.split("\n:")[-1].split("\n")[1:]
-    for file_path in markedAsDeletedFiles:
-        if "articleUrls" in file_path:
+    for fileName in markedAsReadFiles:
+        if "articleUrls" in fileName:
             continue
-        fileName = file_path.split("\t")[0].split("/")[-1]
         utils.hideFilesWithName(articleFileFolder, fileName)
 
 
@@ -210,7 +198,7 @@ if __name__ == "__main__":
     hideArticlesMarkedAsRead()
     markReadBookmarksAsRead()
     # delete duplicate files
-    articlesAndUrls = utils.getUrlsInLists()
+    articlesAndUrls = utils.getArticleUrlsInSubject()
     deleteDuplicateArticleFiles(articlesAndUrls)
     deleteDuplicateFiles(getConfig()["articleFileFolder"])
     utils.addUrlToUrlFile(
