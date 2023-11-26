@@ -18,7 +18,6 @@ def addArticlesToList(listName, articlePathsForList):
         getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"
     )
     articleNamesInList = getArticlesFromList(listName)
-    # print("\n\n\n\n\n\n\n\n" + listName, "\n", articleNamesInList)
     droidEbooksFolderPath = getConfig()["droidEbooksFolderPath"]
     articleFileFolder = getConfig()["articleFileFolder"]
     linesToAppend = []

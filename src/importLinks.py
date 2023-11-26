@@ -4,6 +4,7 @@ from utils import getConfig
 import os
 from collections import defaultdict
 import reTitlePDFs
+import shutil
 
 
 def getBookmarks():
@@ -132,6 +133,21 @@ def deleteDuplicateArticleFiles(urls_to_filenames):
             dir_seen_urls[directory].add(url)
 
 
+def moveDocsToTargetFolder():
+    docPaths = []
+    PDFFolders = getConfig()["pdfSourceFolders"]
+    docFormatsToMove = getConfig()["docFormatsToMove"]
+    targetFolder = getConfig()["articleFileFolder"]
+    for folderPath in PDFFolders:
+        docPaths += utils.getDocsInFolder(folderPath, formats=docFormatsToMove)
+
+    print("LEN OF docPath", len(docPaths))
+    for docPath in docPaths:
+        docName = docPath.split("/")[-1]
+        print("Moving", docName, "to", targetFolder, " derived from", docPath)
+        shutil.move(docPath, targetFolder + "/" + docName)
+
+
 def deleteDuplicateFiles(directory_path):
     duplicate_size_files = defaultdict(list)
 
@@ -189,7 +205,7 @@ def deleteDuplicateFiles(directory_path):
 if __name__ == "__main__":
     # import new documents and give them readable filenames
     reTitlePDFs.retitleAllPDFs()
-    reTitlePDFs.moveDocsToTargetFolder()
+    moveDocsToTargetFolder()
     # update urlList files
     updateUrlListFiles(getConfig()["articleFileFolder"])
     # act on requests to delete/move/hide articles from atVoice app

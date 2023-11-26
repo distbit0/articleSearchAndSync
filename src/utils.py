@@ -126,6 +126,11 @@ def formatUrl(url):
 
 def getUrlOfArticle(articleFilePath):
     extractedUrl = ""
+    articleExtension = articleFilePath.split(".")[-1].lower()
+
+    if articleExtension not in ["txt", "html"]:
+        return articleFilePath
+
     with open(articleFilePath, errors="ignore") as _file:
         fileText = _file.read()
         urlPatterns = getConfig()["urlPatterns"]
@@ -336,40 +341,6 @@ def get_id_type(paper_id):
     return False
 
 
-def getDOITitle(doi):
-    # Make a request to the CrossRef API to get the metadata for the paper
-    headers = {"Accept": "application/json"}
-    res = requests.get(f"https://api.crossref.org/v1/works/{doi}", headers=headers)
-
-    # Check if the request was successful
-    if res.status_code != 200:
-        return "Error: Could not retrieve paper information"
-
-    # Extract the title from the response
-    data = res.json()
-    title = data["message"]["title"][0]
-    return title
-
-
-def getArxivTitle(arxiv_id):
-    # Make a request to the arXiv API to get the metadata for the paper
-    print(arxiv_id)
-    res = requests.get(f"http://export.arxiv.org/api/query?id_list={arxiv_id}")
-
-    # Check if the request was successful
-    if res.status_code != 200:
-        return "Error: Could not retrieve paper information"
-
-    # Extract the title from the response
-    data = res.text.replace("\n", "").replace("\t", "")
-    # print(data)
-    start = data.index("</published>    <title>") + len("</published>    <title>")
-    end = data.index("</title>    <summary>")
-    # print(start, end)
-    title = data[start:end]
-    return title
-
-
 def calculate_file_hash(file_path):
     hasher = hashlib.sha256()
     file_size = os.path.getsize(file_path)
@@ -439,14 +410,45 @@ def checkArticleSubject(articlePath, subjects):
     return False
 
 
+def getArticlePathsForQuery(query):
+    articleFileFolder = getConfig()["articleFileFolder"]
+    if query == "*":
+        filePatterns = []
+        docFormatsToMove = getConfig()["docFormatsToMove"]
+        docFormatsToMove.remove("pdf")
+        for docFormat in docFormatsToMove:
+            articleFilePattern = "**/*" + docFormat
+            filePatterns.append(articleFilePattern)
+    else:
+        filePatterns = [getConfig()["articleFilePattern"]]
+
+    allArticlesPaths = []
+    for pattern in filePatterns:
+        articlePathPattern = articleFileFolder + pattern
+        articlePaths = list(glob.glob(articlePathPattern, recursive=True))
+        allArticlesPaths.extend(articlePaths)
+
+    allArticlesPaths = list(set(allArticlesPaths))
+    return allArticlesPaths
+
+
+def getDocsInFolder(folderPath, formats=["pdf"]):
+    docPaths = []
+    for filePath in glob.glob(folderPath + "/*", recursive=True):
+        if "." not in filePath:
+            continue
+        isDoc = filePath.lower().split(".")[-1] in formats
+        if isDoc:
+            docPaths.append(filePath)
+
+    return docPaths
+
+
 def searchArticlesForQuery(query, subjects=[], onlyUnread=False):
     searchFilter = Query(query, ignore_case=True, match_word=False, ignore_accent=False)
     matchingArticleUrls = []
     matchingArticlePaths = []
-    articleFilePattern = getConfig()["articleFilePattern"]
-    articleFileFolder = getConfig()["articleFileFolder"]
-    articlePathPattern = articleFileFolder + articleFilePattern
-    allArticlesPaths = glob.glob(articlePathPattern, recursive=True)
+    allArticlesPaths = getArticlePathsForQuery(query)
     textToPdfFileMap = getPDFPathMappings()
     allArticlesPaths.extend(textToPdfFileMap)
     for articlePath in allArticlesPaths:
@@ -455,23 +457,25 @@ def searchArticlesForQuery(query, subjects=[], onlyUnread=False):
             if articlePath in textToPdfFileMap
             else articlePath
         )
-
-        skipBecauseRead = onlyUnread and originalArticlePath.split("/")[-1][0] == "."
+        skipBecauseIsRead = onlyUnread and originalArticlePath.split("/")[-1][0] == "."
         invalidSubject = not checkArticleSubject(originalArticlePath, subjects)
 
-        if skipBecauseRead or invalidSubject:
+        if skipBecauseIsRead or invalidSubject:
             continue
 
-        if query == "*":
-            matchInAricle = True
-        else:
-            articleText = open(articlePath, errors="ignore").read().strip()
-            matchInAricle = searchFilter(articleText)
+        matchInAricle = (
+            True
+            if query == "*"
+            else searchFilter(open(articlePath, errors="ignore").read().strip())
+        )
 
-        if matchInAricle:
-            articleUrl = getUrlOfArticle(articlePath)
-            if articleUrl not in matchingArticleUrls and articleUrl:
-                matchingArticleUrls.append(articleUrl)
-                matchingArticlePaths.append(originalArticlePath)
+        if not matchInAricle:
+            continue
+
+        articleUrl = getUrlOfArticle(articlePath)
+
+        if (articleUrl not in matchingArticleUrls) and articleUrl:
+            matchingArticleUrls.append(articleUrl)
+            matchingArticlePaths.append(originalArticlePath)
 
     return matchingArticleUrls, matchingArticlePaths

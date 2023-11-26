@@ -3,6 +3,7 @@ from utils import getConfig
 import os
 import glob
 import shutil
+import requests
 
 
 def removeIllegalChars(pdfTitle):
@@ -11,6 +12,40 @@ def removeIllegalChars(pdfTitle):
         pdfTitle = pdfTitle.replace(char, "")
 
     return pdfTitle
+
+
+def getArxivTitle(arxiv_id):
+    # Make a request to the arXiv API to get the metadata for the paper
+    print(arxiv_id)
+    res = requests.get(f"http://export.arxiv.org/api/query?id_list={arxiv_id}")
+
+    # Check if the request was successful
+    if res.status_code != 200:
+        return "Error: Could not retrieve paper information"
+
+    # Extract the title from the response
+    data = res.text.replace("\n", "").replace("\t", "")
+    # print(data)
+    start = data.index("</published>    <title>") + len("</published>    <title>")
+    end = data.index("</title>    <summary>")
+    # print(start, end)
+    title = data[start:end]
+    return title
+
+
+def getDOITitle(doi):
+    # Make a request to the CrossRef API to get the metadata for the paper
+    headers = {"Accept": "application/json"}
+    res = requests.get(f"https://api.crossref.org/v1/works/{doi}", headers=headers)
+
+    # Check if the request was successful
+    if res.status_code != 200:
+        return "Error: Could not retrieve paper information"
+
+    # Extract the title from the response
+    data = res.json()
+    title = data["message"]["title"][0]
+    return title
 
 
 def getPDFTitle(pdfPath):
@@ -40,20 +75,8 @@ def reTitlePDF(pdfPath):
     return newPath
 
 
-def getDocsInFolder(folderPath, formats=["pdf"]):
-    docPaths = []
-    for filePath in glob.glob(folderPath + "/*", recursive=True):
-        if "." not in filePath:
-            continue
-        isDoc = filePath.lower().split(".")[-1] in formats
-        if isDoc:
-            docPaths.append(filePath)
-
-    return docPaths
-
-
 def retitlePDFsInFolder(folderPath):
-    pdfPaths = getDocsInFolder(folderPath, formats=["pdf"])
+    pdfPaths = utils.getDocsInFolder(folderPath, formats=["pdf"])
     newPdfPaths = []
     for pdfPath in pdfPaths:
         if pdfPath[-4:] != ".pdf":
@@ -70,18 +93,3 @@ def retitleAllPDFs():
         retitlePDFsInFolder(folderPath)
 
     return
-
-
-def moveDocsToTargetFolder():
-    docPaths = []
-    PDFFolders = getConfig()["pdfSourceFolders"]
-    docFormatsToMove = getConfig()["docFormatsToMove"]
-    targetFolder = getConfig()["articleFileFolder"]
-    for folderPath in PDFFolders:
-        docPaths += getDocsInFolder(folderPath, formats=docFormatsToMove)
-
-    print("LEN OF docPath", len(docPaths))
-    for docPath in docPaths:
-        docName = docPath.split("/")[-1]
-        print("Moving", docName, "to", targetFolder, " derived from", docPath)
-        shutil.move(docPath, targetFolder + "/" + docName)
