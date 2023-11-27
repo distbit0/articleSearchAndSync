@@ -1,0 +1,167 @@
+{
+    "articleFileFolder": "/home/pimania/ebooks/",
+    "bookmarksFilePath": "/home/pimania/miscSyncs/bookmarks/Bookmarks",
+    "atVoiceFolderPath": "/home/pimania/atVoice",
+    "droidEbooksFolderPath": "/storage/emulated/0/Ebooks/",
+    "invalidBlogSubstrings": [
+        "hackmd.io",
+        "https://github.com/",
+        "https://www.notion.so",
+        "wikipedia",
+        ".notion.site",
+        "https://www.coindesk.com",
+        "https://docs.",
+        "gitbook",
+        "reddit.com"
+    ],
+    "urlPatterns": [
+        "\\<\\!\\-\\- Hyperionics-OriginHtml(.*?)-->",
+        "\\<\\!\\-\\- Hyperionics-SimpleHtml (.*?)-->",
+        "Snapshot-Content-Location: (.*)\n"
+    ],
+    "pdfSearchFolders": {
+        "/home/pimania/ebooks/Decentralised Finance": {
+            "pdfBaseURL": "http://192.168.0.28:8887/Decentralised%20Finance/",
+            "subject": "Defi"
+        }
+    },
+    "pdfSourceFolders": [
+        "/home/pimania/Downloads",
+        "/home/pimania/atVoice/_articleDownload"
+    ],
+    "docFormatsToMove": [
+        "pdf",
+        "epub",
+        "mobi",
+        "html",
+        "mhtml"
+    ],
+    "docFormatsToAutoCategorise": [
+        "pdf",
+        "html",
+        "mhtml"
+    ],
+    "moveAllDocsToTargetFolder": true,
+    "illegalFileNameChars": [
+        ":",
+        "\n",
+        "?",
+        "/",
+        ","
+    ],
+    "wordsUsedToCategorise": 350,
+    "foldersToExcludeFromCategorisation": [
+        "tweetThreads",
+        "telegramChats",
+        "discordChannels",
+        "Personal",
+        ".git",
+        ".stfolder"
+    ],
+    "listToFolderMappings": {
+        "entropy": {
+            "folders": [
+                "Physics/entropy",
+                "Computer Science/reversible logic"
+            ],
+            "onlyUnread": true
+        },
+        "epistemology": {
+            "folders": [
+                "Machine and human thought/epistemology"
+            ],
+            "onlyUnread": true
+        },
+        "evolution": {
+            "folders": [
+                "Machine and human thought/evolution",
+                "Machine and human thought/emergent systems"
+            ],
+            "onlyUnread": true
+        },
+        "gradient descent": {
+            "folders": [
+                "Machine and human thought/gradient descent"
+            ],
+            "onlyUnread": true
+        },
+        "agi": {
+            "folders": [
+                "Machine and human thought/AGI",
+                "Machine and human thought/connectionist AGI",
+                "Machine and human thought/consciousness and intelligence",
+                "Machine and human thought/LLM AGI",
+                "Machine and human thought/symbolic AGI"
+            ],
+            "onlyUnread": true
+        },
+        "tools for thought": {
+            "folders": [
+                "Machine and human thought/tools for thought"
+            ],
+            "onlyUnread": true
+        },
+        "mental models": {
+            "folders": [
+                "Machine and human thought/problem solving and mental models",
+                "Machine and human thought/learning and memory"
+            ],
+            "onlyUnread": true
+        },
+        "zettelkasten": {
+            "folders": [
+                "Machine and human thought/zettelkasten"
+            ],
+            "onlyUnread": true
+        },
+        "lending": {
+            "folders": [
+                "Decentralised Finance/lending"
+            ],
+            "onlyUnread": true
+        },
+        "options": {
+            "folders": [
+                "Decentralised Finance/options"
+            ],
+            "onlyUnread": true
+        },
+        "oracles": {
+            "folders": [
+                "Decentralised Finance/oracles"
+            ],
+            "onlyUnread": true
+        },
+        "perps": {
+            "folders": [
+                "Decentralised Finance/futures, margin and perps"
+            ],
+            "onlyUnread": true
+        },
+        "stables": {
+            "folders": [
+                "Decentralised Finance/stablecoins and synths"
+            ],
+            "onlyUnread": true
+        },
+        "dexes": {
+            "folders": [
+                "Decentralised Finance/dexes"
+            ],
+            "onlyUnread": true
+        },
+        "diagrams": {
+            "folders": [
+                "Philosophy/diagrams"
+            ],
+            "onlyUnread": true
+        },
+        "entrepreneurship": {
+            "folders": [
+                "Business and entrepreneurship/Entrepreneurship",
+                "Business and entrepreneurship/mental models and advice"
+            ],
+            "onlyUnread": true
+        }
+    }
+}
