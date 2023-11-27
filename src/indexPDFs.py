@@ -1,18 +1,15 @@
 import utils
 from utils import getConfig
 import glob
-import PyPDF2
 import urllib.parse
-import traceback
+from pathlib import Path
 
 
 def getPDFFolders():
     pdfFolders = getConfig()["pdfSearchFolders"]
     indexFolders = [
         folder.split("/")[-1]
-        for folder in glob.glob(
-            utils.getAbsPath("../storage/indexedPDFs") + "/**", recursive=True
-        )
+        for folder in glob.glob(utils.getAbsPath("../storage/indexedPDFs") + "/**")
     ]
     print("INDEX FOLDERS: ", indexFolders, "\nPDF FOLDERS: ", pdfFolders)
     return pdfFolders, indexFolders
@@ -26,12 +23,16 @@ def indexAllPDFFolders(pdfFolders, indexFolders):
         alreadyIndexedPDFs = []
         if subject in indexFolders:
             alreadyIndexedPDFs = [
-                file.split("/")[-1].strip(".txt")
+                file.split("/")[-1].replace(".txt", "")
                 for file in glob.glob(indexSubjectPath + "/**.txt", recursive=True)
             ]
         else:
-            utils.mkdirAndParents(indexSubjectPath)
+            mkdirAndParents(indexSubjectPath)
+        print(folder + "/**/*.pdf")
         pdfFiles = glob.glob(folder + "/**/*.pdf", recursive=True)
+        print(
+            "PDF FILES: ", len(pdfFiles), " ALREADY INDEXED: ", len(alreadyIndexedPDFs)
+        )
         for pdf in pdfFiles:
             fullFileName = pdf.split("/")[-1]
             pdfFileName = fullFileName.replace(".pdf", "")
@@ -40,6 +41,10 @@ def indexAllPDFFolders(pdfFolders, indexFolders):
 
             if pdfFileName not in alreadyIndexedPDFs:
                 indexPDF(pdf, newBaseUrl, pdfFileName, indexSubjectPath)
+
+
+def mkdirAndParents(directory):
+    Path(directory).mkdir(parents=True, exist_ok=True)
 
 
 def indexPDF(pdf, baseUrl, pdfFileName, indexFolderPath):

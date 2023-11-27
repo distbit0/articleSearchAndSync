@@ -1,6 +1,5 @@
 import re
 from eldar import Query
-import hashlib
 import glob
 import urlexpander
 from os import path
@@ -10,7 +9,6 @@ import os
 import snscrape.modules.twitter as sntwitter
 import snscrape
 import shutil
-import requests
 import PyPDF2
 import traceback
 
@@ -308,10 +306,6 @@ def isValidBlog(url):
     return validBlog
 
 
-def mkdirAndParents(directory):
-    Path(directory).mkdir(parents=True, exist_ok=True)
-
-
 def getAbsPath(relPath):
     basepath = path.dirname(__file__)
     fullPath = path.abspath(path.join(basepath, relPath))
@@ -325,35 +319,6 @@ def getConfig():
         config = json.loads(config.read())
 
     return config
-
-
-def get_id_type(paper_id):
-    # Check if the given string is a valid arXiv ID
-    if re.match(r"^\d+\.\d+$", paper_id):
-        return "arxiv"
-
-    # Check if the given string is a valid DOI
-    if paper_id.startswith("10."):
-        return "doi"
-
-    # If the string is neither an arXiv ID nor a DOI, return False
-    return False
-
-
-def calculate_file_hash(file_path):
-    hasher = hashlib.sha256()
-    file_size = os.path.getsize(file_path)
-
-    if file_size < 4096:
-        with open(file_path, "rb") as f:
-            hasher.update(f.read())
-    else:
-        offset = (file_size - 4096) // 2
-        with open(file_path, "rb") as f:
-            f.seek(offset)
-            hasher.update(f.read(4096))
-
-    return hasher.hexdigest()
 
 
 def getPdfText(pdf, pages=None):

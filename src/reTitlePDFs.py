@@ -1,9 +1,8 @@
 import utils
 from utils import getConfig
 import os
-import glob
-import shutil
 import requests
+import re
 
 
 def removeIllegalChars(pdfTitle):
@@ -48,13 +47,26 @@ def getDOITitle(doi):
     return title
 
 
+def get_id_type(paper_id):
+    # Check if the given string is a valid arXiv ID
+    if re.match(r"^\d+\.\d+$", paper_id):
+        return "arxiv"
+
+    # Check if the given string is a valid DOI
+    if paper_id.startswith("10."):
+        return "doi"
+
+    # If the string is neither an arXiv ID nor a DOI, return False
+    return False
+
+
 def getPDFTitle(pdfPath):
     pdfTitle = ""
     originalFileName = pdfPath.split("/")[-1]
     pdfTitle = os.popen('python3 -m pdftitle -p "' + pdfPath + '"').read()
     if (not pdfTitle) or len(pdfTitle) < 4:
         pdfTitle = originalFileName[:-4]
-        idType = utils.get_id_type(pdfTitle)
+        idType = get_id_type(pdfTitle)
         if idType == "arxiv":
             pdfTitle = getArxivTitle(pdfTitle)
         elif idType == "doi":
