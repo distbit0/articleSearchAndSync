@@ -65,10 +65,14 @@ def main():
     # profiler = cProfile.Profile()
     # profiler.enable()
     subjectList = [args.subject] if args.subject else []
-    articleUrls, articlePaths = utils.searchArticlesForQuery(args.query, subjectList)
+    articles = utils.searchArticlesForQuery(
+        args.query, subjectList, onlyUnread=False, formats=["html", "pdf"]
+    )
     # profiler.disable()
     # stats = pstats.Stats(profiler).sort_stats("cumtime")
     # stats.print_stats()
+    articleUrls = [url for url in articles.values() if url]
+    articlePaths = list(articles.keys())
     if args.sort:
         articleUrls = sorted(articleUrls)
 

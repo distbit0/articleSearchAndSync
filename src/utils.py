@@ -15,6 +15,16 @@ import PyPDF2
 import traceback
 
 
+def checkArticleSubject(articlePath, subjects):
+    if not subjects:
+        return True
+    articlePath = "/".join(articlePath.split("/")[:-1])
+    for subject in subjects:
+        if subject.lower() in articlePath.lower():
+            return True
+    return False
+
+
 def handle_cache(file_name, key, value=None):
     # Load existing cache or initialize an empty cache if the file does not exist
     cache = {}
@@ -129,7 +139,7 @@ def getUrlOfArticle(articleFilePath):
     articleExtension = articleFilePath.split(".")[-1].lower()
 
     if articleExtension not in ["txt", "html"]:
-        return articleFilePath
+        return ""
 
     with open(articleFilePath, errors="ignore") as _file:
         fileText = _file.read()
@@ -146,22 +156,8 @@ def getUrlOfArticle(articleFilePath):
     return extractedUrl
 
 
-def getArticleUrlsInSubject(folder="", subject="", pattern=""):
-    extractedUrls = {}
-    articleFilePattern = getConfig()["articleFilePattern"] if pattern == "" else pattern
-    articleFileFolder = getConfig()["articleFileFolder"] if folder == "" else folder
-    articlePathPattern = articleFileFolder + articleFilePattern
-    for f in glob.glob(articlePathPattern, recursive=True):
-        articleSubject = str(f)
-        if subject.lower() not in articleSubject.lower() and subject:
-            continue
-        url = getUrlOfArticle(f)
-        extractedUrls[f] = url
-    return extractedUrls
-
-
 def markArticlesWithUrlsAsRead(readUrls, articleFolder):
-    articleUrls = getArticleUrlsInSubject(folder=articleFolder)
+    articleUrls = searchArticlesForQuery("*", [], False, ["html"])
     articleUrls = {v: k for k, v in articleUrls.items()}
     for url in readUrls:
         if url in articleUrls:
@@ -306,6 +302,9 @@ def isValidBlog(url):
         if substring.lower() in url.lower():
             validBlog = False
 
+    if not url.startswith("http"):
+        validBlog = False
+
     return validBlog
 
 
@@ -400,57 +399,30 @@ def getPDFPathMappings():
     return pdfToTextFileMap
 
 
-def checkArticleSubject(articlePath, subjects):
-    if not subjects:
-        return True
-    articlePath = "/".join(articlePath.split("/")[:-1])
-    for subject in subjects:
-        if subject.lower() in articlePath.lower():
-            return True
-    return False
-
-
-def getArticlePathsForQuery(query):
-    articleFileFolder = getConfig()["articleFileFolder"]
-    if query == "*":
-        filePatterns = []
-        docFormatsToMove = getConfig()["docFormatsToMove"]
-        docFormatsToMove.remove("pdf")
-        for docFormat in docFormatsToMove:
-            articleFilePattern = "**/*" + docFormat
-            filePatterns.append(articleFilePattern)
-    else:
-        filePatterns = [getConfig()["articleFilePattern"]]
+def getArticlePathsForQuery(query, formats, folderPath=""):
+    folderPath = folderPath if folderPath else getConfig()["articleFileFolder"]
+    formats = formats if query == "*" else ["html"]
+    filePatterns = [folderPath + "**/*" + docFormat for docFormat in formats]
 
     allArticlesPaths = []
     for pattern in filePatterns:
-        articlePathPattern = articleFileFolder + pattern
-        articlePaths = list(glob.glob(articlePathPattern, recursive=True))
+        articlePaths = list(glob.glob(pattern, recursive=True))
         allArticlesPaths.extend(articlePaths)
 
     allArticlesPaths = list(set(allArticlesPaths))
     return allArticlesPaths
 
 
-def getDocsInFolder(folderPath, formats=["pdf"]):
-    docPaths = []
-    for filePath in glob.glob(folderPath + "/*", recursive=True):
-        if "." not in filePath:
-            continue
-        isDoc = filePath.lower().split(".")[-1] in formats
-        if isDoc:
-            docPaths.append(filePath)
-
-    return docPaths
-
-
-def searchArticlesForQuery(query, subjects=[], onlyUnread=False):
+def searchArticlesForQuery(query, subjects=[], onlyUnread=False, formats=[], path=""):
     searchFilter = Query(query, ignore_case=True, match_word=False, ignore_accent=False)
-    matchingArticleUrls = []
-    matchingArticlePaths = []
-    allArticlesPaths = getArticlePathsForQuery(query)
-    textToPdfFileMap = getPDFPathMappings()
-    allArticlesPaths.extend(textToPdfFileMap)
+    matchingArticles = {}
+    textToPdfFileMap = {}
+    if "pdf" in formats:
+        formats.remove("pdf")
+    allArticlesPaths = getArticlePathsForQuery(query, formats, path)
+    if "pdf" in formats and path == "":
+        textToPdfFileMap = getPDFPathMappings()
+        allArticlesPaths.extend(textToPdfFileMap)
     for articlePath in allArticlesPaths:
         originalArticlePath = (
             textToPdfFileMap[articlePath]
@@ -474,8 +446,6 @@ def searchArticlesForQuery(query, subjects=[], onlyUnread=False):
 
         articleUrl = getUrlOfArticle(articlePath)
 
-        if (articleUrl not in matchingArticleUrls) and articleUrl:
-            matchingArticleUrls.append(articleUrl)
-            matchingArticlePaths.append(originalArticlePath)
+        matchingArticles[originalArticlePath] = articleUrl
 
-    return matchingArticleUrls, matchingArticlePaths
+    return matchingArticles

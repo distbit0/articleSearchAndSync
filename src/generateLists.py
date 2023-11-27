@@ -46,8 +46,12 @@ def updateLists():
     for listName, listInfo in listFolderMappings.items():
         listFolders, onlyUnread = listInfo["folders"], listInfo["onlyUnread"]
         articlePathsForList = utils.searchArticlesForQuery(
-            "*", listFolders, onlyUnread
-        )[1]
+            "*",
+            subjects=listFolders,
+            onlyUnread=onlyUnread,
+            formats=getConfig()["docFormatsToMove"],
+        ).keys()
+        articlePathsForList = list(articlePathsForList)
         addArticlesToList(listName, articlePathsForList)
 
 

@@ -51,14 +51,14 @@ def getDOITitle(doi):
 def getPDFTitle(pdfPath):
     pdfTitle = ""
     originalFileName = pdfPath.split("/")[-1]
-    pdfTitle = os.popen('pdftitle -p "' + pdfPath + '"').read()
+    pdfTitle = os.popen('python3 -m pdftitle -p "' + pdfPath + '"').read()
     if (not pdfTitle) or len(pdfTitle) < 4:
         pdfTitle = originalFileName[:-4]
         idType = utils.get_id_type(pdfTitle)
         if idType == "arxiv":
-            pdfTitle = utils.getArxivTitle(pdfTitle)
+            pdfTitle = getArxivTitle(pdfTitle)
         elif idType == "doi":
-            pdfTitle = utils.getDOITitle(pdfTitle)
+            pdfTitle = getDOITitle(pdfTitle)
     else:
         pdfTitle = pdfTitle.strip()
 
@@ -76,11 +76,9 @@ def reTitlePDF(pdfPath):
 
 
 def retitlePDFsInFolder(folderPath):
-    pdfPaths = utils.getDocsInFolder(folderPath, formats=["pdf"])
+    pdfPaths = utils.getArticlePathsForQuery("*", ["pdf"], folderPath)
     newPdfPaths = []
     for pdfPath in pdfPaths:
-        if pdfPath[-4:] != ".pdf":
-            continue
         newPath = reTitlePDF(pdfPath).lstrip(".")
         if newPath not in newPdfPaths:
             newPdfPaths.append(newPath)

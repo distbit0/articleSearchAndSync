@@ -116,6 +116,8 @@ def deleteDuplicateArticleFiles(urls_to_filenames):
 
     for fileName in urls_to_filenames:
         url = urls_to_filenames[fileName]
+        if not url:
+            continue
         url = utils.formatUrl(url)
 
         # Get directory of the file
@@ -139,7 +141,7 @@ def moveDocsToTargetFolder():
     docFormatsToMove = getConfig()["docFormatsToMove"]
     targetFolder = getConfig()["articleFileFolder"]
     for folderPath in PDFFolders:
-        docPaths += utils.getDocsInFolder(folderPath, formats=docFormatsToMove)
+        docPaths += utils.getArticlePathsForQuery("*", docFormatsToMove, folderPath)
 
     print("LEN OF docPath", len(docPaths))
     for docPath in docPaths:
@@ -214,11 +216,12 @@ if __name__ == "__main__":
     hideArticlesMarkedAsRead()
     markReadBookmarksAsRead()
     # delete duplicate files
-    articlesAndUrls = utils.getArticleUrlsInSubject()
-    deleteDuplicateArticleFiles(articlesAndUrls)
+    articles = utils.searchArticlesForQuery("*", [], onlyUnread=False, formats=["html"])
+    articleUrls = [url for url in articles.values() if url]
+    deleteDuplicateArticleFiles(articles)
     deleteDuplicateFiles(getConfig()["articleFileFolder"])
     utils.addUrlToUrlFile(
-        list(articlesAndUrls.values()),
+        articleUrls,
         utils.getAbsPath("../storage/alreadyAddedArticles.txt"),
     )
     urlsToAdd = calcUrlsToAdd()
