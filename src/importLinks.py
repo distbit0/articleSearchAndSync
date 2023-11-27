@@ -157,14 +157,26 @@ def moveDocsToTargetFolder():
     PDFFolders = getConfig()["pdfSourceFolders"]
     docFormatsToMove = getConfig()["docFormatsToMove"]
     targetFolder = getConfig()["articleFileFolder"]
+
     for folderPath in PDFFolders:
         docPaths += utils.getArticlePathsForQuery("*", docFormatsToMove, folderPath)
 
     print("LEN OF docPath", len(docPaths))
+
     for docPath in docPaths:
         docName = docPath.split("/")[-1]
-        print("Moving", docName, "to", targetFolder, " derived from", docPath)
-        shutil.move(docPath, targetFolder + "/" + docName)
+
+        # Create a unique filename if needed
+        baseName, extension = os.path.splitext(docName)
+        uniqueName = docName
+        counter = 1
+        while os.path.exists(os.path.join(targetFolder, uniqueName)):
+            uniqueName = f"{baseName}_{counter}{extension}"
+            counter += 1
+
+        targetPath = os.path.join(targetFolder, uniqueName)
+        print("Moving", docName, "to", targetPath, "derived from", docPath)
+        shutil.move(docPath, targetPath)
 
 
 def deleteDuplicateFiles(directory_path):
