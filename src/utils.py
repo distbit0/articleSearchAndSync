@@ -106,12 +106,12 @@ def makeDiscoursePrintable(url):
     tempUrl = str(url)
     if tempUrl[-1] != "/":
         tempUrl += "/"
-    if re.search("(\/t\/[^\/]*\/\d+\/)", tempUrl):
+    if re.search(r"(\/t\/[^\/]*\/\d+\/)", tempUrl):
         # print(1, tempUrl)
-        if re.search("(t\/[^\/]*\/\d+\/)$", tempUrl):
+        if re.search(r"(t\/[^\/]*\/\d+\/)$", tempUrl):
             tempUrl += "print"
             # print(2, tempUrl)
-        if re.search("(t\/[^\/]*\/\d+\/)(([a-z]+|\d+)\/)$", tempUrl):
+        if re.search(r"(t\/[^\/]*\/\d+\/)(([a-z]+|\d+)\/)$", tempUrl):
             tempUrl = re.sub(
                 r"(t\/[^\/]*\/\d+\/)(([a-z]+|\d+)\/)$", r"\1print", tempUrl
             )
