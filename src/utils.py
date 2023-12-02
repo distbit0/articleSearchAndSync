@@ -6,8 +6,9 @@ from os import path
 import json
 from pathlib import Path
 import os
-import snscrape.modules.twitter as sntwitter
-import snscrape
+
+# import snscrape.modules.twitter as sntwitter
+# import snscrape
 import shutil
 import PyPDF2
 import traceback
@@ -202,28 +203,32 @@ def removeDupeUrlsInFile(urlFile):
 
 
 def getTwitterAccountFromTweet(tweet_id):
-    # Create a TwitterTweetScraper object for the given tweet_id
-    username = handle_cache(getAbsPath("./../storage/twitter_handles.json"), tweet_id)
-    if username != None:
-        return username
+    return "NO USERNAME FOUND"
 
-    scraper = sntwitter.TwitterTweetScraper(tweet_id)
 
-    # Use the get_items method to get the tweet
-    try:
-        for i, tweet in enumerate(scraper.get_items()):
-            if i == 1:
-                break
-    except snscrape.base.ScraperException:
-        handle_cache(getAbsPath("./../storage/twitter_handles.json"), tweet_id, "")
-        return ""
-
-    # Access the 'user' attribute of the tweet, which is a User object,
-    # and then access the 'username' attribute of the User object
-    handle_cache(
-        getAbsPath("./../storage/twitter_handles.json"), tweet_id, tweet.user.username
-    )
-    return tweet.user.username
+#     # Create a TwitterTweetScraper object for the given tweet_id
+#     username = handle_cache(getAbsPath("./../storage/twitter_handles.json"), tweet_id)
+#     if username != None:
+#         return username
+#
+#     scraper = sntwitter.TwitterTweetScraper(tweet_id)
+#
+#     # Use the get_items method to get the tweet
+#     try:
+#         for i, tweet in enumerate(scraper.get_items()):
+#             if i == 1:
+#                 break
+#     except snscrape.base.ScraperException:
+#         handle_cache(getAbsPath("./../storage/twitter_handles.json"), tweet_id, "")
+#         return ""
+#
+#     # Access the 'user' attribute of the tweet, which is a User object,
+#     # and then access the 'username' attribute of the User object
+#     handle_cache(
+#         getAbsPath("./../storage/twitter_handles.json"), tweet_id, tweet.user.username
+#     )
+#     return tweet.user.username
+#
 
 
 def getBlogFromUrl(url):
