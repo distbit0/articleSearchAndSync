@@ -11,7 +11,6 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.filters import has_completions, completion_is_selected
 from prompt_toolkit.styles import Style
 from prompt_toolkit.auto_suggest import AutoSuggest, Suggestion
-import threading
 import time
 import queue
 import concurrent.futures
@@ -258,7 +257,7 @@ def main():
         allFiles, categories
     )  # Replace with your actual function to count uncategorized files
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
         startProcessingNextFile(executor, allFiles, next_file_data_queue, 0, categories)
 
         categorisedFileCount = 0
@@ -281,9 +280,9 @@ def main():
                     uncategorized_files,
                     file_path,
                 )
-                subcategories["_DELETE"] = subcategories["_UNDO"] = subcategories[
-                    "_PARENT"
-                ] = {}
+                subcategories["_DELETE"] = subcategories["_NEW"] = subcategories[
+                    "_UNDO"
+                ] = subcategories["_PARENT"] = {}
                 subcategory_input = select_category(
                     session, subcategories, "Subcategory: "
                 )
@@ -304,6 +303,16 @@ def main():
                     elif subcategory_input == "_PARENT":
                         parentFolderPath = file_path.split("/")[:-2]
                         destPath = "/".join(parentFolderPath) + "/" + fileName
+                        print(f"\nMoving {file_path} to {destPath}")
+                        shutil.move(file_path, destPath)
+                        lastMoveOrigin = file_path
+                        lastMoveDest = destPath
+                    elif subcategory_input == "_NEW":
+                        parentFolderPath = file_path.split("/")[:-2]
+                        newFolderName = input("Enter new folder name: ")
+                        newFolderPath = "/".join(parentFolderPath) + "/" + newFolderName
+                        os.makedirs(newFolderPath, exist_ok=True)
+                        destPath = newFolderPath + "/" + fileName
                         print(f"\nMoving {file_path} to {destPath}")
                         shutil.move(file_path, destPath)
                         lastMoveOrigin = file_path
