@@ -14,6 +14,7 @@ from prompt_toolkit.auto_suggest import AutoSuggest, Suggestion
 import threading
 import time
 import queue
+import concurrent.futures
 
 
 def find_first_sentence_position(text):
@@ -154,9 +155,9 @@ def initPromptSession():
     return session
 
 
-def fetch_next_file_data(file_path, output_queue):
+def fetch_next_file_data(file_path):
     nextFile_text, nextFileUrl = getTextOfFile(file_path)
-    output_queue.put((nextFile_text, nextFileUrl))
+    return nextFile_text, nextFileUrl, file_path
 
 
 def getAllFiles():
@@ -182,26 +183,6 @@ def getAllFiles():
 
     all_files = sorted(all_files, key=lambda path: path.split("/")[-2])
     return all_files
-
-
-def printArticleDetails(startTime, next_file_data_queue, done, remaining, file_path):
-    snippet, fileUrl = next_file_data_queue.get()
-    fileName = file_path.split("/")[-1]
-    avgTimePerArticle = (time.time() - startTime) / done
-    snippet = "\n\n" + snippet
-    textToPrint = "\n\n\n" + file_path.split("/")[-2] + "\n\n\n" + fileName
-    textToPrint += "    (" + str(done) + "/" + str(remaining) + ")"
-    textToPrint += (
-        "    (avg: "
-        + str(round(avgTimePerArticle, 2))
-        + "s rem: "
-        + str(round(avgTimePerArticle / 3600 * remaining, 1))
-        + "h)"
-    )
-    textToPrint = (
-        textToPrint + "\n" + fileUrl + snippet if fileUrl else textToPrint + snippet
-    )
-    print(textToPrint)
 
 
 def getUncategorisedFileCount(allFiles, categories):
@@ -236,79 +217,104 @@ def isArticleUncategorised(file_path, categories):
     return (isUncategorised, isRootDir, inCategoryFolder, subcategories)
 
 
-def startProcessingNextFile(allFiles, next_file_data_queue, file_idx, categories):
-    nextFilePath = allFiles[file_idx + 1]
+def startProcessingNextFile(
+    executor, allFiles, next_file_data_queue, file_idx, categories
+):
+    nextFilePath = allFiles[file_idx]
     isNextFileUncategorised = isArticleUncategorised(nextFilePath, categories)[0]
-
     if isNextFileUncategorised:
-        threading.Thread(
-            target=fetch_next_file_data,
-            args=(nextFilePath, next_file_data_queue),
-        ).start()
+        future = executor.submit(fetch_next_file_data, nextFilePath)
+        next_file_data_queue.put((future))
+
+
+def printArticleDetails(startTime, next_file_data_queue, done, remaining, file_path):
+    future = next_file_data_queue.get()
+    snippet, fileUrl, filePathFromQueue = future.result()
+    fileName = file_path.split("/")[-1]
+    avgTimePerArticle = (time.time() - startTime) / done
+    snippet = "\n\n" + snippet
+    textToPrint = "\n\n\n" + file_path.split("/")[-2] + "\n\n\n" + fileName
+    textToPrint += "    (" + str(done) + "/" + str(remaining) + ")"
+    textToPrint += (
+        "    (avg: "
+        + str(round(avgTimePerArticle, 2))
+        + "s rem: "
+        + str(round(avgTimePerArticle / 3600 * remaining, 1))
+        + "h)"
+    )
+    textToPrint = (
+        textToPrint + "\n" + fileUrl + snippet if fileUrl else textToPrint + snippet
+    )
+    print(textToPrint)
 
 
 def main():
-    allFiles = getAllFiles()
-    categories = getCategories()
-    session = initPromptSession()
+    allFiles = getAllFiles()  # Replace with your actual function to get all files
+    categories = getCategories()  # Replace with your actual function to get categories
     next_file_data_queue = queue.Queue()
-    lastMoveDest = None
+    session = initPromptSession()
 
-    uncategorized_files = getUncategorisedFileCount(allFiles, categories)
+    uncategorized_files = getUncategorisedFileCount(
+        allFiles, categories
+    )  # Replace with your actual function to count uncategorized files
 
-    threading.Thread(
-        target=fetch_next_file_data,
-        args=(allFiles[0], next_file_data_queue),
-    ).start()
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        startProcessingNextFile(executor, allFiles, next_file_data_queue, 0, categories)
 
-    categorisedFileCount = 0
-    startTime = time.time()
-    for file_idx, file_path in enumerate(allFiles):
-        fileName = file_path.split("/")[-1]
-
-        startProcessingNextFile(allFiles, next_file_data_queue, file_idx, categories)
-        articleInfo = isArticleUncategorised(file_path, categories)
-        isUncategorised, subcategories = articleInfo[0], articleInfo[3]
-
-        if isUncategorised:
-            categorisedFileCount += 1
-            printArticleDetails(
-                startTime,
-                next_file_data_queue,
-                categorisedFileCount,
-                uncategorized_files,
-                file_path,
+        categorisedFileCount = 0
+        startTime = time.time()
+        for file_idx, file_path in enumerate(allFiles):
+            startProcessingNextFile(
+                executor, allFiles, next_file_data_queue, file_idx + 1, categories
             )
-            subcategories["_DELETE"] = subcategories["_UNDO"] = subcategories[
-                "_PARENT"
-            ] = {}
-            subcategory_input = select_category(session, subcategories, "Subcategory: ")
-            if subcategory_input:
-                if subcategory_input == "_DELETE":
-                    print(f"\n Moving to TRASH {file_path}")
-                    homeDir = os.path.expanduser("~")
-                    dest = os.path.join(homeDir, "/.local/share/Trash/files/", fileName)
-                    shutil.move(file_path, dest)
-                    lastMoveDest = dest
-                    lastMoveOrigin = file_path
-                elif subcategory_input == "_UNDO":
-                    print(f"\nMOVING BACK FROM {lastMoveDest} TO {lastMoveOrigin}")
-                    if lastMoveDest:
-                        shutil.move(lastMoveDest, lastMoveOrigin)
-                elif subcategory_input == "_PARENT":
-                    parentFolderPath = file_path.split("/")[:-2]
-                    destPath = "/".join(parentFolderPath) + "/" + fileName
-                    print(f"\nMoving {file_path} to {destPath}")
-                    shutil.move(file_path, destPath)
-                    lastMoveOrigin = file_path
-                    lastMoveDest = destPath
-                else:
-                    choice = subcategories.get(subcategory_input)
-                    destination = os.path.join(choice["fullPath"], fileName)
-                    print(f"\nMoving {file_path} to {destination}")
-                    shutil.move(file_path, destination)
-                    lastMoveOrigin = file_path
-                    lastMoveDest = destination
+            fileName = file_path.split("/")[-1]
+            articleInfo = isArticleUncategorised(
+                file_path, categories
+            )  # Replace with your actual function
+            isUncategorised, subcategories = articleInfo[0], articleInfo[3]
+            if isUncategorised:
+                categorisedFileCount += 1
+                printArticleDetails(
+                    startTime,
+                    next_file_data_queue,
+                    categorisedFileCount,
+                    uncategorized_files,
+                    file_path,
+                )
+                subcategories["_DELETE"] = subcategories["_UNDO"] = subcategories[
+                    "_PARENT"
+                ] = {}
+                subcategory_input = select_category(
+                    session, subcategories, "Subcategory: "
+                )
+                if subcategory_input:
+                    if subcategory_input == "_DELETE":
+                        print(f"\n Moving to TRASH {file_path}")
+                        homeDir = os.path.expanduser("~")
+                        dest = os.path.join(
+                            homeDir, "/.local/share/Trash/files/", fileName
+                        )
+                        shutil.move(file_path, dest)
+                        lastMoveDest = dest
+                        lastMoveOrigin = file_path
+                    elif subcategory_input == "_UNDO":
+                        print(f"\nMOVING BACK FROM {lastMoveDest} TO {lastMoveOrigin}")
+                        if lastMoveDest:
+                            shutil.move(lastMoveDest, lastMoveOrigin)
+                    elif subcategory_input == "_PARENT":
+                        parentFolderPath = file_path.split("/")[:-2]
+                        destPath = "/".join(parentFolderPath) + "/" + fileName
+                        print(f"\nMoving {file_path} to {destPath}")
+                        shutil.move(file_path, destPath)
+                        lastMoveOrigin = file_path
+                        lastMoveDest = destPath
+                    else:
+                        choice = subcategories.get(subcategory_input)
+                        destination = os.path.join(choice["fullPath"], fileName)
+                        print(f"\nMoving {file_path} to {destination}")
+                        shutil.move(file_path, destination)
+                        lastMoveOrigin = file_path
+                        lastMoveDest = destination
 
 
 if __name__ == "__main__":
