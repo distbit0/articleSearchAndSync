@@ -363,7 +363,12 @@ def getPDFPathMappings():
     PDFTextFilePaths = glob.glob(indexFolderPath + "/**/*.txt", recursive=True)
     for file in PDFTextFilePaths:
         fileText = open(file).read()
-        pdfPath = re.search("PdfFilePath: (.*)\n", fileText).group(1).strip()
+        try:
+            pdfPath = re.search("PdfFilePath: (.*)\n", fileText).group(1).strip()
+        except AttributeError as e:
+            print("Error in file: ", file, "error text: ", e)
+            print(fileText)
+            pdfPath = "not found"
         pdfToTextFileMap[file] = pdfPath
 
     return pdfToTextFileMap
@@ -387,12 +392,13 @@ def searchArticlesForQuery(query, subjects=[], onlyUnread=False, formats=[], pat
     searchFilter = Query(query, ignore_case=True, match_word=False, ignore_accent=False)
     matchingArticles = {}
     textToPdfFileMap = {}
-    if "pdf" in formats:
+    allArticlesPaths = []
+    if "pdf" in formats and query != "*" and path == "":
         formats.remove("pdf")
-    allArticlesPaths = getArticlePathsForQuery(query, formats, path)
-    if "pdf" in formats and path == "":
         textToPdfFileMap = getPDFPathMappings()
         allArticlesPaths.extend(textToPdfFileMap)
+    allArticlesPaths.extend(getArticlePathsForQuery(query, formats, path))
+
     for articlePath in allArticlesPaths:
         originalArticlePath = (
             textToPdfFileMap[articlePath]

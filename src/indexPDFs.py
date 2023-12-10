@@ -58,7 +58,9 @@ def indexPDF(pdf, baseUrl, pdfFileName, indexFolderPath):
     )
     pathString = "PdfFilePath: " + pdf + "\n"
     pdfText = urlString + pathString + utils.getPdfText(pdf)
-    with open(indexFolderPath + "/" + pdfFileName + ".txt", "w") as pdfTextFile:
+    with open(
+        indexFolderPath + "/" + pdfFileName + ".txt", "w", errors="ignore"
+    ) as pdfTextFile:
         pdfTextFile.write(pdfText)
 
 
