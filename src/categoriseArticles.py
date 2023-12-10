@@ -67,8 +67,12 @@ def getTextOfFile(filePath):
         fileHtml = open(filePath, errors="ignore").read()
         fileText = getHtmlText(fileHtml)
         fileUrl = utils.getUrlOfArticle(filePath)
-    if "pdf" in fileExtension:
+    elif "pdf" in fileExtension:
         fileText = utils.getPdfText(filePath, pages=10)
+    elif "epub" in fileExtension:
+        fileText = None
+    elif "mobi" in fileExtension:
+        fileText = None
     if fileText == None:
         fileSnippet = "Article could not be read!"
     else:
@@ -162,7 +166,7 @@ def fetch_next_file_data(file_path):
 def getAllFiles():
     # This function recursively finds files in the articleFileFolder and its subfolders.
     article_file_folder = getConfig()["articleFileFolder"]
-    doc_formats_to_categorise = getConfig()["docFormatsToAutoCategorise"]
+    doc_formats_to_categorise = getConfig()["docFormatsToMove"]
     all_files = []
 
     # Recursive function to find files in subdirectories.
@@ -288,10 +292,9 @@ def main():
                 )
                 if subcategory_input:
                     if subcategory_input == "_DELETE":
-                        print(f"\n Moving to TRASH {file_path}")
                         homeDir = os.path.expanduser("~")
                         dest = os.path.join(
-                            homeDir, "/.local/share/Trash/files/", fileName
+                            homeDir, ".local/share/Trash/files/", fileName
                         )
                         shutil.move(file_path, dest)
                         lastMoveDest = dest
@@ -308,7 +311,8 @@ def main():
                         lastMoveOrigin = file_path
                         lastMoveDest = destPath
                     elif subcategory_input == "_NEW":
-                        parentFolderPath = file_path.split("/")[:-2]
+                        parentFolderPath = file_path.split("/")[:-1]
+                        print(parentFolderPath)
                         newFolderName = input("Enter new folder name: ")
                         newFolderPath = "/".join(parentFolderPath) + "/" + newFolderName
                         os.makedirs(newFolderPath, exist_ok=True)

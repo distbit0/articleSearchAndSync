@@ -36,11 +36,6 @@
         "html",
         "mhtml"
     ],
-    "docFormatsToAutoCategorise": [
-        "pdf",
-        "html",
-        "mhtml"
-    ],
     "moveAllDocsToTargetFolder": true,
     "illegalFileNameChars": [
         ":",
@@ -97,7 +92,8 @@
         },
         "tools for thought": {
             "folders": [
-                "Machine and human thought/tools for thought"
+                "Machine and human thought/tools for thought",
+                "Machine and human thought/zettelkasten"
             ],
             "onlyUnread": true
         },
@@ -105,12 +101,6 @@
             "folders": [
                 "Machine and human thought/problem solving and mental models",
                 "Machine and human thought/learning and memory"
-            ],
-            "onlyUnread": true
-        },
-        "zettelkasten": {
-            "folders": [
-                "Machine and human thought/zettelkasten"
             ],
             "onlyUnread": true
         },
@@ -156,10 +146,22 @@
             ],
             "onlyUnread": true
         },
+        "neural networks": {
+            "folders": [
+                "Machine and human thought/neural networks"
+            ],
+            "onlyUnread": true
+        },
         "entrepreneurship": {
             "folders": [
                 "Business and entrepreneurship/Entrepreneurship",
                 "Business and entrepreneurship/mental models and advice"
+            ],
+            "onlyUnread": true
+        },
+        "price theory": {
+            "folders": [
+                "Economics/Value and Prices"
             ],
             "onlyUnread": true
         }
