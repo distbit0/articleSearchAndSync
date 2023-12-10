@@ -420,8 +420,6 @@ def searchArticlesForQuery(query, subjects=[], onlyUnread=False, formats=[], pat
         if not matchInAricle:
             continue
 
-        articleUrl = getUrlOfArticle(articlePath)
-
-        matchingArticles[originalArticlePath] = articleUrl
+        matchingArticles[originalArticlePath] = getUrlOfArticle(articlePath)
 
     return matchingArticles
