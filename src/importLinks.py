@@ -82,21 +82,21 @@ def generateUrlImportFilesForAtVoice(urlsToAdd):
 
 
 def moveFilesMarkedToMove():
-    markedToMoveFiles = utils.getArticlesFromList("_markedToMove")
+    markedToMoveFiles = utils.getArticlesFromList("_MOVE")
     articleFileFolder = getConfig()["articleFileFolder"]
     for fileName in markedToMoveFiles:
         utils.moveFilesWithNameToRootDir(articleFileFolder, fileName)
 
 
 def deleteFilesMarkedToDelete():
-    markedAsDeletedFiles = utils.getArticlesFromList("_markedAsDeleted")
+    markedAsDeletedFiles = utils.getArticlesFromList("_DELETE")
     articleFileFolder = getConfig()["articleFileFolder"]
     for fileName in markedAsDeletedFiles:
         utils.delete_files_with_name(articleFileFolder, fileName)
 
 
 def hideArticlesMarkedAsRead():
-    markedAsReadFiles = utils.getArticlesFromList("_markedAsRead")
+    markedAsReadFiles = utils.getArticlesFromList("_READ")
     articleFileFolder = getConfig()["articleFileFolder"]
     for fileName in markedAsReadFiles:
         if "articleUrls" in fileName:
