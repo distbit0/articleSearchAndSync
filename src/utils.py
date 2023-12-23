@@ -49,7 +49,9 @@ def delete_files_with_name(folder, file_name):
     # Delete all found files
     for f in matching_files:
         try:
-            os.remove(f)
+            homeDir = os.path.expanduser("~")
+            dest = os.path.join(homeDir, ".local/share/Trash/files/", f.split("/")[-1])
+            shutil.move(f, dest)
             print(f"Deleted {f}")
         except OSError as e:
             print(f"Error deleting {f}: {e}")
@@ -60,7 +62,7 @@ def hideFilesWithName(folder, file_name):
     searchString = os.path.join(folder, "**", file_name)
     matching_files = glob.glob(searchString, recursive=True)
 
-    # Delete all found files
+    # Hide all found files
     for f in matching_files:
         hideFile(f)
 

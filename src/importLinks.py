@@ -145,8 +145,12 @@ def deleteDuplicateArticleFiles(urls_to_filenames):
             dir_seen_urls[directory] = {url}
         elif url in dir_seen_urls[directory] and url:
             # If url has been seen in this directory, delete the file
-            print(fileName, url)
-            os.remove(fileName)
+            print("deleting because duplicate", fileName, url)
+            homeDir = os.path.expanduser("~")
+            dest = os.path.join(
+                homeDir, ".local/share/Trash/files/", fileName.split("/")[-1]
+            )
+            shutil.move(fileName, dest)
         else:
             # If url has not been seen in this directory, add it to the set
             dir_seen_urls[directory].add(url)
@@ -230,7 +234,11 @@ def deleteDuplicateFiles(directory_path):
             )
             for file_path in files_to_remove:
                 print("removed", file_path)
-                os.remove(file_path)
+                homeDir = os.path.expanduser("~")
+                dest = os.path.join(
+                    homeDir, ".local/share/Trash/files/", file_path.split("/")[-1]
+                )
+                shutil.move(file_path, dest)
 
 
 if __name__ == "__main__":
