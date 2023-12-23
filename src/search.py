@@ -2,10 +2,9 @@ from utils import getConfig
 import utils
 import argparse
 import subprocess
-import shutil
 import os
-
-# import semanticSearch
+import cProfile
+import pstats
 
 
 def getCMDArguments():
@@ -39,42 +38,27 @@ def getCMDArguments():
         dest="atVoice",
     )
     parser.add_argument(
-        "-s",
+        "-o",
         action="store_true",
-        help="Sort article urls alphabetically",
-        dest="sort",
+        help="Overwrite articles in @voice list",
+        dest="overwrite",
     )
     args = parser.parse_args()
 
     return args
 
 
-def sendToAtVoice():
-    atVoiceUrlOutputFile = os.path.join(
-        getConfig()["atVoiceFolderPath"], ".config", "Temp.txt"
-    )
-    shutil.copyfile(
-        utils.getAbsPath("../output/searchResultUrls.txt"), atVoiceUrlOutputFile
-    )
-    print("\n\nSent article URLs to @Voice (" + atVoiceUrlOutputFile + ")")
-
-
 def main():
     args = getCMDArguments()
-    ###################################
-    # profiler = cProfile.Profile()
-    # profiler.enable()
     subjectList = [args.subject] if args.subject else []
+
     articles = utils.searchArticlesForQuery(
         args.query, subjectList, onlyUnread=False, formats=["html", "pdf"]
     )
-    # profiler.disable()
-    # stats = pstats.Stats(profiler).sort_stats("cumtime")
-    # stats.print_stats()
+
     articleUrls = [url for url in articles.values() if url]
     articlePaths = list(articles.keys())
-    if args.sort:
-        articleUrls = sorted(articleUrls)
+    articleUrls = sorted(articleUrls)
 
     utils.addUrlToUrlFile(
         articleUrls, utils.getAbsPath("../output/searchResultUrls.txt"), True
@@ -89,17 +73,21 @@ def main():
         blogUrls = utils.getBlogsFromUrls(articleUrls)
         print("\n\nBlog URLs:\n\n" + "\n".join(blogUrls))
 
-    if args.openGedit:
-        subprocess.Popen(["gedit", utils.getAbsPath("../output/searchResultUrls.txt")])
-
     if args.copyUrls:
         os.system(
             "xclip -sel c < " + utils.getAbsPath("../output/searchResultUrls.txt")
         )
         print("\n\nCopied article URLs to clipboard")
 
+    if args.overwrite:
+        utils.deleteAllArticlesInList("zz+++TEMP+++")
+
     if args.atVoice:
-        sendToAtVoice()
+        utils.addArticlesToList("zz+++TEMP+++", articlePaths)
+        if not args.overwrite:
+            print(
+                "not overwriting existing articles in @voice list!. Use -o to overwrite"
+            )
 
 
 if __name__ == "__main__":

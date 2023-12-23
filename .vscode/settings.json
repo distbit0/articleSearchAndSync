@@ -16,5 +16,7 @@
         "/home/pimania/.vscode/extensions/continue.continue-0.1.29-linux-x64",
         "/home/pimania/.vscode/extensions/continue.continue-0.0.412-linux-x64"
     ],
-    "editor.parameterHints.enabled": false
+    "editor.parameterHints.enabled": false,
+    "python.analysis.autoImportCompletions": true,
+    "python.analysis.typeCheckingMode": "off"
 }

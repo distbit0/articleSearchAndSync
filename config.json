@@ -21,7 +21,6 @@
     ],
     "pdfSearchFolders": {
         "/home/pimania/ebooks/Decentralised Finance": {
-            "pdfBaseURL": "http://192.168.0.28:8887/Decentralised%20Finance/",
             "subject": "Defi"
         }
     },
@@ -58,27 +57,28 @@
             "folders": [
                 "Physics/entropy",
                 "Computer Science/reversible logic"
-            ],
-            "onlyUnread": true
+            ]
         },
         "epistemology": {
             "folders": [
                 "Machine and human thought/epistemology"
-            ],
-            "onlyUnread": true
+            ]
         },
         "evolution": {
             "folders": [
                 "Machine and human thought/evolution",
                 "Machine and human thought/emergent systems"
-            ],
-            "onlyUnread": true
+            ]
         },
         "gradient descent": {
             "folders": [
                 "Machine and human thought/gradient descent"
-            ],
-            "onlyUnread": true
+            ]
+        },
+        "interpretability": {
+            "folders": [
+                "Machine and human thought/interpretability"
+            ]
         },
         "agi": {
             "folders": [
@@ -87,83 +87,73 @@
                 "Machine and human thought/consciousness and intelligence",
                 "Machine and human thought/LLM AGI",
                 "Machine and human thought/symbolic AGI"
-            ],
-            "onlyUnread": true
+            ]
         },
         "tools for thought": {
             "folders": [
                 "Machine and human thought/tools for thought",
                 "Machine and human thought/zettelkasten"
-            ],
-            "onlyUnread": true
+            ]
         },
         "mental models": {
             "folders": [
                 "Machine and human thought/problem solving and mental models",
                 "Machine and human thought/learning and memory"
-            ],
-            "onlyUnread": true
+            ]
         },
         "lending": {
             "folders": [
                 "Decentralised Finance/lending"
-            ],
-            "onlyUnread": true
+            ]
         },
         "options": {
             "folders": [
                 "Decentralised Finance/options"
-            ],
-            "onlyUnread": true
+            ]
         },
         "oracles": {
             "folders": [
                 "Decentralised Finance/oracles"
-            ],
-            "onlyUnread": true
+            ]
         },
         "perps": {
             "folders": [
                 "Decentralised Finance/futures, margin and perps"
-            ],
-            "onlyUnread": true
+            ]
         },
         "stables": {
             "folders": [
                 "Decentralised Finance/stablecoins and synths"
-            ],
-            "onlyUnread": true
+            ]
         },
         "dexes": {
             "folders": [
                 "Decentralised Finance/dexes"
-            ],
-            "onlyUnread": true
+            ]
         },
         "diagrams": {
             "folders": [
                 "Philosophy/diagrams"
-            ],
-            "onlyUnread": true
+            ]
         },
         "neural networks": {
             "folders": [
                 "Machine and human thought/neural networks"
-            ],
-            "onlyUnread": true
+            ]
         },
         "entrepreneurship": {
             "folders": [
                 "Business and entrepreneurship/Entrepreneurship",
                 "Business and entrepreneurship/mental models and advice"
-            ],
-            "onlyUnread": true
+            ]
         },
         "price theory": {
             "folders": [
                 "Economics/Value and Prices"
-            ],
-            "onlyUnread": true
+            ]
+        },
+        "ethereumcreditguild": {
+            "query": "\" ECG \" OR \"credit guild\" OR \"onetruekirk\" OR \"Electric Development Co\" OR \"credit-guild\""
         }
     }
 }

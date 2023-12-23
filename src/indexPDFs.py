@@ -17,7 +17,6 @@ def getPDFFolders():
 
 def indexAllPDFFolders(pdfFolders, indexFolders):
     for folder in pdfFolders:
-        baseUrl = pdfFolders[folder]["pdfBaseURL"]
         subject = pdfFolders[folder]["subject"]
         indexSubjectPath = utils.getAbsPath("../storage/indexedPDFs/" + subject)
         alreadyIndexedPDFs = []
@@ -36,26 +35,19 @@ def indexAllPDFFolders(pdfFolders, indexFolders):
         for pdf in pdfFiles:
             fullFileName = pdf.split("/")[-1]
             pdfFileName = fullFileName.replace(".pdf", "")
-            pathBelowBaseFolder = pdf.split(folder)[-1].replace(fullFileName, "")
-            newBaseUrl = baseUrl.strip("/") + pathBelowBaseFolder
 
             if pdfFileName not in alreadyIndexedPDFs:
-                indexPDF(pdf, newBaseUrl, pdfFileName, indexSubjectPath)
+                indexPDF(pdf, pdfFileName, indexSubjectPath)
 
 
 def mkdirAndParents(directory):
     Path(directory).mkdir(parents=True, exist_ok=True)
 
 
-def indexPDF(pdf, baseUrl, pdfFileName, indexFolderPath):
+def indexPDF(pdf, pdfFileName, indexFolderPath):
     pdfText = []
     print("INDEXING: ", pdf)
-    urlString = (
-        "Snapshot-Content-Location: "
-        + baseUrl
-        + urllib.parse.quote(pdfFileName + ".pdf")
-        + "\n"
-    )
+    urlString = "Snapshot-Content-Location: " + pdf + "\n"
     pathString = "PdfFilePath: " + pdf + "\n"
     pdfText = urlString + pathString + utils.getPdfText(pdf)
     with open(

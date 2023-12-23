@@ -289,12 +289,6 @@ def getBlogsFromUrls(urls):
 
 def getInvalidBlogSubstrings():
     invalidBlogSubstrings = getConfig()["invalidBlogSubstrings"]
-    pdfSearchFolders = getConfig()["pdfSearchFolders"]
-    pdfExcludedBlogs = []
-    for folder in pdfSearchFolders.values():
-        pdfExcludedBlogs.append(getBlogFromUrl(folder["pdfBaseURL"]))
-    invalidBlogSubstrings.extend(pdfExcludedBlogs)
-
     return invalidBlogSubstrings
 
 
@@ -423,3 +417,71 @@ def searchArticlesForQuery(query, subjects=[], onlyUnread=False, formats=[], pat
         matchingArticles[originalArticlePath] = getUrlOfArticle(articlePath)
 
     return matchingArticles
+
+
+def checkListExists(listName):
+    listPath = os.path.join(
+        getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"
+    )
+    exists = os.path.exists(listPath)
+    if not exists:
+        # create list
+        open(listPath, "a").close()
+    return True
+
+
+def addArticlesToList(listName, articlePathsForList):
+    if not checkListExists(listName):
+        print("List " + listName + " does not exist")
+        return
+    listPath = os.path.join(
+        getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"
+    )
+    articleNamesInList = getArticlesFromList(listName)
+    droidEbooksFolderPath = getConfig()["droidEbooksFolderPath"]
+    articleFileFolder = getConfig()["articleFileFolder"]
+    linesToAppend = []
+    for articlePath in articlePathsForList:
+        articleName = articlePath.split("/")[-1]
+        relativeArticlePath = os.path.relpath(articlePath, articleFileFolder)
+        droidArticlePath = os.path.join(droidEbooksFolderPath, relativeArticlePath)
+        if articleName not in articleNamesInList:
+            displayName = articleName.split(".")[0]
+            linesToAppend.append(droidArticlePath + "\t" + displayName)
+    newListText = "\n".join(linesToAppend)
+    currentListText = open(listPath).read().strip()
+    combinedListText = currentListText + "\n" + newListText
+    print(
+        "\n\n\n\n\n\n\n\nAdding the following articles to list: " + listName,
+        "\n",
+        newListText,
+    )
+    if currentListText == combinedListText:
+        return
+
+    with open(listPath, "w") as f:
+        f.write(combinedListText)
+
+
+def deleteAllArticlesInList(listName):
+    if not checkListExists(listName):
+        print("List " + listName + " does not exist")
+        return
+    listPath = os.path.join(
+        getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"
+    )
+    currentListText = open(listPath).read().strip()
+
+    textWithArticlesRemoved = ""
+    if ":m" not in currentListText:
+        textWithArticlesRemoved = ""
+    else:
+        textWithArticlesRemoved = (
+            "\n".join(currentListText.split(":m")[:-1])
+            + "\n"
+            + currentListText.split(":m")[-1].split("\n")[0]
+        )
+
+    with open(listPath, "w") as f:
+        print("about to write: ", textWithArticlesRemoved)
+        # f.write(textWithArticlesRemoved)
