@@ -12,6 +12,7 @@ def updateLists():
             listInfo.get("onlyUnread", True),
             listInfo.get("query", "*"),
         )
+        print(listName, listInfo)
         articlePathsForList = utils.searchArticlesForQuery(
             query,
             subjects=listFolders,
