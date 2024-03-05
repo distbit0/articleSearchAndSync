@@ -1,6 +1,6 @@
 {
     "articleFileFolder": "/home/pimania/ebooks/",
-    "bookmarksFilePath": "/home/pimania/miscSyncs/bookmarks/Bookmarks",
+    "bookmarksFilePath": "/home/pimania/.config/BraveSoftware/Brave-Browser/Default/Bookmarks",
     "atVoiceFolderPath": "/home/pimania/atVoice",
     "droidEbooksFolderPath": "/storage/emulated/0/Ebooks/",
     "invalidBlogSubstrings": [
@@ -86,7 +86,8 @@
                 "Machine and human thought/connectionist AGI",
                 "Machine and human thought/consciousness and intelligence",
                 "Machine and human thought/LLM AGI",
-                "Machine and human thought/symbolic AGI"
+                "Machine and human thought/symbolic AGI",
+                "Machine and human thought/RL and directed learning"
             ]
         },
         "tools for thought": {
@@ -159,6 +160,11 @@
         },
         "ethereumcreditguild": {
             "query": "\" ECG \" OR \"credit guild\" OR \"onetruekirk\" OR \"Electric Development Co\" OR \"credit-guild\""
+        },
+        "prediction markets": {
+            "folders": [
+                "Decentralised Finance/prediction markets"
+            ]
         }
     }
 }

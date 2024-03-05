@@ -1,6 +1,7 @@
 import re
 from eldar import Query
 import glob
+from matplotlib import lines
 import urlexpander
 from os import path
 import json
@@ -458,11 +459,10 @@ def addArticlesToList(listName, articlePathsForList):
         "\n",
         newListText,
     )
-    if currentListText == combinedListText:
-        return
 
-    with open(listPath, "w") as f:
-        f.write(combinedListText)
+    if len(linesToAppend) > 0:
+        with open(listPath, "w") as f:
+            f.write(combinedListText)
 
 
 def deleteAllArticlesInList(listName):

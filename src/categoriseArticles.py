@@ -184,7 +184,10 @@ def getAllFiles():
 
     find_files_in_directory(article_file_folder)
 
-    all_files = sorted(all_files, key=lambda path: path.split("/")[-2])
+    all_files = sorted(
+        all_files,
+        key=lambda path: (path.rsplit("/", 2)[-2], utils.getUrlOfArticle(path)),
+    )
     return all_files
 
 
@@ -252,12 +255,12 @@ def printArticleDetails(startTime, next_file_data_queue, done, remaining, file_p
 
 
 def main():
-    allFiles = getAllFiles()  # Replace with your actual function to get all files
-    categories = getCategories()  # Replace with your actual function to get categories
+    allFiles = getAllFiles()
+    categories = getCategories()
     next_file_data_queue = queue.Queue()
     session = initPromptSession()
 
-    uncategorized_files = getUncategorisedFileCount(
+    uncategorizedFileCount = getUncategorisedFileCount(
         allFiles, categories
     )  # Replace with your actual function to count uncategorized files
 
@@ -281,7 +284,7 @@ def main():
                     startTime,
                     next_file_data_queue,
                     categorisedFileCount,
-                    uncategorized_files,
+                    uncategorizedFileCount,
                     file_path,
                 )
                 subcategories["_DELETE"] = subcategories["_NEW"] = subcategories[
