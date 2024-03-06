@@ -2,6 +2,7 @@
     "articleFileFolder": "/home/pimania/ebooks/",
     "bookmarksFilePath": "/home/pimania/.config/BraveSoftware/Brave-Browser/Default/Bookmarks",
     "atVoiceFolderPath": "/home/pimania/atVoice",
+    "convertLinksDir": "/home/pimania/dev/convertLinks",
     "droidEbooksFolderPath": "/storage/emulated/0/Ebooks/",
     "invalidBlogSubstrings": [
         "hackmd.io",

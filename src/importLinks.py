@@ -8,6 +8,9 @@ import sys
 import shutil
 import hashlib
 
+sys.path.append(getConfig()["convertLinksDir"])
+from convertLinks import main
+
 
 def getBookmarks():
     bookmarksFilePath = getConfig()["bookmarksFilePath"]
@@ -55,19 +58,23 @@ def calcUrlsToAdd(onlyRead=False):
                 for link in folder["children"]:
                     url = link["url"]
                     url = utils.formatUrl(url)
-                    sys.path.append("/home/pimania/dev/convertLinks")
-                    from convertLinks import main
-
-                    url = main(url, False, True)[0]
                     if onlyRead:
                         if (
                             url.lower() not in "\n".join(markedAsReadUrls).lower()
                             and url.lower() in "\n".join(allAddedUrls).lower()
                         ):
-                            urlsToAdd[subject].append(url)
+                            url = main(url, False, True)
+                            if url and url[0]:
+                                url = url[0]
+                                urlsToAdd[subject].append(url)
+                                print("added url: ", url)
                     else:
                         if url.lower() not in "\n".join(allAddedUrls).lower():
-                            urlsToAdd[subject].append(url)
+                            url = main(url, False, True)
+                            if url and url[0]:
+                                url = url[0]
+                                urlsToAdd[subject].append(url)
+                                print("added url: ", url)
 
     return urlsToAdd
 
@@ -247,23 +254,33 @@ def deleteDuplicateFiles(directory_path):
 
 if __name__ == "__main__":
     # import new documents and give them readable filenames
+    print("retitle all pdfs")
     reTitlePDFs.retitleAllPDFs()
+    print("move docs to target folder")
     moveDocsToTargetFolder()
     # update urlList files
+    print("update urlList files")
     updateUrlListFiles(getConfig()["articleFileFolder"])
     # act on requests to delete/move/hide articles from atVoice app
+    print("delete files marked to delete")
     deleteFilesMarkedToDelete()
+    print("move files marked to move")
     moveFilesMarkedToMove()
+    print("hide articles marked as read")
     hideArticlesMarkedAsRead()
+    print("mark read bookmarks as read")
     markReadBookmarksAsRead()
     # delete duplicate files
+    print("delete duplicate files")
     articles = utils.searchArticlesForQuery("*", [], onlyUnread=False, formats=["html"])
     articleUrls = [url for url in articles.values() if url]
     deleteDuplicateArticleFiles(articles)
     deleteDuplicateFiles(getConfig()["articleFileFolder"])
+    print("update alreadyAddedArticles.txt")
     utils.addUrlToUrlFile(
         articleUrls,
         utils.getAbsPath("../storage/alreadyAddedArticles.txt"),
     )
+    print("update urls.txt")
     urlsToAdd = calcUrlsToAdd()
     generateUrlImportFilesForAtVoice(urlsToAdd)
