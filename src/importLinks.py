@@ -64,20 +64,21 @@ def calcUrlsToAdd(onlyRead=False):
                             and url.lower() in "\n".join(allAddedUrls).lower()
                         ):
                             url = convertLinks(url, False, True)
-                            if (
-                                url.lower() not in "\n".join(markedAsReadUrls).lower()
-                                and url.lower() in "\n".join(allAddedUrls).lower()
-                            ):
-                                if url and url[0]:
-                                    url = url[0]
+                            if url and url[0]:
+                                url = url[0]
+                                if (
+                                    url.lower()
+                                    not in "\n".join(markedAsReadUrls).lower()
+                                    and url.lower() in "\n".join(allAddedUrls).lower()
+                                ):
                                     urlsToAdd[subject].append(url)
                                     print("added url: ", url)
                     else:
                         if url.lower() not in "\n".join(allAddedUrls).lower():
                             url = convertLinks(url, False, True)
-                            if url.lower() not in "\n".join(allAddedUrls).lower():
-                                if url and url[0]:
-                                    url = url[0]
+                            if url and url[0]:
+                                url = url[0]
+                                if url.lower() not in "\n".join(allAddedUrls).lower():
                                     urlsToAdd[subject].append(url)
                                     print("added url: ", url)
 
