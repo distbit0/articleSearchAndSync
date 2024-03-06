@@ -4,6 +4,7 @@ from utils import getConfig
 import os
 from collections import defaultdict
 import reTitlePDFs
+import sys
 import shutil
 import hashlib
 
@@ -54,7 +55,10 @@ def calcUrlsToAdd(onlyRead=False):
                 for link in folder["children"]:
                     url = link["url"]
                     url = utils.formatUrl(url)
-                    url = utils.makeDiscoursePrintable(url)
+                    sys.path.append("/home/pimania/dev/convertLinks")
+                    from convertLinks import main
+
+                    url = main(url, False, True)[0]
                     if onlyRead:
                         if (
                             url.lower() not in "\n".join(markedAsReadUrls).lower()
