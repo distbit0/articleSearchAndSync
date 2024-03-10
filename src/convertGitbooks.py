@@ -10,7 +10,6 @@ sys.path.append("/home/pimania/dev/convertLinks")
 from convertLinks import main
 
 
-@pysnooper.snoop()
 def process_articles_in_directory(directory):
     filesToConvert = []
     for root, dirs, files in os.walk(directory):
