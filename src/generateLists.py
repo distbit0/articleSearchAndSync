@@ -1,4 +1,4 @@
-from utils import getConfig, getArticlesFromList
+from utils import getConfig
 import utils
 import os
 

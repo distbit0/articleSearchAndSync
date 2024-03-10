@@ -38,8 +38,8 @@ def process_articles_in_directory(directory):
         print(html_content[:200])
         with open(file_path, "w") as file:
             file.write(html_content)
-        if "problematic" in file_path:
-            shutil.move(file_path, directory)
+        # if "problematic" in file_path:
+        #     shutil.move(file_path, directory)
 
 
 directory = getConfig()["articleFileFolder"]
