@@ -129,9 +129,6 @@ def getUrlOfArticle(articleFilePath):
                 extractedUrl = formatUrl(match.group(1).strip())
                 break
 
-        # if not extractedUrl:
-        #     extractedUrl = articleFilePath
-
     return extractedUrl
 
 

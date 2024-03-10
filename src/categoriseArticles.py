@@ -16,18 +16,6 @@ import queue
 import concurrent.futures
 
 
-def find_first_sentence_position(text):
-    # Regular expression pattern for a sentence
-    # Exclude sentences containing *, /, or emojis
-    pattern = re.compile(
-        r"(\b[A-Z](?:(?![*.\/])[^.?!])*[.?!])\s+"  # First sentence pattern
-        r"(\b[A-Z](?:(?![*.\/])[^.?!])*[.?!])"  # Second sentence pattern
-    )
-
-    match = pattern.search(text)
-    return match.start() if match else -1
-
-
 def getCategories(subCategory="", getSubDirs=True):
     categoryObject = {}
     subDirs = {}
@@ -78,6 +66,18 @@ def getTextOfFile(filePath):
     else:
         fileSnippet = display_article_snippet(fileText)
     return fileSnippet, fileUrl
+
+
+def find_first_sentence_position(text):
+    # Regular expression pattern for a sentence
+    # Exclude sentences containing *, /, or emojis
+    pattern = re.compile(
+        r"(\b[A-Z](?:(?![*.\/])[^.?!])*[.?!])\s+"  # First sentence pattern
+        r"(\b[A-Z](?:(?![*.\/])[^.?!])*[.?!])"  # Second sentence pattern
+    )
+
+    match = pattern.search(text)
+    return match.start() if match else -1
 
 
 def display_article_snippet(fileText):
