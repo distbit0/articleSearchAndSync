@@ -1,15 +1,17 @@
 import re
+from unittest import skip
 from eldar import Query
 import glob
 from matplotlib import lines
 import urlexpander
-from os import path
+from os import path, read
 import json
 from pathlib import Path
 import os
 
 # import snscrape.modules.twitter as sntwitter
 # import snscrape
+import pysnooper
 import shutil
 import PyPDF2
 import traceback
@@ -108,6 +110,11 @@ def formatUrl(url):
         url = urlexpander.expand(url)
     url = url.replace("medium.com", "scribe.rip").strip()
     url = url.replace("en.m.wikipedia.org", "en.wikipedia.org").strip()
+    if "gist.github.com" in url:
+        usernameIsInUrl = len(url.split("/")) > 4
+        if usernameIsInUrl:
+            url = "https://gist.github.com/" + url.split("/")[-1]
+
     url = re.sub(r"\?gi=.*", r"", url)
     url = re.sub(r"\&gi=.*", r"", url)
     return url
@@ -133,7 +140,7 @@ def getUrlOfArticle(articleFilePath):
 
 
 def markArticlesWithUrlsAsRead(readUrls, articleFolder):
-    articleUrls = searchArticlesForQuery("*", [], False, ["html"])
+    articleUrls = searchArticlesForQuery("*", [], "", ["html"])
     articleUrls = {v: k for k, v in articleUrls.items()}
     for url in readUrls:
         if url in articleUrls:
@@ -347,19 +354,19 @@ def getPDFPathMappings():
 
 def getArticlePathsForQuery(query, formats, folderPath=""):
     folderPath = folderPath if folderPath else getConfig()["articleFileFolder"]
-    formats = formats if query == "*" else ["html"]
+    formats = formats if query == "*" else ["html", "mhtml"]
     filePatterns = [folderPath + "**/*" + docFormat for docFormat in formats]
 
     allArticlesPaths = []
     for pattern in filePatterns:
-        articlePaths = list(glob.glob(pattern, recursive=True))
+        articlePaths = list(glob.glob(pattern, recursive=True, include_hidden=True))
         allArticlesPaths.extend(articlePaths)
 
     allArticlesPaths = list(set(allArticlesPaths))
     return allArticlesPaths
 
 
-def searchArticlesForQuery(query, subjects=[], onlyUnread=False, formats=[], path=""):
+def searchArticlesForQuery(query, subjects=[], readState="", formats=[], path=""):
     searchFilter = Query(query, ignore_case=True, match_word=False, ignore_accent=False)
     matchingArticles = {}
     textToPdfFileMap = {}
@@ -376,10 +383,17 @@ def searchArticlesForQuery(query, subjects=[], onlyUnread=False, formats=[], pat
             if articlePath in textToPdfFileMap
             else articlePath
         )
-        skipBecauseIsRead = onlyUnread and originalArticlePath.split("/")[-1][0] == "."
+        skipBecauseReadState = False
+        if readState:
+            if readState == "read":
+                isRead = originalArticlePath.split("/")[-1][0] == "."
+                skipBecauseReadState = not isRead
+            elif readState == "unread":
+                isUnread = originalArticlePath.split("/")[-1][0] != "."
+                skipBecauseReadState = not isUnread
         invalidSubject = not checkArticleSubject(originalArticlePath, subjects)
 
-        if skipBecauseIsRead or invalidSubject:
+        if skipBecauseReadState or invalidSubject:
             continue
 
         matchInAricle = (

@@ -53,7 +53,7 @@ def main():
     subjectList = [args.subject] if args.subject else []
 
     articles = utils.searchArticlesForQuery(
-        args.query, subjectList, onlyUnread=False, formats=["html", "pdf"]
+        args.query, subjectList, readState="", formats=["html", "pdf"]
     )
 
     articleUrls = [url for url in articles.values() if url]

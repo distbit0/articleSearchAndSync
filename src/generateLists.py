@@ -7,16 +7,16 @@ def updateLists():
     listFolderMappings = getConfig()["listToFolderMappings"]
 
     for listName, listInfo in listFolderMappings.items():
-        listFolders, onlyUnread, query = (
+        listFolders, readState, query = (
             listInfo.get("folders", []),
-            listInfo.get("onlyUnread", True),
+            listInfo.get("readState", ""),
             listInfo.get("query", "*"),
         )
         print(listName, listInfo)
         articlePathsForList = utils.searchArticlesForQuery(
             query,
             subjects=listFolders,
-            onlyUnread=onlyUnread,
+            readState=readState,
             formats=getConfig()["docFormatsToMove"],
         )
         pathsSortedByUrl = [

@@ -1,3 +1,4 @@
+from ctypes import util
 import json
 import utils
 from utils import getConfig
@@ -17,6 +18,55 @@ def getBookmarks():
     with open(bookmarksFilePath) as f:
         bookmarks = json.load(f)
         return bookmarks
+
+
+def addFileHashesToAlreadyAdded():
+    articleFolder = getConfig()["articleFileFolder"]
+    nonHtmlFormats = getConfig()["docFormatsToMove"]
+    nonHtmlFormats = [fmt for fmt in nonHtmlFormats if fmt not in ["html", "mhtml"]]
+    listFile = utils.getAbsPath("../storage/alreadyAddedFileNamesAndHashes.txt")
+    matchingArticles = utils.searchArticlesForQuery(
+        "*", formats=nonHtmlFormats, path=articleFolder
+    )
+    alreadyAddedFileNames = str(utils.getUrlsFromFile(listFile)).lower()
+    fileNames = [
+        os.path.basename(filePath)
+        for filePath in matchingArticles.keys()
+        if os.path.basename(filePath) not in alreadyAddedFileNames
+    ]
+    fileHashes = [
+        calculate_file_hash(filePath)
+        for filePath in matchingArticles.keys()
+        if os.path.basename(filePath) not in alreadyAddedFileNames
+    ]
+    itemsToAdd = list(set(fileNames + fileHashes))
+    utils.addUrlToUrlFile(itemsToAdd, listFile)
+
+
+def addReadFilesHashesToMarkedAsRead():
+    articleFolder = getConfig()["articleFileFolder"]
+    nonHtmlFormats = getConfig()["docFormatsToMove"]
+    nonHtmlFormats = [fmt for fmt in nonHtmlFormats if fmt not in ["html", "mhtml"]]
+    listFile = utils.getAbsPath("../storage/markedAsReadFileNamesAndHashes.txt")
+    matchingArticles = utils.searchArticlesForQuery(
+        "*", formats=nonHtmlFormats, path=articleFolder, readState="read"
+    )
+    alreadyMarkedAsReadFileNames = utils.getUrlsFromFile(listFile)
+    fileNames = [
+        os.path.basename(filePath)
+        for filePath in matchingArticles.keys()
+        if os.path.basename(filePath) not in alreadyMarkedAsReadFileNames
+    ]
+    fileHashes = [
+        calculate_file_hash(filePath)
+        for filePath in matchingArticles.keys()
+        if os.path.basename(filePath) not in alreadyMarkedAsReadFileNames
+    ]
+    itemsToAdd = list(set(fileNames + fileHashes))
+    utils.addUrlToUrlFile(itemsToAdd, listFile)
+
+    fileHashes = [calculate_file_hash(filePath) for filePath in matchingArticles.keys()]
+    utils.addUrlToUrlFile(fileHashes, listFile)
 
 
 def calculate_file_hash(file_path):
@@ -184,7 +234,23 @@ def moveDocsToTargetFolder():
 
     print("LEN OF docPath", len(docPaths))
 
+    alreadyAddedHashes = str(
+        utils.getUrlsFromFile(
+            utils.getAbsPath("../storage/alreadyAddedFileNamesAndHashes.txt")
+        )
+    )
+    markedAsReadHashes = str(
+        utils.getUrlsFromFile(
+            utils.getAbsPath("../storage/markedAsReadFileNamesAndHashes.txt")
+        )
+    )
+
     for docPath in docPaths:
+        docHash = calculate_file_hash(docPath)
+        if docHash in alreadyAddedHashes:
+            print("Skipping importing duplicate file:", docPath)
+            continue
+
         docName = docPath.split("/")[-1]
 
         # Create a unique filename if needed
@@ -196,8 +262,21 @@ def moveDocsToTargetFolder():
             counter += 1
 
         targetPath = os.path.join(targetFolder, uniqueName)
+
+        if docHash in markedAsReadHashes:
+            targetPath = os.path.join(targetFolder, "." + uniqueName)
+            print("Marking as read:", docName)
+
         print("Moving", docName, "to", targetPath, "derived from", docPath)
         shutil.move(docPath, targetPath)
+
+        utils.addUrlToUrlFile(
+            docHash, utils.getAbsPath("../storage/alreadyAddedFileNamesAndHashes.txt")
+        )
+        utils.addUrlToUrlFile(
+            os.path.basename(targetPath),
+            utils.getAbsPath("../storage/alreadyAddedFileNames.txt"),
+        )
 
 
 def deleteDuplicateFiles(directory_path):
@@ -205,7 +284,7 @@ def deleteDuplicateFiles(directory_path):
 
     for root, _, filenames in os.walk(directory_path):
         if any(part.startswith(".") for part in root.split(os.sep)):
-            continue
+            continue  ###why is this here... mightn't it result in duplicate hidden articles remaining?
 
         for filename in filenames:
             full_path = os.path.join(root, filename)
@@ -276,9 +355,14 @@ if __name__ == "__main__":
     hideArticlesMarkedAsRead()
     print("mark read bookmarks as read")
     markReadBookmarksAsRead()
+    # add file hashes to read and added files
+    print("add file hashes to already added files")
+    addFileHashesToAlreadyAdded()
+    print("add reaf file hashes to marked as read files")
+    addReadFilesHashesToMarkedAsRead()
     # delete duplicate files
     print("delete duplicate files")
-    articles = utils.searchArticlesForQuery("*", [], onlyUnread=False, formats=["html"])
+    articles = utils.searchArticlesForQuery("*", [], readState="", formats=["html"])
     articleUrls = [url for url in articles.values() if url]
     deleteDuplicateArticleFiles(articles)
     deleteDuplicateFiles(getConfig()["articleFileFolder"])
