@@ -24,7 +24,7 @@ def addFileHashesToAlreadyAdded():
     articleFolder = getConfig()["articleFileFolder"]
     nonHtmlFormats = getConfig()["docFormatsToMove"]
     nonHtmlFormats = [fmt for fmt in nonHtmlFormats if fmt not in ["html", "mhtml"]]
-    listFile = utils.getAbsPath("../storage/alreadyAddedFileNamesAndHashes.txt")
+    listFile = utils.getAbsPath("../storage/alreadyAddedArticles.txt")
     matchingArticles = utils.searchArticlesForQuery(
         "*", formats=nonHtmlFormats, path=articleFolder
     )
@@ -47,7 +47,7 @@ def addReadFilesHashesToMarkedAsRead():
     articleFolder = getConfig()["articleFileFolder"]
     nonHtmlFormats = getConfig()["docFormatsToMove"]
     nonHtmlFormats = [fmt for fmt in nonHtmlFormats if fmt not in ["html", "mhtml"]]
-    listFile = utils.getAbsPath("../storage/markedAsReadFileNamesAndHashes.txt")
+    listFile = utils.getAbsPath("../storage/alreadyAddedArticles.txt")
     matchingArticles = utils.searchArticlesForQuery(
         "*", formats=nonHtmlFormats, path=articleFolder, readState="read"
     )
@@ -171,7 +171,7 @@ def hideArticlesMarkedAsRead():
         utils.hideFilesWithName(articleFileFolder, fileName)
 
 
-def updateUrlListFiles(folder_path):
+def updatePerFolderUrlListFiles(folder_path):
     # Loop over all subdirectories using os.walk
     for dirpath, dirs, files in os.walk(folder_path):
         # Filter out the html and mhtml files
@@ -235,14 +235,10 @@ def moveDocsToTargetFolder():
     print("LEN OF docPath", len(docPaths))
 
     alreadyAddedHashes = str(
-        utils.getUrlsFromFile(
-            utils.getAbsPath("../storage/alreadyAddedFileNamesAndHashes.txt")
-        )
+        utils.getUrlsFromFile(utils.getAbsPath("../storage/alreadyAddedArticles.txt"))
     )
     markedAsReadHashes = str(
-        utils.getUrlsFromFile(
-            utils.getAbsPath("../storage/markedAsReadFileNamesAndHashes.txt")
-        )
+        utils.getUrlsFromFile(utils.getAbsPath("../storage/markedAsReadArticles.txt"))
     )
 
     for docPath in docPaths:
@@ -271,11 +267,8 @@ def moveDocsToTargetFolder():
         shutil.move(docPath, targetPath)
 
         utils.addUrlToUrlFile(
-            docHash, utils.getAbsPath("../storage/alreadyAddedFileNamesAndHashes.txt")
-        )
-        utils.addUrlToUrlFile(
-            os.path.basename(targetPath),
-            utils.getAbsPath("../storage/alreadyAddedFileNames.txt"),
+            [docHash, os.path.basename(targetPath)],
+            utils.getAbsPath("../storage/alreadyAddedArticles.txt"),
         )
 
 
@@ -345,7 +338,7 @@ if __name__ == "__main__":
     moveDocsToTargetFolder()
     # update urlList files
     print("update urlList files")
-    updateUrlListFiles(getConfig()["articleFileFolder"])
+    updatePerFolderUrlListFiles(getConfig()["articleFileFolder"])
     # act on requests to delete/move/hide articles from atVoice app
     print("delete files marked to delete")
     deleteFilesMarkedToDelete()
@@ -358,7 +351,7 @@ if __name__ == "__main__":
     # add file hashes to read and added files
     print("add file hashes to already added files")
     addFileHashesToAlreadyAdded()
-    print("add reaf file hashes to marked as read files")
+    print("add read file hashes to marked as read files")
     addReadFilesHashesToMarkedAsRead()
     # delete duplicate files
     print("delete duplicate files")
