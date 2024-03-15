@@ -9,7 +9,7 @@ def updateLists():
     for listName, listInfo in listFolderMappings.items():
         listFolders, readState, query = (
             listInfo.get("folders", []),
-            listInfo.get("readState", ""),
+            listInfo.get("readState", "unread"),
             listInfo.get("query", "*"),
         )
         print(listName, listInfo)
