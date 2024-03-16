@@ -159,6 +159,11 @@
                 "Economics/Value and Prices"
             ]
         },
+        "mev": {
+            "folders": [
+                "Decentralised Finance/auctions and mev"
+            ]
+        },
         "ethereumcreditguild": {
             "query": "\" ECG \" OR \"credit guild\" OR \"onetruekirk\" OR \"Electric Development Co\" OR \"credit-guild\""
         },
