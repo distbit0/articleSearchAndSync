@@ -162,9 +162,20 @@
         "ethereumcreditguild": {
             "query": "\" ECG \" OR \"credit guild\" OR \"onetruekirk\" OR \"Electric Development Co\" OR \"credit-guild\""
         },
-        "prediction markets": {
+        "pms and desci": {
             "folders": [
-                "Decentralised Finance/prediction markets"
+                "Decentralised Finance/prediction markets",
+                "Decentralised Finance/desci"
+            ]
+        },
+        "defi and ai": {
+            "folders": [
+                "Decentralised Finance/ml and computation"
+            ]
+        },
+        "economics": {
+            "folders": [
+                "Economics/Value and Prices"
             ]
         }
     }
