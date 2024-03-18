@@ -2,6 +2,7 @@ from calendar import c
 import html
 import os
 import sys
+from pyparsing import html_comment
 import requests
 import shutil
 from bs4 import BeautifulSoup
@@ -39,29 +40,29 @@ def process_articles_in_directory(directory):
         # print(i, "of ", len(filesToConvert), " ", file_path, url)
         file_path, url = article
         print("converting url: ", url)
-        newUrls = main(url, False, True)
-        newUrl = newUrls[0] if newUrls else False
-        isHidden = file_path.split("/")[-1][0] == "."
+        # newUrls = main(url, False, True)
+        # newUrl = newUrls[0] if newUrls else False
+        # isHidden = file_path.split("/")[-1][0] == "."
 
-        if not newUrl:
-            if "/home/pimania/" in url:
-                print("issue with url because of home directory")
-            print(
-                "issue with url: ",
-                url,
-                "file path: ",
-                file_path,
-                "is hidden: ",
-                isHidden,
-            )
-            # os.remove(file_path)
-            continue
+        # if not newUrl:
+        #     if "/home/pimania/" in url:
+        #         print("issue with url because of home directory")
+        #     print(
+        #         "issue with url: ",
+        #         url,
+        #         "file path: ",
+        #         file_path,
+        #         "is hidden: ",
+        #         isHidden,
+        #     )
+        #     # os.remove(file_path)
+        #     continue
 
         # print("new url: ", newUrl)
         # response = requests.get(newUrl)
         # soup = BeautifulSoup(response.text, "html.parser")
         # html_content = str(soup)
-        # html_content = f"<!-- Hyperionics-SimpleHtml {newUrl}-->\n" + html_content
+        # html_content = f"<!-- Hyperionics-OriginHtml {newUrl}-->\n" + html_content
         # print(html_content[:100])
         # with open(file_path, "w") as file:
         #     file.write(html_content)
