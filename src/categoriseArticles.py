@@ -96,7 +96,8 @@ def find_first_sentence_position(text):
 
 
 def display_article_snippet(fileText):
-    gistString = "to your computer and use it in GitHub Desktop. Download ZIP"
+    gistString = """to your computer and use it in GitHub Desktop.
+                Download ZIP"""
     if gistString in fileText:
         fileText = fileText.split(gistString)[1]
     indexOfFirstSentence = find_first_sentence_position(fileText)
