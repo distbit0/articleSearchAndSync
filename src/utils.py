@@ -475,3 +475,12 @@ def deleteAllArticlesInList(listName):
     with open(listPath, "w") as f:
         print("about to write: ", textWithArticlesRemoved)
         # f.write(textWithArticlesRemoved)
+
+
+def getSrcUrlOfGitbook(articlePath):
+    htmlText = open(articlePath, errors="ignore").read()
+    if '" rel="nofollow">Link to original</a></p>' in htmlText:
+        srcUrl = htmlText.split('" rel="nofollow">Link to original</a></p>')[0]
+        srcUrl = srcUrl.split('><a href="')[-1]
+        return srcUrl
+    return None

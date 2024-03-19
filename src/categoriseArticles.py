@@ -1,5 +1,7 @@
 from inscriptis import get_text as getHtmlText
 import shutil
+
+from zeroconf import NonUniqueNameException
 import utils
 from utils import getConfig
 import os
@@ -14,6 +16,15 @@ from prompt_toolkit.auto_suggest import AutoSuggest, Suggestion
 import time
 import queue
 import concurrent.futures
+
+
+def getUrlOfArticle(articlePath):
+    url = utils.getUrlOfArticle(articlePath)
+    if "gist.github.com" in url:
+        srcUrl = utils.getSrcUrlOfGitbook(articlePath)
+        if srcUrl:
+            url = srcUrl
+    return url
 
 
 def getCategories(subCategory="", getSubDirs=True):
@@ -54,7 +65,11 @@ def getTextOfFile(filePath):
     if "html" in fileExtension:
         fileHtml = open(filePath, errors="ignore").read()
         fileText = getHtmlText(fileHtml)
-        fileUrl = utils.getUrlOfArticle(filePath)
+        fileUrl = getUrlOfArticle(filePath)
+        if "gist.github.com" in fileUrl:
+            srcUrl = utils.getSrcUrlOfGitbook(filePath)
+            if srcUrl:
+                fileUrl = srcUrl
     elif "pdf" in fileExtension:
         fileText = utils.getPdfText(filePath, pages=10)
     elif "epub" in fileExtension:
@@ -186,7 +201,7 @@ def getAllFiles():
 
     all_files = sorted(
         all_files,
-        key=lambda path: (path.rsplit("/", 2)[-2], utils.getUrlOfArticle(path)),
+        key=lambda path: (path.rsplit("/", 2)[-2], getUrlOfArticle(path)),
     )
     return all_files
 
@@ -226,7 +241,10 @@ def isArticleUncategorised(file_path, categories):
 def startProcessingNextFile(
     executor, allFiles, next_file_data_queue, file_idx, categories
 ):
-    nextFilePath = allFiles[file_idx]
+    try:
+        nextFilePath = allFiles[file_idx]
+    except IndexError:
+        return
     isNextFileUncategorised = isArticleUncategorised(nextFilePath, categories)[0]
     if isNextFileUncategorised:
         future = executor.submit(fetch_next_file_data, nextFilePath)
@@ -259,6 +277,7 @@ def main():
     categories = getCategories()
     next_file_data_queue = queue.Queue()
     session = initPromptSession()
+    noUncategorisedFiles = True
 
     uncategorizedFileCount = getUncategorisedFileCount(
         allFiles, categories
@@ -269,6 +288,7 @@ def main():
 
         categorisedFileCount = 0
         startTime = time.time()
+        last_subcategory_input = ""
         for file_idx, file_path in enumerate(allFiles):
             startProcessingNextFile(
                 executor, allFiles, next_file_data_queue, file_idx + 1, categories
@@ -279,6 +299,7 @@ def main():
             )  # Replace with your actual function
             isUncategorised, subcategories = articleInfo[0], articleInfo[3]
             if isUncategorised:
+                noUncategorisedFiles = False
                 categorisedFileCount += 1
                 printArticleDetails(
                     startTime,
@@ -289,12 +310,16 @@ def main():
                 )
                 subcategories["_DELETE"] = subcategories["_NEW"] = subcategories[
                     "_UNDO"
-                ] = subcategories["_PARENT"] = {}
+                ] = subcategories["_PARENT"] = subcategories[","] = {}
                 subcategory_input = select_category(
                     session, subcategories, "Subcategory: "
                 )
                 if subcategory_input:
+                    if subcategory_input == ",":  ## for repeating last subcategory
+                        subcategory_input = last_subcategory_input
+                    last_subcategory_input = subcategory_input
                     if subcategory_input == "_DELETE":
+                        print("moving to trash: ", file_path)
                         homeDir = os.path.expanduser("~")
                         dest = os.path.join(
                             homeDir, ".local/share/Trash/files/", fileName
@@ -332,6 +357,11 @@ def main():
                         lastMoveOrigin = file_path
                         lastMoveDest = destination
 
+    return noUncategorisedFiles
+
 
 if __name__ == "__main__":
-    main()
+    while True:
+        noUncategorisedFiles = main()
+        if noUncategorisedFiles:
+            break

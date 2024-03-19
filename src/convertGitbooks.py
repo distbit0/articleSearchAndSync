@@ -83,4 +83,4 @@ def createFiles(mapOfFiles):
 
 directory = getConfig()["articleFileFolder"]
 # process_articles_in_directory(directory)
-createFiles(urlToFiles)
+# createFiles()
