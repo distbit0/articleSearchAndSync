@@ -1,3 +1,4 @@
+from numpy import sort
 from utils import getConfig
 import utils
 import os
@@ -19,11 +20,12 @@ def updateLists():
             readState=readState,
             formats=getConfig()["docFormatsToMove"],
         )
-        pathsSortedByUrl = [
+
+        articlePathsForList = [
             x[0] for x in sorted(articlePathsForList.items(), key=lambda x: x[1])
         ]
 
-        utils.addArticlesToList(listName, pathsSortedByUrl)
+        utils.addArticlesToList(listName, articlePathsForList)
 
 
 if __name__ == "__main__":

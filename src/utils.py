@@ -410,24 +410,18 @@ def searchArticlesForQuery(query, subjects=[], readState="", formats=[], path=""
     return matchingArticles
 
 
-def checkListExists(listName):
-    listPath = os.path.join(
-        getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"
-    )
+def createListIfNotExists(listPath):
     exists = os.path.exists(listPath)
     if not exists:
-        # create list
         open(listPath, "a").close()
     return True
 
 
 def addArticlesToList(listName, articlePathsForList):
-    if not checkListExists(listName):
-        print("List " + listName + " does not exist")
-        return
     listPath = os.path.join(
         getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"
     )
+    createListIfNotExists(listPath)
     articleNamesInList = getArticlesFromList(listName)
     droidEbooksFolderPath = getConfig()["droidEbooksFolderPath"]
     articleFileFolder = getConfig()["articleFileFolder"]
@@ -441,22 +435,26 @@ def addArticlesToList(listName, articlePathsForList):
             linesToAppend.append(droidArticlePath + "\t" + displayName)
     newListText = "\n".join(linesToAppend)
     currentListText = open(listPath).read().strip()
-    combinedListText = currentListText + "\n" + newListText
-    print(
-        "\n\n\n\n\n\n\n\nAdding the following articles to list: " + listName,
-        "\n",
-        newListText,
+    existingArticleListText = "\n".join(
+        currentListText.split("\n:")[-1].split("\n")[1:]
     )
+    headers = currentListText.replace(existingArticleListText, "").strip()
+    combinedListText = headers + "\n" + newListText + "\n" + currentListText
+    # print(
+    #     "\n\n\n\n\n\n\n\nAdding the following articles to list: " + listName,
+    #     "\n",
+    #     newListText,
+    # )
 
     if len(linesToAppend) > 0:
-        with open(listPath, "w") as f:
-            f.write(combinedListText)
+        print(combinedListText)
+        print("\n\n\n the new articles are:\n", newListText + "\n")
+        # with open(listPath, "w") as f:
+        # f.write(combinedListText)
 
 
 def deleteAllArticlesInList(listName):
-    if not checkListExists(listName):
-        print("List " + listName + " does not exist")
-        return
+    createListIfNotExists(listName)
     listPath = os.path.join(
         getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"
     )
