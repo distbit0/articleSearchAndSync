@@ -327,7 +327,10 @@ def getArticlesFromList(listName):
         getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"
     )
     listText = open(listPath).read().strip()
-    listArticles = listText.split("\n:")[-1].split("\n")[1:]
+    if listText.split("\n")[1][0] == ":":
+        listArticles = listText.split("\n:")[-1].split("\n")[1:]
+    else:
+        listArticles = listText.split("\n")
     articleFileNames = []
     for articleLine in listArticles:
         articleFileName = articleLine.split("\t")[0].split("/")[-1]
@@ -433,24 +436,24 @@ def addArticlesToList(listName, articlePathsForList):
         if articleName not in articleNamesInList:
             displayName = articleName.split(".")[0]
             linesToAppend.append(droidArticlePath + "\t" + displayName)
-    newListText = "\n".join(linesToAppend)
+    newListText = "\n".join(linesToAppend) + "\n"
     currentListText = open(listPath).read().strip()
-    existingArticleListText = "\n".join(
-        currentListText.split("\n:")[-1].split("\n")[1:]
+    headers, existingArticleListText = "", str(currentListText)
+    if currentListText.split("\n")[1][0] == ":":
+        existingArticleListText = "\n".join(
+            currentListText.split("\n:")[-1].split("\n")[1:]
+        )
+        headers = currentListText.replace(existingArticleListText, "").strip() + "\n"
+    combinedListText = headers + newListText + existingArticleListText
+    print(
+        "\n\n\n\nAdding the following articles to list: " + listName,
+        "\n",
+        newListText,
     )
-    headers = currentListText.replace(existingArticleListText, "").strip()
-    combinedListText = headers + "\n" + newListText + "\n" + currentListText
-    # print(
-    #     "\n\n\n\n\n\n\n\nAdding the following articles to list: " + listName,
-    #     "\n",
-    #     newListText,
-    # )
 
     if len(linesToAppend) > 0:
-        print(combinedListText)
-        print("\n\n\n the new articles are:\n", newListText + "\n")
-        # with open(listPath, "w") as f:
-        # f.write(combinedListText)
+        with open(listPath, "w") as f:
+            f.write(combinedListText)
 
 
 def deleteAllArticlesInList(listName):
