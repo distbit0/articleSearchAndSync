@@ -245,6 +245,12 @@ def moveDocsToTargetFolder():
         docHash = calculate_file_hash(docPath)
         if docHash in alreadyAddedHashes:
             print("Skipping importing duplicate file:", docPath)
+            docFileName = docPath.split("/")[-1]
+            homeDir = os.path.expanduser("~")
+            erroDocPath = os.path.join(
+                homeDir, ".local/share/Trash/files/", "DUPLICATE_" + docFileName
+            )
+            shutil.move(docPath, erroDocPath)
             continue
 
         docName = docPath.split("/")[-1]
