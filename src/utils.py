@@ -420,6 +420,15 @@ def createListIfNotExists(listPath):
     return True
 
 
+def deleteListIfExists(listName):
+    listPath = os.path.join(
+        getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"
+    )
+    if os.path.exists(listPath):
+        print("deleting disabled list: ", listName)
+        os.remove(listPath)
+
+
 def addArticlesToList(listName, articlePathsForList):
     listPath = os.path.join(
         getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"

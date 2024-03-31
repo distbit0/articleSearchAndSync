@@ -8,11 +8,16 @@ def updateLists():
     listFolderMappings = getConfig()["listToFolderMappings"]
 
     for listName, listInfo in listFolderMappings.items():
-        listFolders, readState, query = (
+        listFolders, readState, query, disabled = (
             listInfo.get("folders", []),
             listInfo.get("readState", "unread"),
             listInfo.get("query", "*"),
+            listInfo.get("disabled", False),
         )
+        if disabled:
+            utils.deleteListIfExists(listName)
+            continue
+
         print(listName, listInfo)
         articlePathsForList = utils.searchArticlesForQuery(
             query,
