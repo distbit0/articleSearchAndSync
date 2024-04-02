@@ -117,6 +117,8 @@ def formatUrl(url):
 
     url = re.sub(r"\?gi=.*", r"", url)
     url = re.sub(r"\&gi=.*", r"", url)
+    if "discord.com" in url:
+        url = url.replace("#update", "")
     return url
 
 
