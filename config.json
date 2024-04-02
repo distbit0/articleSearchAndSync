@@ -95,6 +95,28 @@
                 "Machine and human thought/RL and directed learning"
             ]
         },
+        "pms, desci and ai": {
+            "folders": [
+                "Decentralised Finance/prediction markets",
+                "Decentralised Finance/desci",
+                "Decentralised Finance/ml and computation"
+            ]
+        },
+        "fringe": {
+            "folders": [
+                "Decentralised Finance/lending",
+                "Decentralised Finance/stablecoins and synths",
+                "Decentralised Finance/oracles",
+                "Decentralised Finance/options"
+            ]
+        },
+        "increment": {
+            "folders": [
+                "Decentralised Finance/futures, margin and perps",
+                "Decentralised Finance/dexes",
+                "Decentralised Finance/options"
+            ]
+        },
         "tools for thought": {
             "folders": [
                 "Machine and human thought/tools for thought",
@@ -107,36 +129,6 @@
                 "Machine and human thought/learning and memory"
             ],
             "disabled": true
-        },
-        "lending": {
-            "folders": [
-                "Decentralised Finance/lending"
-            ]
-        },
-        "options": {
-            "folders": [
-                "Decentralised Finance/options"
-            ]
-        },
-        "oracles": {
-            "folders": [
-                "Decentralised Finance/oracles"
-            ]
-        },
-        "perps": {
-            "folders": [
-                "Decentralised Finance/futures, margin and perps"
-            ]
-        },
-        "stables": {
-            "folders": [
-                "Decentralised Finance/stablecoins and synths"
-            ]
-        },
-        "dexes": {
-            "folders": [
-                "Decentralised Finance/dexes"
-            ]
         },
         "diagrams": {
             "folders": [
@@ -167,17 +159,6 @@
         },
         "ethereumcreditguild": {
             "query": "\" ECG \" OR \"credit guild\" OR \"onetruekirk\" OR \"Electric Development Co\" OR \"credit-guild\""
-        },
-        "pms and desci": {
-            "folders": [
-                "Decentralised Finance/prediction markets",
-                "Decentralised Finance/desci"
-            ]
-        },
-        "defi and ai": {
-            "folders": [
-                "Decentralised Finance/ml and computation"
-            ]
         },
         "economics": {
             "folders": [

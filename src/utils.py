@@ -327,6 +327,8 @@ def getArticlesFromList(listName):
         getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"
     )
     listText = open(listPath).read().strip()
+    if listText == "":
+        return []
     if listText.split("\n")[1][0] == ":":
         listArticles = listText.split("\n:")[-1].split("\n")[1:]
     else:
@@ -448,7 +450,7 @@ def addArticlesToList(listName, articlePathsForList):
     newListText = "\n".join(linesToAppend) + "\n"
     currentListText = open(listPath).read().strip()
     headers, existingArticleListText = "", str(currentListText)
-    if currentListText.split("\n")[1][0] == ":":
+    if currentListText and currentListText.split("\n")[1][0] == ":":
         existingArticleListText = "\n".join(
             currentListText.split("\n:")[-1].split("\n")[1:]
         )
