@@ -337,15 +337,13 @@ def deleteDuplicateFiles(directory_path):
 
 
 if __name__ == "__main__":
-    # import new documents and give them readable filenames
-    print("retitle all pdfs")
+    print("import new documents and give them readable filenames")
     reTitlePDFs.retitleAllPDFs()
     print("move docs to target folder")
     moveDocsToTargetFolder()
-    # update urlList files
     print("update urlList files")
     updatePerFolderUrlListFiles(getConfig()["articleFileFolder"])
-    # act on requests to delete/move/hide articles from atVoice app
+    print("act on requests to delete/move/hide articles from atVoice app\n\n")
     print("delete files marked to delete")
     deleteFilesMarkedToDelete()
     print("move files marked to move")
@@ -354,12 +352,10 @@ if __name__ == "__main__":
     hideArticlesMarkedAsRead()
     print("mark read bookmarks as read")
     markReadBookmarksAsRead()
-    # add file hashes to read and added files
     print("add file hashes to already added files")
     addFileHashesToAlreadyAdded()
     print("add read file hashes to marked as read files")
     addReadFilesHashesToMarkedAsRead()
-    # delete duplicate files
     print("delete duplicate files")
     articles = utils.searchArticlesForQuery("*", [], readState="", formats=["html"])
     articleUrls = [url for url in articles.values() if url]
