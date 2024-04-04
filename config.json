@@ -83,7 +83,6 @@
         "increment": {
             "folders": [
                 "Decentralised Finance/futures, margin and perps",
-                "Decentralised Finance/dexes",
                 "Decentralised Finance/options"
             ]
         },
