@@ -23,6 +23,9 @@
     "pdfSearchFolders": {
         "/home/pimania/ebooks/Decentralised Finance": {
             "subject": "Defi"
+        },
+        "/home/pimania/ebooks/Machine and human thought": {
+            "subject": "ai"
         }
     },
     "pdfSourceFolders": [
