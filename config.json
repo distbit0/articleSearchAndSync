@@ -68,11 +68,9 @@
                 "Machine and human thought/tools for thought"
             ]
         },
-        "pms, desci and ai": {
+        "epistemic finance": {
             "folders": [
-                "Decentralised Finance/prediction markets",
-                "Decentralised Finance/desci",
-                "Decentralised Finance/ml and computation"
+                "Decentralised Finance/epistemic finance"
             ]
         },
         "fringe": {

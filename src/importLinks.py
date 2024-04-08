@@ -5,6 +5,7 @@ from utils import getConfig
 import os
 from collections import defaultdict
 import reTitlePDFs
+from generateLists import updateLists
 import sys
 import shutil
 import hashlib
@@ -369,3 +370,5 @@ if __name__ == "__main__":
     print("update urls.txt")
     urlsToAdd = calcUrlsToAdd()
     generateUrlImportFilesForAtVoice(urlsToAdd)
+    print("update @voice lists")
+    updateLists()
