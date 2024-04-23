@@ -5,7 +5,7 @@ subject = "decentralised finance"
 
 def getBlogs(subject):
     urls = utils.searchArticlesForQuery(
-        "*", [subject], readState="", formats=["html"]
+        "*", [subject], readState="", formats=["html", "mhtml"]
     ).values()
     urls = list(urls)
     blogs = utils.getBlogsFromUrls(urls)
