@@ -6,6 +6,7 @@ import os
 from collections import defaultdict
 import reTitlePDFs
 from generateLists import updateLists
+from downloadNewArticles import downloadNewArticles
 import sys
 import shutil
 import hashlib
@@ -139,14 +140,6 @@ def calcUrlsToAdd(onlyRead=False):
 def markReadBookmarksAsRead():
     readUrls = calcUrlsToAdd(onlyRead=True)["AlreadyRead"]
     utils.markArticlesWithUrlsAsRead(readUrls, getConfig()["articleFileFolder"])
-
-
-def generateUrlImportFilesForAtVoice(urlsToAdd):
-    atVoiceFolderPath = getConfig()["atVoiceFolderPath"]
-    linkText = "\n".join(["\n".join(urlsToAdd[subject]) for subject in urlsToAdd])
-    print(atVoiceFolderPath + "links" + ".txt")
-    with open(os.path.join(atVoiceFolderPath, ".config", "links.txt"), "w") as f:
-        f.write(linkText)
 
 
 def moveFilesMarkedToMove():
@@ -338,7 +331,11 @@ def deleteDuplicateFiles(directory_path):
 
 
 if __name__ == "__main__":
-    print("import new documents and give them readable filenames")
+    print("download new articles")
+    urlsToAdd = calcUrlsToAdd()
+    urlsToAdd = urlsToAdd["AlreadyRead"] + urlsToAdd["UnRead"]
+    downloadNewArticles(urlsToAdd)
+    print("give files readable filenames")
     reTitlePDFs.retitleAllPDFs()
     print("move docs to target folder")
     moveDocsToTargetFolder()
@@ -358,7 +355,9 @@ if __name__ == "__main__":
     print("add read file hashes to marked as read files")
     addReadFilesHashesToMarkedAsRead()
     print("delete duplicate files")
-    articles = utils.searchArticlesForQuery("*", [], readState="", formats=["html"])
+    articles = utils.searchArticlesForQuery(
+        "*", [], readState="", formats=["html", "mhtml"]
+    )
     articleUrls = [url for url in articles.values() if url]
     deleteDuplicateArticleFiles(articles)
     deleteDuplicateFiles(getConfig()["articleFileFolder"])
@@ -367,8 +366,5 @@ if __name__ == "__main__":
         articleUrls,
         utils.getAbsPath("../storage/alreadyAddedArticles.txt"),
     )
-    print("update urls.txt")
-    urlsToAdd = calcUrlsToAdd()
-    generateUrlImportFilesForAtVoice(urlsToAdd)
     print("update @voice lists")
     updateLists()

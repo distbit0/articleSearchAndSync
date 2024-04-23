@@ -126,7 +126,7 @@ def getUrlOfArticle(articleFilePath):
     extractedUrl = ""
     articleExtension = articleFilePath.split(".")[-1].lower()
 
-    if articleExtension not in ["txt", "html"]:
+    if articleExtension not in ["txt", "html", "mhtml"]:
         return ""
 
     with open(articleFilePath, errors="ignore") as _file:
@@ -142,7 +142,7 @@ def getUrlOfArticle(articleFilePath):
 
 
 def markArticlesWithUrlsAsRead(readUrls, articleFolder):
-    articleUrls = searchArticlesForQuery("*", [], "", ["html"])
+    articleUrls = searchArticlesForQuery("*", [], "", ["html", "mhtml"])
     articleUrls = {v: k for k, v in articleUrls.items()}
     for url in readUrls:
         if url in articleUrls:

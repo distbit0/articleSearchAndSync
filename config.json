@@ -29,8 +29,7 @@
         }
     },
     "pdfSourceFolders": [
-        "/home/pimania/Downloads",
-        "/home/pimania/atVoice/_articleDownload"
+        "/home/pimania/Downloads"
     ],
     "docFormatsToMove": [
         "pdf",
