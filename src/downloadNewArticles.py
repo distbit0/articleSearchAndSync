@@ -1,3 +1,4 @@
+import html
 import os
 import ssl
 import time
@@ -18,7 +19,7 @@ import markdown
 requests.packages.urllib3.disable_warnings()
 
 
-def save_text_as_html(url, saveDirectory):
+def save_text_as_html(url):
     response = requests.get(url, verify=ssl.CERT_NONE)
     text_content = response.text
 
@@ -29,15 +30,7 @@ def save_text_as_html(url, saveDirectory):
     title = os.path.basename(parsed_url.path)
     title = "".join(c for c in title if c.isalnum() or c.isspace()).rstrip()
 
-    html_content = f"<!-- Hyperionics-OriginHtml {url}-->\n{html_content}"
-
-    file_path = os.path.join(saveDirectory, f"{title}.html")
-    if os.path.exists(file_path):
-        currentTime = int(time.time())
-        file_path = file_path.replace(".html", f"_{currentTime}.html")
-
-    with open(file_path, "w") as file:
-        file.write(html_content)
+    return html_content, title
 
 
 def downloadNewArticles(urlsToAdd):
@@ -47,7 +40,7 @@ def downloadNewArticles(urlsToAdd):
         save_mobile_article_as_mhtml(url, saveDirectory)
 
 
-def save_webpage_as_mhtml(url, saveDirectory, timeout=10, min_load_time=5):
+def save_webpage_as_mhtml(url, timeout=10, min_load_time=5):
     chrome_options = Options()
     user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
     chrome_options.add_argument(f"user-agent={user_agent}")
@@ -66,26 +59,20 @@ def save_webpage_as_mhtml(url, saveDirectory, timeout=10, min_load_time=5):
 
         title = driver.title
         title = "".join(c for c in title if c.isalnum() or c.isspace()).rstrip()
-        file_path = os.path.join(saveDirectory, f"{title}_mobile.mhtml")
 
         driver.execute_cdp_cmd("Page.captureSnapshot", {"format": "mhtml"})
         mhtml_data = driver.execute_cdp_cmd(
             "Page.captureSnapshot", {"format": "mhtml"}
         )["data"]
 
-        mhtml_data = f"<!-- Hyperionics-OriginHtml {url}-->\n{mhtml_data}"
-
-        if os.path.exists(file_path):
-            currentTime = int(time.time())
-            file_path = file_path.replace(".mhtml", f"_{currentTime}.mhtml")
-
-        with open(file_path, "wb") as file:
-            file.write(mhtml_data.encode("utf-8"))
     finally:
         driver.quit()
 
+    return mhtml_data, title
+
 
 def save_mobile_article_as_mhtml(url, saveDirectory, timeout=10, min_load_time=5):
+    originalUrl = url
     try:
         response = requests.get(url, verify=False)
     except requests.exceptions.SSLError:
@@ -94,19 +81,33 @@ def save_mobile_article_as_mhtml(url, saveDirectory, timeout=10, min_load_time=5
 
     content_type = response.headers.get("Content-Type")
     content_disposition = response.headers.get("Content-Disposition")
-
-    if content_type == "text/plain" or (
+    downloadAsHtml = content_type == "text/plain" or (
         content_disposition and "attachment" in content_disposition
-    ):
+    )
+    if downloadAsHtml:
+        fileExt = ".html"
         print(f"saving url: {url} as text")
-        save_text_as_html(url, saveDirectory)
+        htmlText, title = save_text_as_html(url)
     else:
+        fileExt = ".mhtml"
         print(f"saving url: {url} as webpage")
-        save_webpage_as_mhtml(url, saveDirectory, timeout, min_load_time)
+        htmlText, title = save_webpage_as_mhtml(url, timeout, min_load_time)
+
+    file_path = os.path.join(saveDirectory, f"{title}{fileExt}")
+    if os.path.exists(file_path):
+        currentTime = int(time.time())
+        file_path = file_path.replace(fileExt, f"_{currentTime}{fileExt}")
+
+    if downloadAsHtml:
+        htmlText = f"<!-- Hyperionics-OriginHtml {originalUrl}-->\n{htmlText}"
+        with open(file_path, "w") as file:
+            file.write(htmlText)
+    else:
+        with open(file_path, "wb") as file:
+            file.write(htmlText.encode("utf-8"))
 
 
 if __name__ == "__main__":
     articles = """https://embeddedsw.net/doc/physical_coercion.txt
-https://docs.google.com/document/d/1RgUr4dGAcfqmzQR8Ceym5QcfvrD8jGbGnrr4whkvDmU/export?format=txt
-https://docs.google.com/document/d/1tza0OIdTZNNjTqhkWZLRC9ha9Sp7lumGF5ytthx_Ozw/export?format=txt"""
+    https://github.com"""
     downloadNewArticles(articles.split("\n"))
