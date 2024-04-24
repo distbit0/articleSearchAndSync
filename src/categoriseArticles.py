@@ -314,7 +314,9 @@ def main():
                 )
                 subcategories["_DELETE"] = subcategories["_NEW"] = subcategories[
                     "_UNDO"
-                ] = subcategories["_PARENT"] = subcategories[","] = {}
+                ] = subcategories["_PARENT"] = subcategories[","] = subcategories[
+                    "_READ"
+                ] = {}
                 subcategory_input = select_category(
                     session, subcategories, "Subcategory: "
                 )
@@ -350,6 +352,15 @@ def main():
                         os.makedirs(newFolderPath, exist_ok=True)
                         destPath = newFolderPath + "/" + fileName
                         print(f"\nMoving {file_path} to {destPath}")
+                        shutil.move(file_path, destPath)
+                        lastMoveOrigin = file_path
+                        lastMoveDest = destPath
+                    elif subcategory_input == "_READ":
+                        folderPath = file_path.split("/")[:-1]
+                        destPath = (
+                            "/".join(folderPath) + "/" + "." + fileName.lstrip(".")
+                        )
+                        print(f"\nMarking as read {file_path} to {destPath}")
                         shutil.move(file_path, destPath)
                         lastMoveOrigin = file_path
                         lastMoveDest = destPath

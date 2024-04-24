@@ -106,6 +106,12 @@
         "ethereumcreditguild": {
             "query": "\" ECG \" OR \"credit guild\" OR \"onetruekirk\" OR \"Electric Development Co\" OR \"credit-guild\""
         },
+        "productivity": {
+            "folders": [
+                "Philosophy/advice",
+                "Business and entrepreneurship/time management + procrastination"
+            ]
+        },
         "entropy": {
             "folders": [
                 "Physics/entropy",
