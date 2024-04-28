@@ -359,6 +359,13 @@ def getPDFPathMappings():
     return pdfToTextFileMap
 
 
+def doesPathContainDotFolders(path):
+    for folder in path.split("/")[:-1]:
+        if folder and folder[0] == ".":
+            return True
+    return False
+
+
 def getArticlePathsForQuery(query, formats, folderPath=""):
     folderPath = folderPath if folderPath else getConfig()["articleFileFolder"]
     formats = formats if query == "*" else ["html", "mhtml"]
@@ -367,6 +374,9 @@ def getArticlePathsForQuery(query, formats, folderPath=""):
     allArticlesPaths = []
     for pattern in filePatterns:
         articlePaths = list(glob.glob(pattern, recursive=True, include_hidden=True))
+        articlePaths = [
+            path for path in articlePaths if not doesPathContainDotFolders(path)
+        ]
         allArticlesPaths.extend(articlePaths)
 
     allArticlesPaths = list(set(allArticlesPaths))
