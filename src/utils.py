@@ -480,10 +480,10 @@ def addArticlesToList(listName, articlePathsForList):
 
 
 def deleteAllArticlesInList(listName):
-    createListIfNotExists(listName)
     listPath = os.path.join(
         getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"
     )
+    createListIfNotExists(listPath)
     currentListText = open(listPath).read().strip()
 
     textWithArticlesRemoved = ""

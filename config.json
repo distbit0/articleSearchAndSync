@@ -33,6 +33,7 @@
     ],
     "docFormatsToMove": [
         "pdf",
+        "djvu",
         "epub",
         "mobi",
         "html",
