@@ -147,6 +147,7 @@ def moveFilesMarkedToMove():
     articleFileFolder = getConfig()["articleFileFolder"]
     for fileName in markedToMoveFiles:
         utils.moveFilesWithNameToRootDir(articleFileFolder, fileName)
+    utils.deleteAllArticlesInList("_MOVE")
 
 
 def deleteFilesMarkedToDelete():

@@ -74,6 +74,8 @@ def getPDFTitle(pdfPath):
     else:
         pdfTitle = pdfTitle.strip()
 
+    pdfTitle = pdfTitle[:50]
+
     pdfTitle += ".pdf"
 
     pdfTitle = removeIllegalChars(pdfTitle)
