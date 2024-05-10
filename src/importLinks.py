@@ -155,6 +155,7 @@ def deleteFilesMarkedToDelete():
     articleFileFolder = getConfig()["articleFileFolder"]
     for fileName in markedAsDeletedFiles:
         utils.delete_files_with_name(articleFileFolder, fileName)
+    utils.deleteAllArticlesInList("_DELETE")
 
 
 def hideArticlesMarkedAsRead():
@@ -164,6 +165,7 @@ def hideArticlesMarkedAsRead():
         if "articleUrls" in fileName:
             continue
         utils.hideFilesWithName(articleFileFolder, fileName)
+    utils.deleteAllArticlesInList("_READ")
 
 
 def updatePerFolderUrlListFiles(folder_path):
