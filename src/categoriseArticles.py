@@ -316,6 +316,8 @@ def main():
                     "_UNDO"
                 ] = subcategories["_PARENT"] = subcategories[","] = subcategories[
                     "_READ"
+                ] = subcategories[
+                    "_RENAME"
                 ] = {}
                 subcategory_input = select_category(
                     session, subcategories, "Subcategory: "
@@ -361,6 +363,14 @@ def main():
                             "/".join(folderPath) + "/" + "." + fileName.lstrip(".")
                         )
                         print(f"\nMarking as read {file_path} to {destPath}")
+                        shutil.move(file_path, destPath)
+                        lastMoveOrigin = file_path
+                        lastMoveDest = destPath
+                    elif subcategory_input == "_RENAME":
+                        folderPath = file_path.split("/")[:-1]
+                        newFileName = input("Enter new file name: ")
+                        destPath = "/".join(folderPath) + "/" + newFileName
+                        print(f"\nMoving {file_path} to {destPath}")
                         shutil.move(file_path, destPath)
                         lastMoveOrigin = file_path
                         lastMoveDest = destPath

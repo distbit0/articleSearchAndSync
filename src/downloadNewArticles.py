@@ -37,7 +37,10 @@ def downloadNewArticles(urlsToAdd):
     saveDirectory = getConfig()["pdfSourceFolders"][0]
     print(urlsToAdd)
     for url in urlsToAdd:
-        save_mobile_article_as_mhtml(url, saveDirectory)
+        try:
+            save_mobile_article_as_mhtml(url, saveDirectory)
+        except Exception as e:
+            print("Error downloading article: ", url, e)
 
 
 def save_webpage_as_mhtml(url, timeout=10, min_load_time=5):
