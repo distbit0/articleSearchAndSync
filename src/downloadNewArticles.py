@@ -37,6 +37,8 @@ def downloadNewArticles(urlsToAdd):
     saveDirectory = getConfig()["pdfSourceFolders"][0]
     print(urlsToAdd)
     for url in urlsToAdd:
+        if url.endswith(".pdf"):
+            continue
         try:
             save_mobile_article_as_mhtml(url, saveDirectory)
         except Exception as e:
