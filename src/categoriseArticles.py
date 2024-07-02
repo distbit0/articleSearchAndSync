@@ -390,7 +390,8 @@ def main(categorisedAlready):
 
 if __name__ == "__main__":
     categorisedAlready = 0
+    maxCategorisations = getConfig()["maxCategorisationsPerSession"]
     while True:
         noUncategorisedFiles, categorisedAlready = main(categorisedAlready)
-        if noUncategorisedFiles:
+        if noUncategorisedFiles or categorisedAlready >= maxCategorisations:
             break
