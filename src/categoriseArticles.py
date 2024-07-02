@@ -1,6 +1,5 @@
 from inscriptis import get_text as getHtmlText
 import shutil
-
 from zeroconf import NonUniqueNameException
 import utils
 from utils import getConfig
@@ -276,17 +275,18 @@ def printArticleDetails(startTime, next_file_data_queue, done, remaining, file_p
     print(textToPrint)
 
 
-def main():
+def main(categorisedAlready):
     allFiles = getAllFiles()
     categories = getCategories()
     next_file_data_queue = queue.Queue()
     session = initPromptSession()
     noUncategorisedFiles = True
 
-    uncategorizedFileCount = getUncategorisedFileCount(
-        allFiles, categories
-    )  # Replace with your actual function to count uncategorized files
-
+    uncategorizedFileCount = getUncategorisedFileCount(allFiles, categories)
+    maxCategorisations = (
+        getConfig()["maxCategorisationsPerSession"] - categorisedAlready
+    )
+    uncategorizedFileCount = min(uncategorizedFileCount, maxCategorisations)
     with concurrent.futures.ThreadPoolExecutor(max_workers=100) as executor:
         startProcessingNextFile(executor, allFiles, next_file_data_queue, 0, categories)
 
@@ -294,6 +294,8 @@ def main():
         startTime = time.time()
         last_subcategory_input = ""
         for file_idx, file_path in enumerate(allFiles):
+            if categorisedAlready >= maxCategorisations:
+                break
             startProcessingNextFile(
                 executor, allFiles, next_file_data_queue, file_idx + 1, categories
             )
@@ -323,6 +325,7 @@ def main():
                     session, subcategories, "Subcategory: "
                 )
                 if subcategory_input:
+                    categorisedAlready += 1
                     if subcategory_input == ",":  ## for repeating last subcategory
                         subcategory_input = last_subcategory_input
                     last_subcategory_input = subcategory_input
@@ -382,11 +385,12 @@ def main():
                         lastMoveOrigin = file_path
                         lastMoveDest = destination
 
-    return noUncategorisedFiles
+    return noUncategorisedFiles, categorisedAlready
 
 
 if __name__ == "__main__":
+    categorisedAlready = 0
     while True:
-        noUncategorisedFiles = main()
+        noUncategorisedFiles, categorisedAlready = main(categorisedAlready)
         if noUncategorisedFiles:
             break
