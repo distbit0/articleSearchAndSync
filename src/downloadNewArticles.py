@@ -45,12 +45,9 @@ def downloadNewArticles(urlsToAdd):
             downloaded_urls.append(url)
         except Exception as e:
             print("Error downloading article: ", url, e)
-    
+
     # Add downloaded URLs to alreadyAddedArticles.txt
-    addUrlToUrlFile(
-        downloaded_urls,
-        getAbsPath("../storage/alreadyAddedArticles.txt")
-    )
+    addUrlToUrlFile(downloaded_urls, getAbsPath("../storage/alreadyAddedArticles.txt"))
 
 
 def save_webpage_as_mhtml(url, timeout=10, min_load_time=5):
