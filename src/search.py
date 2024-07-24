@@ -64,7 +64,12 @@ def main():
         articleUrls, utils.getAbsPath("../output/searchResultUrls.txt"), True
     )
 
-    print("Article URLs:\n\n" + "\n".join(articleUrls))
+    print("Article URLs:\n")
+    for path, url in articles.items():
+        if url:
+            file_name = os.path.basename(path)
+            clean_file_name = ''.join(c if c.isalnum() else ' ' for c in file_name)
+            print(f"{clean_file_name}:\n{url}\n")
 
     if args.returnPaths:
         print("\n\nArticle paths:\n\n" + "\n".join(articlePaths))
