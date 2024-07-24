@@ -5,7 +5,7 @@ subject = "decentralised finance"
 
 def getBlogs(subject):
     urls = utils.searchArticlesForQuery(
-        "*", [subject], readState="", formats=["html", "mhtml"]
+        "*", [subject], readState="read", formats=["html", "mhtml"]
     ).values()
     urls = list(urls)
     blogs = utils.getBlogsFromUrls(urls)
@@ -26,11 +26,19 @@ def getOnlyNewBlogs(blogs):
 
 if __name__ == "__main__":
     blogs = getBlogs(subject)
-    newBlogs = getOnlyNewBlogs(blogs)
-    newBlogs = [blog.replace("scribe.rip", "medium.com") for blog in newBlogs]
-    print("\n".join(sorted(list(set(newBlogs)))))
+    blogCounts = {}
+    for blog in blogs:
+        blogUrl = utils.getBlogUrlFromUrl(blog)
+        if blogUrl in blogCounts:
+            blogCounts[blogUrl] += 1
+        else:
+            blogCounts[blogUrl] = 1
+
+    sortedBlogCounts = sorted(blogCounts.items(), key=lambda x: x[1], reverse=True)
+    newBlogs = [f"{blog.replace('scribe.rip', 'medium.com')} ({count})" for blog, count in sortedBlogCounts]
+    print("\n".join(newBlogs))
     addBlogs = input("Add blogs to reviewed? (default=no): ")
     if addBlogs.lower() in ["y", "yes"]:
         utils.addUrlToUrlFile(
-            newBlogs, utils.getAbsPath("../storage/reviewedBlogs.txt")
+            [blog.split(" ")[0] for blog in newBlogs], utils.getAbsPath("../storage/reviewedBlogs.txt")
         )
