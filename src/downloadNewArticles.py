@@ -42,9 +42,10 @@ def downloadNewArticles(urlsToAdd):
             continue
         try:
             save_mobile_article_as_mhtml(url, saveDirectory)
-            downloaded_urls.append(url)
         except Exception as e:
             print("Error downloading article: ", url, e)
+        else:
+            downloaded_urls.append(url)
 
     # Add downloaded URLs to alreadyAddedArticles.txt
     addUrlToUrlFile(downloaded_urls, getAbsPath("../storage/alreadyAddedArticles.txt"))
