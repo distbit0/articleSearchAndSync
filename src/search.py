@@ -68,7 +68,7 @@ def main():
     for path, url in articles.items():
         if url:
             file_name = os.path.basename(path)
-            clean_file_name = ''.join(c if c.isalnum() else ' ' for c in file_name)
+            clean_file_name = "".join(c if c.isalnum() else " " for c in file_name)
             print(f"{clean_file_name}:\n{url}\n")
 
     if args.returnPaths:
