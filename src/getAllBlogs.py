@@ -1,6 +1,6 @@
 import utils
 
-subject = "decentralised finance"
+subject = ""
 
 
 def getBlogs(subject):
@@ -28,7 +28,7 @@ if __name__ == "__main__":
     blogs = getBlogs(subject)
     blogCounts = {}
     for blog in blogs:
-        blogUrl = utils.getBlogUrlFromUrl(blog)
+        blogUrl = utils.getBlogFromUrl(blog)
         if blogUrl in blogCounts:
             blogCounts[blogUrl] += 1
         else:
