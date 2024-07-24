@@ -37,10 +37,10 @@ if __name__ == "__main__":
     sortedBlogCounts = sorted(blogCounts.items(), key=lambda x: x[1], reverse=True)
     newBlogs = [
         f"{blog.replace('scribe.rip', 'medium.com')} ({count})"
-        for blog, count in sortedBlogCounts
+        for blog, count in sortedBlogCounts[:10]
     ]
     print("\n".join(newBlogs))
-    addBlogs = input("Add blogs to reviewed? (default=no): ")
+    addBlogs = input("Add top 10 blogs to reviewed? (default=no): ")
     if addBlogs.lower() in ["y", "yes"]:
         utils.addUrlToUrlFile(
             [blog.split(" ")[0] for blog in newBlogs],
