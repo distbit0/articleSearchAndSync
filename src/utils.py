@@ -270,7 +270,7 @@ def getBlogsFromUrls(urls):
             if blogUrl:
                 blogUrls.append(blogUrl)
 
-    return removeDupesPreserveOrder(blogUrls)
+    return blogUrls
 
 
 def getInvalidBlogSubstrings():
