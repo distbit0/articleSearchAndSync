@@ -10,7 +10,7 @@ from selenium.webdriver.common.by import By
 import requests
 from selenium import webdriver
 from urllib.parse import urlparse
-from utils import getConfig
+from utils import getConfig, addUrlToUrlFile, getAbsPath
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import markdown
@@ -36,13 +36,21 @@ def save_text_as_html(url):
 def downloadNewArticles(urlsToAdd):
     saveDirectory = getConfig()["pdfSourceFolders"][0]
     print(urlsToAdd)
+    downloaded_urls = []
     for url in urlsToAdd:
         if url.endswith(".pdf"):
             continue
         try:
             save_mobile_article_as_mhtml(url, saveDirectory)
+            downloaded_urls.append(url)
         except Exception as e:
             print("Error downloading article: ", url, e)
+    
+    # Add downloaded URLs to alreadyAddedArticles.txt
+    addUrlToUrlFile(
+        downloaded_urls,
+        getAbsPath("../storage/alreadyAddedArticles.txt")
+    )
 
 
 def save_webpage_as_mhtml(url, timeout=10, min_load_time=5):
