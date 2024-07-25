@@ -191,6 +191,28 @@ def updatePerFolderUrlListFiles(folder_path):
                     f.write(f"{url}\n")
 
 
+def updatePerFolderFileNamesAndHashes(folder_path):
+    # Loop over all subdirectories using os.walk
+    for dirpath, dirs, files in os.walk(folder_path):
+        # Filter out the html and mhtml files
+        non_html_files = [f for f in files if not f.endswith((".html", ".mhtml"))]
+        file_data = {}
+
+        # If there are non-html/mhtml files in the directory
+        if non_html_files:
+            # Loop over each file
+            for file in non_html_files:
+                # Full file path
+                file_path = os.path.join(dirpath, file)
+                # Calculate IPFS-compatible hash
+                file_hash = calculate_file_hash(file_path)
+                file_data[file] = file_hash
+
+            # Write the file names and hashes to a JSON file in the directory
+            with open(os.path.join(dirpath, "fileNamesAndHashes.txt"), "w") as f:
+                json.dump(file_data, f, indent=2)
+
+
 def deleteDuplicateArticleFiles(urls_to_filenames):
     # Dictionary to store seen URLs in each directory
     dir_seen_urls = {}
@@ -344,6 +366,8 @@ if __name__ == "__main__":
     moveDocsToTargetFolder()
     print("update urlList files")
     updatePerFolderUrlListFiles(getConfig()["articleFileFolder"])
+    print("update file names and hashes")
+    updatePerFolderFileNamesAndHashes(getConfig()["articleFileFolder"])
     print("act on requests to delete/move/hide articles from atVoice app\n\n")
     print("delete files marked to delete")
     deleteFilesMarkedToDelete()
