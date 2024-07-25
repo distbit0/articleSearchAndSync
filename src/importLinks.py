@@ -10,9 +10,17 @@ from downloadNewArticles import downloadNewArticles
 import sys
 import shutil
 import hashlib
+import multihash
 
 sys.path.append(getConfig()["convertLinksDir"])
 from convertLinks import main as convertLinks
+
+def calculate_ipfs_hash(file_path):
+    with open(file_path, "rb") as f:
+        content = f.read()
+    sha256_hash = hashlib.sha256(content).digest()
+    mh = multihash.encode(sha256_hash, 'sha2-256')
+    return multihash.to_b58_string(mh)
 
 
 def getBookmarks():
@@ -205,7 +213,7 @@ def updatePerFolderFileNamesAndHashes(folder_path):
                 # Full file path
                 file_path = os.path.join(dirpath, file)
                 # Calculate IPFS-compatible hash
-                file_hash = calculate_file_hash(file_path)
+                file_hash = calculate_ipfs_hash(file_path)
                 file_data[file] = file_hash
 
             # Write the file names and hashes to a JSON file in the directory
