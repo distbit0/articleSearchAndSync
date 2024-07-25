@@ -2,6 +2,7 @@
     "articleFileFolder": "/home/pimania/ebooks/",
     "bookmarksFilePath": "/home/pimania/.config/BraveSoftware/Brave-Browser/Default/Bookmarks",
     "atVoiceFolderPath": "/home/pimania/atVoice",
+    "backupFolderPath": "/home/pimania/miscSyncs/ebooksBackup/",
     "convertLinksDir": "/home/pimania/dev/convertLinks",
     "maxCategorisationsPerSession": 25,
     "droidEbooksFolderPath": "/storage/emulated/0/Ebooks/",

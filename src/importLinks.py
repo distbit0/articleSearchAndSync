@@ -23,7 +23,7 @@ def calculate_ipfs_hash(file_path):
         content = f.read()
     sha256_hash = hashlib.sha256(content).digest()
     mh = multihash.encode(sha256_hash, 0x12)  # 0x12 is the code for SHA-256
-    return base58.b58encode(mh).decode('utf-8')
+    return base58.b58encode(mh).decode("utf-8")
 
 
 def getBookmarks():
@@ -206,7 +206,9 @@ def updatePerFolderFileNamesAndHashes(folder_path):
     # Loop over all subdirectories using os.walk
     for dirpath, dirs, files in os.walk(folder_path):
         # Filter out the html, mhtml, and txt files
-        non_excluded_files = [f for f in files if not f.endswith((".html", ".mhtml", ".txt"))]
+        non_excluded_files = [
+            f for f in files if not f.endswith((".html", ".mhtml", ".txt"))
+        ]
         file_data = {}
 
         # If there are non-excluded files in the directory
