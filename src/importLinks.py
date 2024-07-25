@@ -403,3 +403,5 @@ if __name__ == "__main__":
     )
     print("update @voice lists")
     updateLists()
+    print("backup file index")
+    backup_file_index()
