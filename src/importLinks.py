@@ -11,6 +11,7 @@ import sys
 import shutil
 import hashlib
 import multihash
+from backupFileIndex import backup_file_index
 
 sys.path.append(getConfig()["convertLinksDir"])
 from convertLinks import main as convertLinks
