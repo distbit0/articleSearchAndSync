@@ -11,6 +11,7 @@ import sys
 import shutil
 import hashlib
 import multihash
+import base58
 from backupFileIndex import backup_file_index
 
 sys.path.append(getConfig()["convertLinksDir"])
@@ -22,7 +23,7 @@ def calculate_ipfs_hash(file_path):
         content = f.read()
     sha256_hash = hashlib.sha256(content).digest()
     mh = multihash.encode(sha256_hash, 0x12)  # 0x12 is the code for SHA-256
-    return multihash.to_b58_string(mh)
+    return base58.b58encode(mh).decode('utf-8')
 
 
 def getBookmarks():
