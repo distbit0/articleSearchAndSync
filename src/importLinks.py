@@ -11,6 +11,8 @@ import sys
 import shutil
 import hashlib
 import multihash
+from cid import make_cid
+import hashlib
 import base58
 from backupFileIndex import backup_file_index
 
@@ -19,11 +21,20 @@ from convertLinks import main as convertLinks
 
 
 def calculate_ipfs_hash(file_path):
-    with open(file_path, "rb") as f:
-        content = f.read()
-    sha256_hash = hashlib.sha256(content).digest()
-    mh = multihash.encode(sha256_hash, 0x12)  # 0x12 is the code for SHA-256
-    return base58.b58encode(mh).decode("utf-8")
+    # Read the file in binary mode
+    with open(file_path, "rb") as file:
+        file_data = file.read()
+
+    # Calculate the SHA-256 hash of the file content
+    sha256_hash = hashlib.sha256(file_data).digest()
+
+    # Create a multihash from the SHA-256 hash
+    mh = multihash.encode(sha256_hash, "sha2-256")
+
+    # Create a CID (Content Identifier) from the multihash
+    cid = make_cid("base58btc", "dag-pb", mh)
+
+    return str(cid)
 
 
 def getBookmarks():
