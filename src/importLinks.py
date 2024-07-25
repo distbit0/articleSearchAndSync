@@ -21,7 +21,7 @@ def calculate_ipfs_hash(file_path):
     with open(file_path, "rb") as f:
         content = f.read()
     sha256_hash = hashlib.sha256(content).digest()
-    mh = multihash.encode(sha256_hash, "sha2-256")
+    mh = multihash.encode(sha256_hash, 0x12)  # 0x12 is the code for SHA-256
     return multihash.to_b58_string(mh)
 
 
