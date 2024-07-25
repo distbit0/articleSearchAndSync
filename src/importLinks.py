@@ -205,14 +205,14 @@ def updatePerFolderUrlListFiles(folder_path):
 def updatePerFolderFileNamesAndHashes(folder_path):
     # Loop over all subdirectories using os.walk
     for dirpath, dirs, files in os.walk(folder_path):
-        # Filter out the html and mhtml files
-        non_html_files = [f for f in files if not f.endswith((".html", ".mhtml"))]
+        # Filter out the html, mhtml, and txt files
+        non_excluded_files = [f for f in files if not f.endswith((".html", ".mhtml", ".txt"))]
         file_data = {}
 
-        # If there are non-html/mhtml files in the directory
-        if non_html_files:
+        # If there are non-excluded files in the directory
+        if non_excluded_files:
             # Loop over each file
-            for file in non_html_files:
+            for file in non_excluded_files:
                 # Full file path
                 file_path = os.path.join(dirpath, file)
                 # Calculate IPFS-compatible hash
