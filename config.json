@@ -4,7 +4,7 @@
     "atVoiceFolderPath": "/home/pimania/atVoice",
     "backupFolderPath": "/home/pimania/miscSyncs/ebooksBackup/",
     "convertLinksDir": "/home/pimania/dev/convertLinks",
-    "maxCategorisationsPerSession": 25,
+    "maxCategorisationsPerSession": 65,
     "droidEbooksFolderPath": "/storage/emulated/0/Ebooks/",
     "invalidBlogSubstrings": [
         "hackmd.io",
