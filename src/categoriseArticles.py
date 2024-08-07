@@ -353,6 +353,7 @@ def main(categorisedAlready):
                         parentFolderPath = file_path.split("/")[:-1]
                         print(parentFolderPath)
                         newFolderName = input("Enter new folder name: ")
+                        subcategories[newFolderName] = {}
                         newFolderPath = "/".join(parentFolderPath) + "/" + newFolderName
                         os.makedirs(newFolderPath, exist_ok=True)
                         destPath = newFolderPath + "/" + fileName
