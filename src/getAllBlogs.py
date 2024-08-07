@@ -40,7 +40,7 @@ if __name__ == "__main__":
         for blog, count in sortedBlogCounts[:5]
     ]
     print("\n".join(newBlogs))
-    addBlogs = input("Add top 10 blogs to reviewed? (default=no): ")
+    addBlogs = input(f"Add top {len(newBlogs)} blogs to reviewed? (default=no): ")
     if addBlogs.lower() in ["y", "yes"]:
         utils.addUrlToUrlFile(
             [blog.split(" ")[0] for blog in newBlogs],
