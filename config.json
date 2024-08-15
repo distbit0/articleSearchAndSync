@@ -4,7 +4,7 @@
     "atVoiceFolderPath": "/home/pimania/atVoice",
     "backupFolderPath": "/home/pimania/miscSyncs/ebooksBackup/",
     "convertLinksDir": "/home/pimania/dev/convertLinks",
-    "maxCategorisationsPerSession": 65,
+    "maxCategorisationsPerSession": 100,
     "droidEbooksFolderPath": "/storage/emulated/0/Ebooks/",
     "invalidBlogSubstrings": [
         "hackmd.io",
@@ -84,10 +84,11 @@
                 "Decentralised Finance/options"
             ]
         },
-        "increment": {
+        "dexes and derivs": {
             "folders": [
                 "Decentralised Finance/futures, margin and perps",
-                "Decentralised Finance/options"
+                "Decentralised Finance/options",
+                "Decentralised Finance/dexes"
             ]
         },
         "ml": {
