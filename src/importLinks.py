@@ -32,7 +32,7 @@ def calculate_ipfs_hash(file_path):
     mh = multihash.encode(sha256_hash, "sha2-256")
 
     # Create a CID (Content Identifier) from the multihash
-    cid = make_cid("base58btc", "dag-pb", mh)
+    cid = make_cid(1, "dag-pb", mh)
 
     return str(cid)
 

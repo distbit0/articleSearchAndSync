@@ -79,7 +79,10 @@ def hideFile(f):
     hiddenFilePath.append(hiddenFileName)
     hiddenFilePath = "/".join(hiddenFilePath)
     print("HIDING", f, "  >>  ", hiddenFilePath)
-    shutil.move(f, hiddenFilePath)
+    try:
+        shutil.move(f, hiddenFilePath)
+    except OSError as e:
+        print(f"Error hiding {f}: {e}")
 
 
 def moveFilesWithNameToRootDir(folder, file_name):
