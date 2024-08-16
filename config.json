@@ -78,16 +78,15 @@
         },
         "fringe": {
             "folders": [
+                "Decentralised Finance/futures, margin and perps",
                 "Decentralised Finance/lending",
                 "Decentralised Finance/stablecoins and synths",
                 "Decentralised Finance/oracles",
                 "Decentralised Finance/options"
             ]
         },
-        "dexes and derivs": {
+        "dexes": {
             "folders": [
-                "Decentralised Finance/futures, margin and perps",
-                "Decentralised Finance/options",
                 "Decentralised Finance/dexes"
             ]
         },
