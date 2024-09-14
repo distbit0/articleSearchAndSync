@@ -4,7 +4,7 @@
     "atVoiceFolderPath": "/home/pimania/atVoice",
     "backupFolderPath": "/home/pimania/miscSyncs/ebooksBackup/",
     "convertLinksDir": "/home/pimania/dev/convertLinks",
-    "maxCategorisationsPerSession": 100,
+    "maxCategorisationsPerSession": 150,
     "droidEbooksFolderPath": "/storage/emulated/0/Ebooks/",
     "invalidBlogSubstrings": [
         "hackmd.io",
@@ -73,7 +73,8 @@
         "epistemic finance": {
             "folders": [
                 "Decentralised Finance/epistemic finance",
-                "Decentralised Finance/public goods"
+                "Decentralised Finance/public goods",
+                "Decentralised Finance/cryptoecon"
             ]
         },
         "fringe": {
@@ -105,7 +106,8 @@
         "mev": {
             "folders": [
                 "Decentralised Finance/auctions and mev"
-            ]
+            ],
+            "disabled": true
         },
         "ethereumcreditguild": {
             "query": "\" ECG \" OR \"credit guild\" OR \"onetruekirk\" OR \"Electric Development Co\" OR \"credit-guild\""
