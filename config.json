@@ -5,7 +5,7 @@
     "backupFolderPath": "/home/pimania/miscSyncs/ebooksBackup/",
     "convertLinksDir": "/home/pimania/dev/convertLinks",
     "maxCategorisationsPerSession": 150,
-    "droidEbooksFolderPath": "/storage/emulated/0/Ebooks/",
+    "droidEbooksFolderPath": "/storage/emulated/0/ebooks/",
     "invalidBlogSubstrings": [
         "hackmd.io",
         "https://github.com/",
