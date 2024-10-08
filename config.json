@@ -59,6 +59,11 @@
         ".stfolder"
     ],
     "listToFolderMappings": {
+        "interpersonal": {
+            "folders": [
+                "Philosophy/conversation and relationships"
+            ]
+        },
         "agi": {
             "folders": [
                 "Machine and human thought/AGI",
