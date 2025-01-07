@@ -1,3 +1,4 @@
 #!/bin/bash
 SCRIPTPATH="$( cd -- "$(dirname "$0")" >/dev/null 2>&1 ; pwd -P )"
-python3 "$SCRIPTPATH"/src/search.py "$@"
+cd "$SCRIPTPATH"
+uv run "$SCRIPTPATH"/src/search.py "$@"
