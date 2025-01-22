@@ -63,7 +63,7 @@ def get_id_type(paper_id):
 def getPDFTitle(pdfPath):
     pdfTitle = ""
     originalFileName = pdfPath.split("/")[-1]
-    pdfTitle = os.popen('python3 -m pdftitle -p "' + pdfPath + '"').read()
+    pdfTitle = os.popen('pdftitle -p "' + pdfPath + '"').read()
     if (not pdfTitle) or len(pdfTitle) < 4:
         pdfTitle = originalFileName[:-4]
         idType = get_id_type(pdfTitle)

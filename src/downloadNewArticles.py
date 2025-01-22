@@ -84,10 +84,10 @@ def save_webpage_as_mhtml(url, timeout=10, min_load_time=5):
 def save_mobile_article_as_mhtml(url, saveDirectory, timeout=10, min_load_time=5):
     originalUrl = url
     try:
-        response = requests.get(url, verify=False)
+        response = requests.get(url, verify=False, timeout=timeout)
     except requests.exceptions.SSLError:
         url = url.replace("https", "http")
-        response = requests.get(url, verify=False)
+        response = requests.get(url, verify=False, timeout=timeout)
 
     content_type = response.headers.get("Content-Type")
     content_disposition = response.headers.get("Content-Disposition")
