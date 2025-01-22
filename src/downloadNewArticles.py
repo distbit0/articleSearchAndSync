@@ -36,7 +36,6 @@ def save_text_as_html(url):
 def downloadNewArticles(urlsToAdd):
     saveDirectory = getConfig()["pdfSourceFolders"][0]
     print(urlsToAdd)
-    downloaded_urls = []
     for url in urlsToAdd:
         if url.endswith(".pdf"):
             continue
@@ -46,10 +45,9 @@ def downloadNewArticles(urlsToAdd):
         except Exception as e:
             print("Error downloading article: ", url, e)
         else:
-            downloaded_urls.append(url)
+            addUrlToUrlFile([url], getAbsPath("../storage/alreadyAddedArticles.txt"))
 
     # Add downloaded URLs to alreadyAddedArticles.txt
-    addUrlToUrlFile(downloaded_urls, getAbsPath("../storage/alreadyAddedArticles.txt"))
 
 
 def save_webpage_as_mhtml(url, timeout=10, min_load_time=5):

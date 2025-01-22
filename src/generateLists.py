@@ -8,11 +8,12 @@ def updateLists():
     listFolderMappings = getConfig()["listToFolderMappings"]
 
     for listName, listInfo in listFolderMappings.items():
-        listFolders, readState, query, disabled = (
+        listFolders, readState, query, disabled, formats = (
             listInfo.get("folders", []),
             listInfo.get("readState", "unread"),
             listInfo.get("query", "*"),
             listInfo.get("disabled", False),
+            listInfo.get("formats", getConfig()["docFormatsToMove"]),
         )
         if disabled:
             utils.deleteListIfExists(listName)
@@ -23,7 +24,7 @@ def updateLists():
             query,
             subjects=listFolders,
             readState=readState,
-            formats=getConfig()["docFormatsToMove"],
+            formats=formats,
         )
 
         articlePathsForList = [

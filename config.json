@@ -59,6 +59,22 @@
         ".stfolder"
     ],
     "listToFolderMappings": {
+        "PDFs": {
+            "formats": [
+                "pdf"
+            ]
+        },
+        "EPUBs": {
+            "formats": [
+                "epub",
+                "mobi"
+            ]
+        },
+        "YT": {
+            "folders": [
+                "YTvideo"
+            ]
+        }
         "interpersonal": {
             "folders": [
                 "Philosophy/conversation and relationships"

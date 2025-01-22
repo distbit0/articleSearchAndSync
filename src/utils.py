@@ -20,7 +20,7 @@ import traceback
 def checkArticleSubject(articlePath, subjects):
     if not subjects:
         return True
-    articlePath = "/".join(articlePath.split("/")[:-1])
+    # articlePath = "/".join(articlePath.split("/")[:-1]) commented out because sometimes I want to filter by the filename e.g. to find yt videos
     for subject in subjects:
         if subject.lower() in articlePath.lower():
             return True
