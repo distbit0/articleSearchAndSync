@@ -6,3 +6,5 @@ __pycache__/
 __pycache__/*
 *.session*
 .aider*
+
+.env
