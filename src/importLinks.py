@@ -15,6 +15,7 @@ from cid import make_cid
 import hashlib
 import base58
 from backupFileIndex import backup_file_index
+from articleSummary import summarize_articles
 
 sys.path.append(getConfig()["convertLinksDir"])
 from convertLinks import main as convertLinks
@@ -386,6 +387,8 @@ if __name__ == "__main__":
     downloadNewArticles(urlsToAdd)
     print("give files readable filenames")
     reTitlePDFs.retitleAllPDFs()
+    print("summarize articles")
+    # summarize_articles()
     print("move docs to target folder")
     moveDocsToTargetFolder()
     print("update urlList files")
