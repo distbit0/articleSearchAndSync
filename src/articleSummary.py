@@ -114,7 +114,7 @@ def summarize_with_openrouter(text: str) -> str:
         print(f"Sending summary request to OpenRouter with model: {model}")
 
         system_prompt = "You are a helpful system that generates concise summaries of academic or educational content."
-        user_prompt = f"""Please summarize the following text in a concise but informative way that captures the main points, key concepts, novel arguments, and important details. The summary should be written in the third person and should be objective in tone.
+        user_prompt = f"""Please summarize the following text in a concise but informative way that captures the main points, topics, concepts, novel arguments, novel ideas, and important details. The summary should be written from the same perspective as the article i.e. first person.
 
 Text to summarize:
 {text}"""
@@ -333,7 +333,6 @@ def process_single_article(article_path: str) -> Tuple[bool, str]:
         return True, f"Summary generated ({len(summary)} chars)"
     except Exception as e:
         error_message = f"Error: {str(e)}"
-        error_traceback = traceback.format_exc()
         print(error_message)
         traceback.print_exc()
         return False, error_message

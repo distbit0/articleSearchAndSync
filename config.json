@@ -7,7 +7,6 @@
     "maxSummariesPerSession": 150,
     "droidEbooksFolderPath": "/storage/emulated/0/ebooks/",
     "summary_in_max_words": 3000,
-    "summary_max_words": 300,
     "enable_article_summarization": true,
     "summary_batch_size": 15,
     "ai_model": "google/gemini-2.0-flash-001",
@@ -54,7 +53,6 @@
         "/",
         ","
     ],
-    "wordsUsedToCategorise": 350,
     "foldersToExcludeFromCategorisation": [
         "tweetThreads",
         "telegramChats",
