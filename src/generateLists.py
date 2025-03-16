@@ -5,13 +5,13 @@ import os
 
 
 def updateLists():
-    listFolderMappings = getConfig()["listToFolderMappings"]
+    listToTagMappings = getConfig()["listToTagMappings"]
 
-    for listName, listInfo in listFolderMappings.items():
-        listFolders, readState, query, disabled, formats = (
-            listInfo.get("folders", []),
+    for listName, listInfo in listToTagMappings.items():
+        all_tags, any_tags, readState, disabled, formats = (
+            listInfo.get("all_tags", []),
+            listInfo.get("any_tags", []),
             listInfo.get("readState", "unread"),
-            listInfo.get("query", "*"),
             listInfo.get("disabled", False),
             listInfo.get("formats", getConfig()["docFormatsToMove"]),
         )
@@ -20,9 +20,9 @@ def updateLists():
             continue
 
         print(listName, listInfo)
-        articlePathsForList = utils.searchArticlesForQuery(
-            query,
-            subjects=listFolders,
+        articlePathsForList = utils.searchArticlesByTags(
+            all_tags=all_tags,
+            any_tags=any_tags,
             readState=readState,
             formats=formats,
         )

@@ -1,23 +1,17 @@
-import os
 import sqlite3
-import json
-import hashlib
+import random
 import traceback
-import time
 from pathlib import Path
-from typing import Optional, Dict, Any, List, Tuple
-import tempfile
-import pysnooper
-import subprocess
+from typing import Optional, Tuple
+import concurrent.futures
+import sys
+from loguru import logger
 from dotenv import load_dotenv
 from openai import OpenAI
-import concurrent.futures
-from loguru import logger
-import sys
+import os
 
 # Import utils properly based on how it's structured in the project
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src import utils
 from src.utils import getConfig, getArticlePathsForQuery
 from src.textExtraction import (
     extract_text_from_file,
@@ -196,6 +190,8 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
     file_hash = calculate_file_hash(file_path)
     file_name = os.path.basename(file_path)
     file_format = os.path.splitext(file_path)[1].lower()
+    if file_format.startswith("."):
+        file_format = file_format[1:]  # Remove leading dot
 
     # Setup database
     db_path = setup_database()
@@ -210,10 +206,25 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
 
     if result:
         summary = result[0]
+
+        # If summary is NULL, it means the file was added to the database but not yet summarized
+        if summary is None:
+            logger.info(
+                f"File {file_name} is in the database but has not been summarized yet"
+            )
+            # Close the current connection since we'll open a new one during summarization
+            conn.close()
+            # Proceed with summarization (same logic as below)
+        else:
+            conn.close()
+            # Check if summary indicates insufficient text (empty string)
+            is_sufficient = bool(
+                summary
+            )  # Empty string means insufficient, anything else is sufficient
+            return summary, is_sufficient
+    else:
+        # Article not in database, so no existing summary
         conn.close()
-        # Check if summary indicates insufficient text
-        is_sufficient = not summary.startswith("[INSUFFICIENT_TEXT]")
-        return summary, is_sufficient
 
     # Extract text from the file
     try:
@@ -227,6 +238,16 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
         # Generate a summary and check if text was sufficient
         summary, is_sufficient = summarize_with_openrouter(text)
 
+        # Reconnect to the database
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+
+        # Check if the article is already in the database (could have been added by add_files_to_database)
+        cursor.execute(
+            "SELECT id FROM article_summaries WHERE file_hash = ?", (file_hash,)
+        )
+        existing_article = cursor.fetchone()
+
         # If text is insufficient, set summary to empty string
         if not is_sufficient:
             db_summary = ""
@@ -237,22 +258,35 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
             db_summary = summary
             logger.info(f"Successfully created summary for file: {file_path}")
 
-        # Store the summary
-        cursor.execute(
-            """
-            INSERT INTO article_summaries 
-            (file_hash, file_name, file_format, summary, extraction_method, word_count)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (
-                file_hash,
-                file_name,
-                file_format,
-                db_summary,
-                extraction_method,
-                word_count,
-            ),
-        )
+        if existing_article:
+            # Update existing record
+            cursor.execute(
+                """
+                UPDATE article_summaries
+                SET summary = ?, extraction_method = ?, word_count = ?
+                WHERE file_hash = ?
+                """,
+                (db_summary, extraction_method, word_count, file_hash),
+            )
+            logger.info(f"Updated existing database entry for file: {file_path}")
+        else:
+            # Insert new record
+            cursor.execute(
+                """
+                INSERT INTO article_summaries 
+                (file_hash, file_name, file_format, summary, extraction_method, word_count)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    file_hash,
+                    file_name,
+                    file_format,
+                    db_summary,
+                    extraction_method,
+                    word_count,
+                ),
+            )
+            logger.info(f"Created new database entry for file: {file_path}")
 
         conn.commit()
         conn.close()
@@ -274,7 +308,13 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
         logger.error(f"{error_message}\n{error_traceback}")
         print(error_message)
         traceback.print_exc()
-        conn.close()
+
+        # Ensure the database connection is closed in case of error
+        try:
+            conn.close()
+        except:
+            pass
+
         return f"Failed to summarize article: {error_message}", False
 
 
@@ -306,68 +346,75 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # Get supported file extensions from config
-    config = getConfig()
-    doc_formats = config.get("docFormatsToMove", [])
-
-    # Convert formats to extensions with leading dots for file matching
-    supported_extensions = [f".{fmt}" for fmt in doc_formats]
-
-    # Add additional text formats if they're not already in the config
-    if "txt" not in doc_formats:
-        supported_extensions.append(".txt")
-    if "md" not in doc_formats:
-        supported_extensions.append(".md")
-
-    # Get formats without leading dots for getArticlePathsForQuery
-    formats = [ext[1:] if ext.startswith(".") else ext for ext in supported_extensions]
-
-    # Use getArticlePathsForQuery to get list of all supported articles
-    all_articles = getArticlePathsForQuery(query, formats, articles_path)
-
-    print(f"Found {len(all_articles)} supported articles")
-    logger.info(f"Found {len(all_articles)} supported articles")
-
-    # Get list of articles already summarized
-    cursor.execute("SELECT file_hash FROM article_summaries")
-    summarized_hashes = {row[0] for row in cursor.fetchall()}
+    # Get list of articles that need summarization (NULL summary)
+    cursor.execute(
+        """
+        SELECT file_hash, file_name
+        FROM article_summaries
+        WHERE summary IS NULL
+    """
+    )
+    articles_needing_summary = cursor.fetchall()
     conn.close()
 
-    # Filter out articles that already have summaries
+    print(
+        f"Found {len(articles_needing_summary)} articles in database that need summarization"
+    )
+    logger.info(
+        f"Found {len(articles_needing_summary)} articles in database that need summarization"
+    )
+
+    if not articles_needing_summary:
+        print("No articles need summarization")
+        logger.info("No articles need summarization")
+        return
+
+    # Articles to summarize, with their paths
     articles_to_summarize = []
-    for article_path in all_articles:
-        try:
-            file_hash = calculate_file_hash(article_path)
-            if file_hash not in summarized_hashes:
-                articles_to_summarize.append(article_path)
-        except Exception as e:
-            print(f"Error calculating hash for {article_path}: {str(e)}")
-            logger.error(f"Error calculating hash for {article_path}: {str(e)}")
+
+    # Get max summaries per session from config before the loop
+    config = getConfig()
+    max_summaries_per_session = int(config.get("maxSummariesPerSession", 150))
+
+    # Process each article that needs summarization
+    random.shuffle(articles_needing_summary)
+
+    for file_hash, file_name in articles_needing_summary:
+        # Stop if we've reached the maximum number of articles to summarize
+        if len(articles_to_summarize) >= max_summaries_per_session:
+            print(
+                f"Reached limit of {max_summaries_per_session} articles, stopping search"
+            )
+            logger.info(
+                f"Reached limit of {max_summaries_per_session} articles, stopping search"
+            )
+            break
+
+        # Find the article path using the helper function
+        file_paths = getArticlePathsForQuery("*", [], articles_path, file_name)
+
+        if file_paths:
+            # Use the first matching file path
+            articles_to_summarize.append(file_paths[0])
+        else:
+            print(
+                f"Warning: Could not find file path for {file_name} in {articles_path}"
+            )
+            logger.warning(
+                f"Could not find file path for {file_name} in {articles_path}"
+            )
 
     print(f"{len(articles_to_summarize)} articles need summarization")
     logger.info(f"{len(articles_to_summarize)} articles need summarization")
 
     if not articles_to_summarize:
-        print("No new articles to summarize")
-        logger.info("No new articles to summarize")
+        print("No articles to summarize")
+        logger.info("No articles to summarize")
         return
 
     # Get max workers from config
     config = getConfig()
     max_workers = int(config.get("llm_api_batch_size", 4))
-
-    # Get max summaries per session from config
-    max_summaries_per_session = int(config.get("maxSummariesPerSession", 150))
-
-    # Limit the number of articles to process based on maxSummariesPerSession
-    if len(articles_to_summarize) > max_summaries_per_session:
-        print(
-            f"Limiting to {max_summaries_per_session} articles due to maxSummariesPerSession config setting"
-        )
-        logger.info(
-            f"Limiting to {max_summaries_per_session} articles due to maxSummariesPerSession config setting"
-        )
-        articles_to_summarize = articles_to_summarize[:max_summaries_per_session]
 
     # Track statistics
     total_articles = len(articles_to_summarize)
@@ -398,33 +445,32 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
                         )
                         successful += 1
                     else:
-                        print(f"[{i+1}/{total_articles}] {file_name}: {message}")
+                        print(
+                            f"[{i+1}/{total_articles}] {file_name}: Insufficient text, storing empty summary"
+                        )
                         logger.warning(
-                            f"Insufficient text in: {article_path} - {message}"
+                            f"Insufficient text in: {article_path} - storing empty summary"
                         )
                         insufficient += 1
                 else:
-                    print(f"[{i+1}/{total_articles}] {file_name}: {message}")
+                    print(f"[{i+1}/{total_articles}] {file_name}: FAILED - {message}")
                     logger.error(f"Failed to summarize: {article_path} - {message}")
                     failed += 1
             except Exception as e:
                 file_name = os.path.basename(article_path)
                 print(
-                    f"[{i+1}/{total_articles}] {file_name}: Unhandled error - {str(e)}"
+                    f"[{i+1}/{total_articles}] {file_name}: FAILED - Unexpected error: {str(e)}"
                 )
                 logger.error(
-                    f"Unhandled error processing {article_path}: {str(e)}\n{traceback.format_exc()}"
+                    f"Unexpected error processing {article_path}: {str(e)}\n{traceback.format_exc()}"
                 )
                 failed += 1
 
-    print(f"\nSummary generation completed:")
-    print(f"- Total articles processed: {total_articles}")
-    print(f"- Successfully summarized: {successful}")
-    print(f"- Insufficient text detected: {insufficient}")
-    print(f"- Failed to summarize: {failed}")
-
+    print(
+        f"\nSummary: Processed {total_articles} articles - {successful} successful, {insufficient} insufficient text, {failed} failed"
+    )
     logger.info(
-        f"Summary generation completed - Total: {total_articles}, Success: {successful}, Insufficient: {insufficient}, Failed: {failed}"
+        f"Summary: Processed {total_articles} articles - {successful} successful, {insufficient} insufficient text, {failed} failed"
     )
 
 
@@ -452,5 +498,104 @@ def process_single_article(article_path: str) -> Tuple[bool, str, bool]:
         return False, error_message, False
 
 
+def add_files_to_database(articles_path: Optional[str] = None) -> int:
+    """Add all supported files to the database without summarizing.
+
+    This function finds all article files in the given path and adds them to the database
+    with NULL summaries, indicating they need to be summarized later. This ensures that
+    folder tagging can work with all files regardless of summarization status.
+
+    Args:
+        articles_path: Path to the articles directory
+
+    Returns:
+        int: Number of new files added to the database
+    """
+    # Get articles path from config if not provided
+    if not articles_path:
+        config = getConfig()
+        articles_path = config.get("articleFileFolder", "")
+        if not articles_path:
+            logger.error("Article file folder not found in config")
+            return 0
+
+    logger.info(f"Adding files to database from: {articles_path}")
+
+    # Setup database
+    db_path = setup_database()
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Get list of supported file formats from config
+    config = getConfig()
+    supported_formats = config.get(
+        "docFormatsToMove", ["pdf", "djvu", "epub", "mobi", "html", "mhtml"]
+    )
+    file_names_to_skip = config.get("fileNamesToSkip", [])
+
+    # Get all existing file hashes to avoid duplicates
+    cursor.execute("SELECT file_hash FROM article_summaries")
+    existing_hashes = set(row[0] for row in cursor.fetchall())
+
+    # Add all files to database with NULL summary
+    added_count = 0
+
+    # Use getArticlePathsForQuery to find all articles with supported formats in one call
+    all_article_paths = getArticlePathsForQuery("*", supported_formats, articles_path)
+
+    # Process each file found
+    for file_path in all_article_paths:
+        file_name = os.path.basename(file_path)
+
+        # Skip files in the exclusion list
+        if file_name in file_names_to_skip:
+            continue
+
+        try:
+            # Calculate file hash to check if already in DB
+            file_hash = calculate_file_hash(file_path)
+
+            # Skip if already in database
+            if file_hash in existing_hashes:
+                continue
+
+            # Determine the file format from the extension
+            file_ext = os.path.splitext(file_name)[1].lstrip(".")
+
+            # Add to database with NULL summary
+            # We use NULL (not empty string) to indicate it needs to be summarized
+            # This is different from an empty string ("") which indicates a failed summarization
+            cursor.execute(
+                """
+                INSERT INTO article_summaries 
+                (file_hash, file_name, file_format, summary, extraction_method, word_count)
+                VALUES (?, ?, ?, NULL, NULL, 0)
+                """,
+                (file_hash, file_name, file_ext),
+            )
+            existing_hashes.add(file_hash)
+            added_count += 1
+
+            if added_count % 100 == 0:
+                logger.info(f"Added {added_count} new files to database")
+                conn.commit()  # Commit in batches
+
+        except Exception as e:
+            logger.error(f"Error adding file to database: {file_path}: {str(e)}")
+            traceback.print_exc()
+
+    # Final commit
+    conn.commit()
+    conn.close()
+
+    logger.info(f"Added a total of {added_count} new files to database")
+    return added_count
+
+
 if __name__ == "__main__":
-    summarize_articles()
+    # If no arguments, summarize articles
+    if len(sys.argv) == 1:
+        summarize_articles()
+    # If --add-files argument is provided, add files to database without summarizing
+    elif len(sys.argv) > 1 and sys.argv[1] == "--add-files":
+        add_files_to_database()

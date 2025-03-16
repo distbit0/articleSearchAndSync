@@ -1,5 +1,6 @@
 {
     "cSpell.enabledFileTypes": {
         "python": true
-    }
+    },
+    "python.languageServer": "None"
 }

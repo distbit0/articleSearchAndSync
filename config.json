@@ -81,14 +81,14 @@
         },
         "philosophy": {
             "description": "Articles about philosophy, ethics, metaphysics, epistemology, and related topics",
-            "use_summary": false
+            "use_summary": true
         },
         "programming": {
             "description": "Articles about programming, software development, coding practices, and specific programming languages",
             "use_summary": true
         }
     },
-    "listToFolderMappings": {
+    "listToTagMappings": {
         "PDFs": {
             "formats": [
                 "pdf"
@@ -101,116 +101,135 @@
             ]
         },
         "YT": {
-            "folders": [
-                "YTvideo"
+            "all_tags": [],
+            "any_tags": [
+                "folder_YTvideo"
             ]
         },
         "interpersonal": {
-            "folders": [
-                "Philosophy/conversation and relationships"
+            "all_tags": [],
+            "any_tags": [
+                "folder_Philosophy/conversation and relationships"
             ]
         },
         "agi": {
-            "folders": [
-                "Machine and human thought/AGI",
-                "Machine and human thought/connectionist AGI",
-                "Machine and human thought/consciousness and intelligence",
-                "Machine and human thought/LLM AGI",
-                "Machine and human thought/symbolic AGI",
-                "Machine and human thought/RL and directed learning",
-                "Machine and human thought/tools for thought"
+            "all_tags": [],
+            "any_tags": [
+                "folder_Machine and human thought/AGI",
+                "folder_Machine and human thought/connectionist AGI",
+                "folder_Machine and human thought/consciousness and intelligence",
+                "folder_Machine and human thought/LLM AGI",
+                "folder_Machine and human thought/symbolic AGI",
+                "folder_Machine and human thought/RL and directed learning",
+                "folder_Machine and human thought/tools for thought"
             ]
         },
         "epistemic finance": {
-            "folders": [
-                "Decentralised Finance/epistemic finance",
-                "Decentralised Finance/public goods",
-                "Decentralised Finance/cryptoecon"
+            "all_tags": [],
+            "any_tags": [
+                "folder_Decentralised Finance/epistemic finance",
+                "folder_Decentralised Finance/public goods",
+                "folder_Decentralised Finance/cryptoecon"
             ]
         },
         "fringe": {
-            "folders": [
-                "Decentralised Finance/futures, margin and perps",
-                "Decentralised Finance/lending",
-                "Decentralised Finance/stablecoins and synths",
-                "Decentralised Finance/oracles",
-                "Decentralised Finance/options"
+            "all_tags": [],
+            "any_tags": [
+                "folder_Decentralised Finance/futures, margin and perps",
+                "folder_Decentralised Finance/lending",
+                "folder_Decentralised Finance/stablecoins and synths",
+                "folder_Decentralised Finance/oracles",
+                "folder_Decentralised Finance/options"
             ]
         },
         "dexes": {
-            "folders": [
-                "Decentralised Finance/dexes"
+            "all_tags": [],
+            "any_tags": [
+                "folder_Decentralised Finance/dexes"
             ]
         },
         "ml": {
-            "folders": [
-                "Machine and human thought/neural networks",
-                "Machine and human thought/interpretability",
-                "Machine and human thought/gradient descent"
+            "all_tags": [],
+            "any_tags": [
+                "folder_Machine and human thought/neural networks",
+                "folder_Machine and human thought/interpretability",
+                "folder_Machine and human thought/gradient descent"
             ]
         },
         "biology": {
-            "folders": [
-                "Biology"
+            "all_tags": [],
+            "any_tags": [
+                "folder_Biology"
             ]
         },
         "mev": {
-            "folders": [
-                "Decentralised Finance/auctions and mev"
+            "all_tags": [],
+            "any_tags": [
+                "folder_Decentralised Finance/auctions and mev"
             ],
             "disabled": true
         },
         "ethereumcreditguild": {
-            "query": "\" ECG \" OR \"credit guild\" OR \"onetruekirk\" OR \"Electric Development Co\" OR \"credit-guild\""
+            "all_tags": [],
+            "any_tags": []
         },
         "productivity": {
-            "folders": [
-                "Philosophy/advice",
-                "Business and entrepreneurship/time management + procrastination"
+            "all_tags": [],
+            "any_tags": [
+                "folder_Philosophy/advice",
+                "folder_Business and entrepreneurship/time management + procrastination"
             ]
         },
         "entropy": {
-            "folders": [
-                "Physics/entropy",
-                "Computer Science/reversible logic"
+            "all_tags": [],
+            "any_tags": [
+                "folder_Physics/entropy",
+                "folder_Computer Science/reversible logic"
             ],
             "disabled": true
         },
         "epistemology": {
-            "folders": [
-                "Machine and human thought/epistemology"
+            "all_tags": [],
+            "any_tags": [
+                "folder_Machine and human thought/epistemology"
             ],
             "disabled": true
         },
         "evolution": {
-            "folders": [
-                "Machine and human thought/evolution",
-                "Machine and human thought/emergent systems"
+            "all_tags": [],
+            "any_tags": [
+                "folder_Machine and human thought/evolution",
+                "folder_Machine and human thought/emergent systems"
             ],
             "disabled": true
         },
         "mental models": {
-            "folders": [
-                "Machine and human thought/problem solving and mental models",
-                "Machine and human thought/learning and memory"
+            "all_tags": [],
+            "any_tags": [
+                "folder_Machine and human thought/problem solving and mental models",
+                "folder_Machine and human thought/learning and memory"
             ],
-            "disabled": true
+            "readState": "",
+            "disabled": false
         },
         "diagrams": {
-            "folders": [
-                "Philosophy/diagrams"
+            "all_tags": [],
+            "any_tags": [
+                "folder_Philosophy/diagrams"
             ],
             "disabled": true
         },
         "entrepreneurship": {
-            "folders": [
-                "Business and entrepreneurship/Entrepreneurship",
-                "Business and entrepreneurship/mental models and advice"
+            "all_tags": [],
+            "any_tags": [
+                "folder_Business and entrepreneurship/Entrepreneurship",
+                "folder_Business and entrepreneurship/mental models and advice"
             ]
         },
         "economics": {
-            "folders": [
-                "Economics/Value and Prices"
+            "all_tags": [],
+            "any_tags": [
+                "folder_Economics/Value and Prices"
             ],
             "disabled": true
         }
