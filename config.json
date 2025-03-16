@@ -5,10 +5,11 @@
     "backupFolderPath": "/home/pimania/miscSyncs/ebooksBackup/",
     "convertLinksDir": "/home/pimania/dev/convertLinks",
     "maxSummariesPerSession": 150,
+    "maxArticlesToTagPerSession": 100,
     "droidEbooksFolderPath": "/storage/emulated/0/ebooks/",
-    "summary_in_max_words": 3000,
+    "summary_in_max_words": 8000,
     "enable_article_summarization": true,
-    "summary_batch_size": 15,
+    "llm_api_batch_size": 15,
     "ai_model": "google/gemini-2.0-flash-001",
     "fileNamesToSkip": [
         "fileNamesAndHashes.txt",
@@ -65,6 +66,28 @@
         ".git",
         ".stfolder"
     ],
+    "article_tags": {
+        "ai": {
+            "description": "Articles about artificial intelligence, machine learning, neural networks, deep learning, and related technologies",
+            "use_summary": true
+        },
+        "blockchain": {
+            "description": "Articles about blockchain technology, cryptocurrencies, smart contracts, and decentralized applications",
+            "use_summary": true
+        },
+        "finance": {
+            "description": "Articles about finance, economics, investing, banking, and financial markets",
+            "use_summary": true
+        },
+        "philosophy": {
+            "description": "Articles about philosophy, ethics, metaphysics, epistemology, and related topics",
+            "use_summary": false
+        },
+        "programming": {
+            "description": "Articles about programming, software development, coding practices, and specific programming languages",
+            "use_summary": true
+        }
+    },
     "listToFolderMappings": {
         "PDFs": {
             "formats": [

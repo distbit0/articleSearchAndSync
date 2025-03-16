@@ -354,7 +354,7 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
 
     # Get max workers from config
     config = getConfig()
-    max_workers = int(config.get("max_workers", 4))
+    max_workers = int(config.get("llm_api_batch_size", 4))
 
     # Get max summaries per session from config
     max_summaries_per_session = int(config.get("maxSummariesPerSession", 150))
