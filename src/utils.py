@@ -355,9 +355,10 @@ def doesPathContainDotFolders(path):
 def getArticlePathsForQuery(query, formats, folderPath="", fileName=None):
     folderPath = folderPath if folderPath else getConfig()["articleFileFolder"]
     folderPath = (folderPath + "/").replace("//", "/")
+    formats = getConfig()["docFormatsToMove"] if not formats else formats
     formats = formats if query == "*" else ["html", "mhtml"]
     filePatterns = [folderPath + "**/*" + docFormat for docFormat in formats]
-    print(filePatterns, query, folderPath)
+    # print(filePatterns, query, folderPath)
     allArticlesPaths = []
     for pattern in filePatterns:
         articlePaths = list(glob.glob(pattern, recursive=True, include_hidden=True))
@@ -372,13 +373,15 @@ def getArticlePathsForQuery(query, formats, folderPath="", fileName=None):
         for path in allArticlesPaths
         if not any(skip in path for skip in fileNamesToSkip)
     ]
-    
+
     # Filter by fileName if provided
     if fileName:
         allArticlesPaths = [
-            path for path in allArticlesPaths if fileName.lower() in os.path.basename(path).lower()
+            path
+            for path in allArticlesPaths
+            if fileName.lower() in os.path.basename(path).lower()
         ]
-        
+
     allArticlesPaths = list(set(allArticlesPaths))
     return allArticlesPaths
 

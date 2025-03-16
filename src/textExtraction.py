@@ -30,7 +30,7 @@ logger.add(
     log_file_path,
     rotation="5 MB",
     retention=3,
-    level="INFO",
+    level="WARNING",
     format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} - {message}",
 )
 

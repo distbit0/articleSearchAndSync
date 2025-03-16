@@ -10,11 +10,12 @@ from loguru import logger
 from dotenv import load_dotenv
 from openai import OpenAI
 import concurrent.futures
+import glob
 
 # Import utils properly based on how it's structured in the project
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src import utils
-from src.utils import getConfig, getArticlePathsForQuery
+from src.utils import getConfig
 from src.textExtraction import extract_text_from_file, calculate_file_hash
 
 # Constants
@@ -218,6 +219,10 @@ class TagManager:
     def create_folder_tags(self, articles_path: str) -> None:
         """Create tags based on folder structure.
 
+        Also tracks when articles are moved between folders by:
+        - Removing folder_X tags when an article is no longer in folder X
+        - Adding prev_folder_X tags to indicate the article was previously in folder X
+
         Args:
             articles_path: Path to the articles directory
         """
@@ -230,57 +235,118 @@ class TagManager:
         cursor.execute("SELECT id, file_name FROM article_summaries")
         articles = cursor.fetchall()
 
-        # Get existing folder tags
-        cursor.execute("SELECT id, name FROM tags WHERE name LIKE 'folder_%'")
-        folder_tags = {row[1]: row[0] for row in cursor.fetchall()}
+        # Get existing folder tags and prev_folder tags
+        cursor.execute(
+            "SELECT id, name FROM tags WHERE name LIKE 'folder_%' OR name LIKE 'prev_folder_%'"
+        )
+        tag_rows = cursor.fetchall()
+        folder_tags = {
+            row[1]: row[0] for row in tag_rows if row[1].startswith("folder_")
+        }
+        prev_folder_tags = {
+            row[1]: row[0] for row in tag_rows if row[1].startswith("prev_folder_")
+        }
 
         for article_id, file_name in articles:
-            # Find the article path from the file_name
-            file_paths = getArticlePathsForQuery(
-                "*", [], articles_path, fileName=file_name
+            # Get current folder tags for this article
+            cursor.execute(
+                "SELECT t.name, at.tag_id FROM article_tags at "
+                "JOIN tags t ON at.tag_id = t.id "
+                "WHERE at.article_id = ? AND t.name LIKE 'folder_%'",
+                (article_id,),
             )
+            current_folder_tags = {row[0]: row[1] for row in cursor.fetchall()}
+
+            # Find the article path using glob instead of getArticlePathsForQuery
+            searchString = os.path.join(articles_path, "**", file_name)
+            file_paths = glob.glob(searchString, recursive=True)
+
+            # Track which folder tags should be kept
+            should_keep_tags = set()
 
             for file_path in file_paths:
-                if file_name in file_path:
-                    # Get relative path to extract folders
-                    if os.path.isabs(file_path) and os.path.isabs(articles_path):
-                        rel_path = os.path.relpath(file_path, articles_path)
-                        # Extract folders from path
-                        folders = Path(rel_path).parent.parts
+                if os.path.isabs(file_path) and os.path.isabs(articles_path):
+                    rel_path = os.path.relpath(file_path, articles_path)
+                    # Extract folders from path
+                    folders = Path(rel_path).parent.parts
 
-                        # Create folder tags for each subfolder
-                        for folder in folders:
-                            # Skip excluded folders and empty folder names
-                            if folder in folder_exclusions or not folder:
-                                continue
+                    # Create folder tags for each subfolder
+                    for folder in folders:
+                        # Skip excluded folders and empty folder names
+                        if folder in folder_exclusions or not folder:
+                            continue
 
-                            tag_name = f"folder_{folder}"
+                        tag_name = f"folder_{folder}"
+                        should_keep_tags.add(tag_name)
 
-                            # Create folder tag if it doesn't exist
-                            if tag_name not in folder_tags:
-                                cursor.execute(
-                                    "INSERT INTO tags (name, description, use_summary) VALUES (?, ?, ?)",
-                                    (
-                                        tag_name,
-                                        f"Articles located in the '{folder}' folder",
-                                        False,
-                                    ),
-                                )
-                                tag_id = cursor.lastrowid
-                                folder_tags[tag_name] = tag_id
-                                print(f"Created folder tag '{tag_name}'")
-                            else:
-                                tag_id = folder_tags[tag_name]
+                        # Create folder tag if it doesn't exist
+                        if tag_name not in folder_tags:
+                            cursor.execute(
+                                "INSERT INTO tags (name, description, use_summary) VALUES (?, ?, ?)",
+                                (
+                                    tag_name,
+                                    f"Articles located in the '{folder}' folder",
+                                    False,
+                                ),
+                            )
+                            tag_id = cursor.lastrowid
+                            folder_tags[tag_name] = tag_id
+                            print(f"Created folder tag '{tag_name}'")
+                        else:
+                            tag_id = folder_tags[tag_name]
 
-                            # Associate article with folder tag
-                            try:
-                                cursor.execute(
-                                    "INSERT INTO article_tags (article_id, tag_id, matches) VALUES (?, ?, 1)",
-                                    (article_id, tag_id),
-                                )
-                            except sqlite3.IntegrityError:
-                                # Tag already associated with article
-                                pass
+                        # Associate article with folder tag
+                        try:
+                            cursor.execute(
+                                "INSERT INTO article_tags (article_id, tag_id, matches) VALUES (?, ?, 1)",
+                                (article_id, tag_id),
+                            )
+                        except sqlite3.IntegrityError:
+                            # Tag already associated with article
+                            pass
+
+            # Handle removed folders
+            for tag_name, tag_id in current_folder_tags.items():
+                if tag_name not in should_keep_tags:
+                    # Article is no longer in this folder, remove folder tag
+                    folder_name = tag_name[7:]  # Remove 'folder_' prefix
+                    prev_tag_name = f"prev_folder_{folder_name}"
+
+                    # Remove the folder tag
+                    cursor.execute(
+                        "DELETE FROM article_tags WHERE article_id = ? AND tag_id = ?",
+                        (article_id, tag_id),
+                    )
+                    print(f"Removed folder tag '{tag_name}' from article {article_id}")
+
+                    # Create prev_folder tag if it doesn't exist
+                    if prev_tag_name not in prev_folder_tags:
+                        cursor.execute(
+                            "INSERT INTO tags (name, description, use_summary) VALUES (?, ?, ?)",
+                            (
+                                prev_tag_name,
+                                f"Articles previously located in the '{folder_name}' folder",
+                                False,
+                            ),
+                        )
+                        prev_tag_id = cursor.lastrowid
+                        prev_folder_tags[prev_tag_name] = prev_tag_id
+                        print(f"Created previous folder tag '{prev_tag_name}'")
+                    else:
+                        prev_tag_id = prev_folder_tags[prev_tag_name]
+
+                    # Add the prev_folder tag to the article
+                    try:
+                        cursor.execute(
+                            "INSERT INTO article_tags (article_id, tag_id, matches) VALUES (?, ?, 1)",
+                            (article_id, prev_tag_id),
+                        )
+                        print(
+                            f"Added previous folder tag '{prev_tag_name}' to article {article_id}"
+                        )
+                    except sqlite3.IntegrityError:
+                        # Tag already associated with article
+                        pass
 
         conn.commit()
         conn.close()
@@ -293,6 +359,9 @@ class TagEvaluator:
         """Initialize the TagEvaluator."""
         self.config = getConfig()
         self.model = self.config.get("ai_model", "google/gemini-2.0-flash-001")
+        self.batch_size = int(
+            self.config.get("tag_batch_size", 3)
+        )  # Default to 3 tags per batch
 
         # Load API key
         self.api_key = os.getenv("OPENROUTER_API_KEY")
@@ -394,24 +463,66 @@ Note: Only include actual tags in your response (do not include placeholder 'tag
 
             # Extract the response and parse JSON
             result_text = response.choices[0].message.content.strip()
-            try:
-                result_json = json.loads(result_text)
 
-                # Map the results back to tag_ids
-                results = {}
-                for tag_id, tag_name, _ in tags_to_evaluate:
-                    if tag_name in result_json:
-                        results[tag_id] = result_json[tag_name]
-                    else:
-                        logger.warning(f"Tag '{tag_name}' not found in API response")
-                        results[tag_id] = False
+            # Retry logic for JSON parsing
+            max_retries = 3
+            retry_count = 0
 
-                logger.info(f"Tag evaluation results: {result_json}")
-                return results
+            while retry_count < max_retries:
+                try:
+                    result_json = json.loads(result_text)
 
-            except json.JSONDecodeError:
-                logger.error(f"Failed to parse JSON response: {result_text}")
-                return {tag_id: False for tag_id, _, _ in tags_to_evaluate}
+                    # Map the results back to tag_ids
+                    results = {}
+                    for tag_id, tag_name, _ in tags_to_evaluate:
+                        if tag_name in result_json:
+                            results[tag_id] = result_json[tag_name]
+                        else:
+                            logger.warning(
+                                f"Tag '{tag_name}' not found in API response"
+                            )
+                            results[tag_id] = False
+
+                    logger.info(f"Tag evaluation results: {result_json}")
+                    return results
+
+                except json.JSONDecodeError as e:
+                    retry_count += 1
+                    logger.warning(
+                        f"Attempt {retry_count}: Failed to parse JSON response: {result_text}"
+                    )
+
+                    if retry_count >= max_retries:
+                        logger.error(
+                            f"All {max_retries} attempts failed to parse JSON response. Last error: {str(e)}"
+                        )
+                        return {tag_id: False for tag_id, _, _ in tags_to_evaluate}
+
+                    # Modify the original user prompt with error information for retry
+                    retry_user_prompt = f"""The previous response couldn't be parsed as valid JSON. The error was: {str(e)}
+
+{user_prompt}
+
+IMPORTANT: YOU MUST RETURN ONLY VALID JSON. No explanations or additional text."""
+
+                    # Reuse the original request with slightly modified prompt
+                    try:
+                        retry_response = client.chat.completions.create(
+                            extra_headers={
+                                "HTTP-Referer": self.referer,
+                                "X-Title": self.title,
+                            },
+                            model=self.model,
+                            messages=[
+                                {"role": "system", "content": system_prompt},
+                                {"role": "user", "content": retry_user_prompt},
+                            ],
+                            response_format={"type": "json_object"},
+                        )
+                        result_text = retry_response.choices[0].message.content.strip()
+                    except Exception as retry_error:
+                        logger.error(f"Error during retry: {str(retry_error)}")
+                        retry_count = max_retries  # Force exit from retry loop
 
         except Exception as e:
             error_message = f"Error evaluating tags: {str(e)}"
@@ -421,52 +532,59 @@ Note: Only include actual tags in your response (do not include placeholder 'tag
             traceback.print_exc()
             return {tag_id: False for tag_id, _, _ in tags_to_evaluate}
 
-    def evaluate_single_tag(
-        self, text: str, tag_name: str, tag_description: str
-    ) -> bool:
-        """Evaluate if an article matches a tag using OpenRouter API.
-
-        Note: This is a legacy function that uses the batch function internally.
-        It's kept for backward compatibility.
-
-        Args:
-            text: Article text or summary to evaluate
-            tag_name: Name of the tag
-            tag_description: Description of the tag
-
-        Returns:
-            bool: True if the article matches the tag, False otherwise
-        """
-        tag_id = -1  # Temporary ID for single tag evaluation
-        results = self.evaluate_tags(text, [(tag_id, tag_name, tag_description)])
-        return results.get(tag_id, False)
-
-    def process_single_tag(
-        self, article_id: int, file_name: str, text: str, tag_data: Tuple[int, str, str]
-    ) -> Tuple[bool, str, Dict[int, bool]]:
-        """Process a single tag evaluation.
+    def batch_evaluate_tags(
+        self,
+        article_id: int,
+        file_name: str,
+        text: str,
+        tags_list: List[Tuple[int, str, str]],
+    ) -> Dict[int, bool]:
+        """Process a list of tags in batches to minimize API calls.
 
         Args:
-            article_id: ID of the article being evaluated
+            article_id: ID of the article
             file_name: Name of the article file (for logging)
-            text: Article text or summary to evaluate
-            tag_data: Tuple containing (tag_id, tag_name, tag_description)
+            text: Text to evaluate (summary or full text)
+            tags_list: List of tags to evaluate
 
         Returns:
-            Tuple[bool, str, Dict[int, bool]]: Success status, result message, and tag results dict
+            Dict[int, bool]: Dictionary mapping tag_id to boolean (True if matched, False otherwise)
         """
-        tag_id, tag_name, tag_description = tag_data
-        try:
-            # Evaluate single tag using the legacy function
-            is_match = self.evaluate_single_tag(text, tag_name, tag_description)
-            return (
-                True,
-                f"Successfully evaluated tag '{tag_name}' for article '{file_name}'",
-                {tag_id: is_match},
-            )
-        except Exception as e:
-            error_message = f"Error evaluating tag '{tag_name}': {str(e)}"
-            return False, error_message, {}
+        if not tags_list or not text:
+            return {}
+
+        # Split tags into batches of size batch_size
+        tag_batches = []
+        for i in range(0, len(tags_list), self.batch_size):
+            tag_batches.append(tags_list[i : i + self.batch_size])
+
+        print(
+            f"  Processing {len(tags_list)} tags in {len(tag_batches)} batches (batch size: {self.batch_size})"
+        )
+
+        # Process each batch of tags
+        tag_results = {}
+        for i, batch in enumerate(tag_batches):
+            try:
+                batch_tag_names = [tag_name for _, tag_name, _ in batch]
+                print(
+                    f"  Batch {i+1}/{len(tag_batches)}: Evaluating tags {', '.join(batch_tag_names)}"
+                )
+
+                # Evaluate tags in this batch
+                batch_results = self.evaluate_tags(text, batch)
+                tag_results.update(batch_results)
+
+                print(
+                    f"  Batch {i+1}/{len(tag_batches)}: Completed evaluation of {len(batch)} tags"
+                )
+            except Exception as e:
+                error_message = f"Error processing batch {i+1}: {str(e)}"
+                logger.error(error_message)
+                print(error_message)
+                # Continue with the next batch instead of failing the entire process
+
+        return tag_results
 
 
 class ArticleTagger:
@@ -663,48 +781,64 @@ class ArticleTagger:
         if not tags_list or not text:
             return {}
 
-        print(f"  Processing {len(tags_list)} tags with {self.max_workers} workers")
+        # Reorganize tags into balanced batches for parallel processing
+        tag_batches = []
+        batch_count = min(
+            self.max_workers,
+            max(
+                1,
+                len(tags_list) // self.tag_evaluator.batch_size
+                + (1 if len(tags_list) % self.tag_evaluator.batch_size > 0 else 0),
+            ),
+        )
+
+        # Create roughly equal-sized batches based on the number of workers
+        for i in range(batch_count):
+            start_idx = i * len(tags_list) // batch_count
+            end_idx = (i + 1) * len(tags_list) // batch_count
+            if end_idx > start_idx:  # Ensure we don't create empty batches
+                tag_batches.append(tags_list[start_idx:end_idx])
+
+        print(
+            f"  Processing {len(tags_list)} tags with {len(tag_batches)} parallel workers"
+        )
+
         tag_results = {}
         tags_processed = 0
-        tags_successful = 0
-        tags_failed = 0
 
+        # Use ThreadPoolExecutor to process batches in parallel
         with concurrent.futures.ThreadPoolExecutor(
-            max_workers=self.max_workers
+            max_workers=len(tag_batches)
         ) as executor:
-            # Submit all tasks
-            future_to_tag = {
+            # Submit batch processing tasks
+            future_to_batch = {
                 executor.submit(
-                    self.tag_evaluator.process_single_tag,
+                    self.tag_evaluator.batch_evaluate_tags,
                     article_id,
                     file_name,
                     text,
-                    tag_data,
-                ): tag_data
-                for tag_data in tags_list
+                    batch,
+                ): batch
+                for batch in tag_batches
             }
 
             # Process results as they complete
-            for future in concurrent.futures.as_completed(future_to_tag):
-                tag_data = future_to_tag[future]
-                tag_id, tag_name, _ = tag_data
-                tags_processed += 1
+            for future in concurrent.futures.as_completed(future_to_batch):
+                batch = future_to_batch[future]
+                batch_tag_names = [tag_name for _, tag_name, _ in batch]
 
                 try:
-                    success, message, result = future.result()
-                    if success:
-                        tag_results.update(result)
-                        tags_successful += 1
-                        print(f"  [{tags_processed}/{len(tags_list)}] {message}")
-                    else:
-                        tags_failed += 1
-                        print(
-                            f"  [{tags_processed}/{len(tags_list)}] Failed: {message}"
-                        )
-                except Exception as e:
-                    tags_failed += 1
+                    batch_results = future.result()
+                    tags_processed += len(batch)
+                    tag_results.update(batch_results)
+
                     print(
-                        f"  [{tags_processed}/{len(tags_list)}] Error processing tag '{tag_name}': {str(e)}"
+                        f"  [{tags_processed}/{len(tags_list)}] Processed batch with tags: {', '.join(batch_tag_names)}"
+                    )
+                except Exception as e:
+                    tags_processed += len(batch)
+                    print(
+                        f"  [{tags_processed}/{len(tags_list)}] Error processing batch: {str(e)}"
                     )
 
         return tag_results
@@ -731,25 +865,24 @@ class ArticleTagger:
 
         # Process each article
         for article_id, file_hash, file_name, summary in articles:
+
+            # Get tags that need to be evaluated for this article
+            tags_to_evaluate = self._get_tags_for_article(article_id, active_tag_ids)
+
+            if not tags_to_evaluate:
+                # print(f"  No tags to evaluate for this article")
+                continue
             print(f"Tagging article: {file_name}")
 
             # Find the article path
-            file_paths = getArticlePathsForQuery(
-                "*", [], self.articles_path, fileName=file_name
+            file_paths = glob.glob(
+                os.path.join(self.articles_path, "**", file_name), recursive=True
             )
             if not file_paths:
                 print(f"  Could not find article file: {file_name}")
                 continue
 
             file_path = file_paths[0]
-
-            # Get tags that need to be evaluated for this article
-            tags_to_evaluate = self._get_tags_for_article(article_id, active_tag_ids)
-
-            if not tags_to_evaluate:
-                print(f"  No tags to evaluate for this article")
-                continue
-
             # Group tags by whether they use summary or full text
             tags_using_summary = [
                 (tag_id, tag_name, tag_description)
@@ -768,9 +901,19 @@ class ArticleTagger:
             if tags_using_fulltext:
                 try:
                     article_text, _, _ = extract_text_from_file(file_path)
+                    if not article_text or len(article_text.strip()) == 0:
+                        print(f"  Warning: Extracted text from {file_name} is empty")
+                        article_text = None
                 except Exception as e:
                     print(f"  Error extracting text from {file_name}: {str(e)}")
                     article_text = None
+
+                # Skip full-text evaluation if text extraction failed
+                if article_text is None and tags_using_fulltext:
+                    print(
+                        f"  Skipping {len(tags_using_fulltext)} full-text tags due to text extraction failure"
+                    )
+                    tags_using_fulltext = []
 
             # Initialize tag results
             tag_results = {}
