@@ -24,7 +24,7 @@ os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
 # Remove default handler and add custom handlers
 logger.remove()
 # Add stdout handler
-logger.add(sys.stdout, level="INFO")
+logger.add(sys.stdout, level="WARNING")
 # Add rotating file handler - 5MB max size, keep 3 backup files
 logger.add(
     log_file_path,

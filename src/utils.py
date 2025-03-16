@@ -69,28 +69,6 @@ def hideFilesWithName(folder, file_name):
         hideFile(f)
 
 
-def moveFilesWithNameToRootDir(folder, file_name):
-    # Find all files with the file name in the folder using our enhanced function
-    matching_files = getArticlePathsForQuery("*", [], folder, file_name)
-
-    # Move all found files to the root of the directory
-    for f in matching_files:
-        try:
-            # Determine the new file path
-            new_path = os.path.join(folder, os.path.basename(f))
-
-            # # If file with the same name exists at the destination, we delete it before moving.
-            # if os.path.isfile(new_path) and os.path.exists(f):
-            #     print("deleted root file", new_path)
-            # #     os.remove(new_path)
-            # Move the file
-            if f != new_path:
-                shutil.move(f, new_path)
-                print(f"Moved {f} to {new_path}")
-        except OSError as e:
-            print(f"Error moving {f}: {e}")
-
-
 def hideFile(f):
     fileName = f.split("/")[-1]
     hiddenFileName = "." + fileName
@@ -371,7 +349,9 @@ def doesPathContainDotFolders(path):
     return False
 
 
-def getArticlePathsForQuery(query, formats, folderPath="", fileName=None):
+def getArticlePathsForQuery(
+    query, formats, folderPath="", fileName=None, recursive=True
+):
     """
     Get article paths matching the query, formats, and optional fileName.
 
@@ -384,6 +364,7 @@ def getArticlePathsForQuery(query, formats, folderPath="", fileName=None):
     Returns:
         List of article paths matching the criteria
     """
+    globWildcard = "**" if recursive else "*"
     folderPath = folderPath if folderPath else getConfig()["articleFileFolder"]
     folderPath = (folderPath + "/").replace("//", "/")
     formats = getConfig()["docFormatsToMove"] if not formats else formats
@@ -398,18 +379,19 @@ def getArticlePathsForQuery(query, formats, folderPath="", fileName=None):
         escaped_file_name = glob.escape(fileName)
 
         # Create a pattern to search for this specific file
-        glob_patterns = [os.path.join(folderPath, "**", escaped_file_name)]
+        glob_patterns = [os.path.join(folderPath, globWildcard, escaped_file_name)]
     else:
         # Original implementation for when no specific fileName is provided
         glob_patterns = [
-            os.path.join(folderPath, "**", f"*{docFormat}") for docFormat in formats
+            os.path.join(folderPath, globWildcard, f"*{docFormat}")
+            for docFormat in formats
         ]
 
     # Use a single approach to search using glob
     allArticlesPaths = []
     for pattern in glob_patterns:
         try:
-            matching_paths = glob.glob(pattern, recursive=True)
+            matching_paths = glob.glob(pattern, recursive=recursive)
             # Filter out dot folders
             matching_paths = [
                 path for path in matching_paths if not doesPathContainDotFolders(path)

@@ -30,7 +30,7 @@ os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
 # Remove default handler and add custom handlers
 logger.remove()
 # Add stdout handler
-logger.add(sys.stdout, level="INFO")
+logger.add(sys.stdout, level="WARNING")
 # Add rotating file handler - 5MB max size, keep 3 backup files
 logger.add(
     log_file_path,
@@ -439,7 +439,7 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
 
                 if success:
                     if is_sufficient:
-                        print(f"[{i+1}/{total_articles}] {file_name}: {message}")
+                        # print(f"[{i+1}/{total_articles}] {file_name}: {message}")
                         logger.info(
                             f"Successfully summarized: {article_path} - {message}"
                         )

@@ -814,19 +814,6 @@ class ArticleTagger:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # Get all tags from the database first (for debugging)
-        cursor.execute("SELECT COUNT(*) FROM tags")
-        total_tags = cursor.fetchone()[0]
-        print(f"DEBUG: Total tags in database: {total_tags}")
-        
-        # Get tags that are already applied to this article (for debugging)
-        cursor.execute(
-            "SELECT COUNT(*) FROM article_tags WHERE article_id = ?",
-            (article_id,),
-        )
-        applied_tags = cursor.fetchone()[0]
-        print(f"DEBUG: Tags already applied to article ID {article_id}: {applied_tags}")
-
         # Get tags that need to be evaluated for this article
         cursor.execute(
             """
@@ -838,25 +825,16 @@ class ArticleTagger:
             """,
             (article_id,),
         )
-        tags_to_evaluate_raw = cursor.fetchall()
-        print(f"DEBUG: Tags before filtering for article ID {article_id}: {len(tags_to_evaluate_raw)}")
-        
-        # Count folder tags and inactive tags for debugging
-        folder_tags_count = sum(1 for _, tag_name, _, _ in tags_to_evaluate_raw if tag_name.startswith("folder_"))
-        inactive_tags_count = sum(1 for tag_id, _, _, _ in tags_to_evaluate_raw if tag_id not in active_tag_ids)
-        print(f"DEBUG: Folder tags filtered out: {folder_tags_count}")
-        print(f"DEBUG: Inactive tags filtered out: {inactive_tags_count}")
+        tags_to_evaluate = cursor.fetchall()
 
         conn.close()
 
         # Filter out folder tags and inactive tags
-        filtered_tags = [
+        return [
             (tag_id, tag_name, tag_description, use_summary)
-            for tag_id, tag_name, tag_description, use_summary in tags_to_evaluate_raw
+            for tag_id, tag_name, tag_description, use_summary in tags_to_evaluate
             if not tag_name.startswith("folder_") and tag_id in active_tag_ids
         ]
-
-        return filtered_tags
 
     def _prepare_article_work_units(
         self, article_data: Tuple[int, str, str, str], active_tag_ids: Set[int]
@@ -876,24 +854,13 @@ class ArticleTagger:
         # Get tags that need to be evaluated for this article
         tags_to_evaluate = self._get_tags_for_article(article_id, active_tag_ids)
 
-        # Debug: Check if we have active tags
-        print(f"DEBUG: Active tag IDs count: {len(active_tag_ids)}")
-        
-        # Debug: Check if we have tags to evaluate for this article
-        print(f"DEBUG: Tags to evaluate for article '{file_name}' (ID: {article_id}): {len(tags_to_evaluate)}")
         if not tags_to_evaluate:
-            print(f"DEBUG: No tags to evaluate for article '{file_name}' - returning empty work units")
             return work_units
 
         print(f"Preparing article: {file_name}")
 
         # Find the article path
         file_paths = getArticlePathsForQuery("*", [], self.articles_path, file_name)
-        
-        # Debug: Check if we found the article file
-        print(f"DEBUG: Found {len(file_paths)} file paths for article '{file_name}'")
-        print(f"DEBUG: articles_path is '{self.articles_path}'")
-        
         if not file_paths:
             print(f"  Could not find article file: {file_name}")
             return work_units
@@ -913,11 +880,6 @@ class ArticleTagger:
             if not use_summary
         ]
 
-        # Debug: Check summary and fulltext tag counts
-        print(f"DEBUG: Tags using summary: {len(tags_using_summary)}")
-        print(f"DEBUG: Tags using fulltext: {len(tags_using_fulltext)}")
-        print(f"DEBUG: Summary available: {'Yes' if summary else 'No'}")
-
         # Skip summary-based evaluation if no summary available
         if not summary and tags_using_summary:
             print(
@@ -933,9 +895,6 @@ class ArticleTagger:
                 if not article_text or len(article_text.strip()) == 0:
                     print(f"  Warning: Extracted text from {file_name} is empty")
                     article_text = None
-                else:
-                    # Debug: Check article text length
-                    print(f"DEBUG: Extracted text length: {len(article_text)}")
             except Exception as e:
                 print(f"  Error extracting text from {file_name}: {str(e)}")
                 article_text = None
@@ -962,9 +921,6 @@ class ArticleTagger:
                 batch = tags_using_fulltext[i : i + batch_size]
                 work_units.append((article_id, file_name, article_text, batch))
 
-        # Debug: Final work units count
-        print(f"DEBUG: Final work units count for article '{file_name}': {len(work_units)}")
-        
         return work_units
 
     def _process_work_units(self, work_units: List[Tuple]) -> Dict[int, Dict]:

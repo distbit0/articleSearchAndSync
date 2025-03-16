@@ -165,14 +165,6 @@ def markReadBookmarksAsRead():
     utils.markArticlesWithUrlsAsRead(readUrls, getConfig()["articleFileFolder"])
 
 
-def moveFilesMarkedToMove():
-    markedToMoveFiles = utils.getArticlesFromList("_MOVE")
-    articleFileFolder = getConfig()["articleFileFolder"]
-    for fileName in markedToMoveFiles:
-        utils.moveFilesWithNameToRootDir(articleFileFolder, fileName)
-    utils.deleteAllArticlesInList("_MOVE")
-
-
 def deleteFilesMarkedToDelete():
     markedAsDeletedFiles = utils.getArticlesFromList("_DELETE")
     articleFileFolder = getConfig()["articleFileFolder"]
@@ -274,7 +266,9 @@ def moveDocsToTargetFolder():
     targetFolder = getConfig()["articleFileFolder"]
 
     for folderPath in PDFFolders:
-        docPaths += utils.getArticlePathsForQuery("*", docFormatsToMove, folderPath)
+        docPaths += utils.getArticlePathsForQuery(
+            "*", docFormatsToMove, folderPath, recursive=False
+        )
 
     print("LEN OF docPath", len(docPaths))
 
@@ -397,11 +391,9 @@ if __name__ == "__main__":
     updatePerFolderUrlListFiles(getConfig()["articleFileFolder"])
     print("update file names and hashes")
     updatePerFolderFileNamesAndHashes(getConfig()["articleFileFolder"])
-    print("act on requests to delete/move/hide articles from atVoice app\n\n")
+    print("act on requests to delete/hide articles from atVoice app\n\n")
     print("delete files marked to delete")
     deleteFilesMarkedToDelete()
-    print("move files marked to move")
-    moveFilesMarkedToMove()
     print("hide articles marked as read")
     hideArticlesMarkedAsRead()
     print("mark read bookmarks as read")
