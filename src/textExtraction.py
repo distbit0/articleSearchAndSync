@@ -899,7 +899,7 @@ def extract_text_from_file(
             word_count = len(words)
 
             if max_words is not None and word_count > max_words:
-                text = " ".join(words[:max_words])
+                text = " ".join(words[:max_words]) + "..."
                 word_count = max_words
 
             return text, "direct_read", word_count

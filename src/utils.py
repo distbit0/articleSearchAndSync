@@ -345,23 +345,6 @@ def getArticlesFromList(listName):
     return articleFileNames
 
 
-def getPDFPathMappings():
-    pdfToTextFileMap = {}
-    indexFolderPath = getAbsPath("../storage/indexedPDFs")
-    PDFTextFilePaths = glob.glob(indexFolderPath + "/**/*.txt", recursive=True)
-    for file in PDFTextFilePaths:
-        fileText = open(file).read()
-        try:
-            pdfPath = re.search("PdfFilePath: (.*)\n", fileText).group(1).strip()
-        except AttributeError as e:
-            print("Error in file: ", file, "error text: ", e)
-            print(fileText)
-            pdfPath = "not found"
-        pdfToTextFileMap[file] = pdfPath
-
-    return pdfToTextFileMap
-
-
 def doesPathContainDotFolders(path):
     for folder in path.split("/")[:-1]:
         if folder and folder[0] == ".":
@@ -383,6 +366,12 @@ def getArticlePathsForQuery(query, formats, folderPath=""):
         ]
         allArticlesPaths.extend(articlePaths)
 
+    fileNamesToSkip = getConfig()["fileNamesToSkip"]
+    allArticlesPaths = [
+        path
+        for path in allArticlesPaths
+        if not any(skip in path for skip in fileNamesToSkip)
+    ]
     allArticlesPaths = list(set(allArticlesPaths))
     return allArticlesPaths
 
@@ -390,22 +379,14 @@ def getArticlePathsForQuery(query, formats, folderPath=""):
 def searchArticlesForQuery(query, subjects=[], readState="", formats=[], path=""):
     searchFilter = Query(query, ignore_case=True, match_word=False, ignore_accent=False)
     matchingArticles = {}
-    textToPdfFileMap = {}
     allArticlesPaths = []
     if (
         "pdf" in formats and query != "*" and path == ""
     ):  # i.e. if we want to search in the text of the pdf files
         formats.remove("pdf")
-        textToPdfFileMap = getPDFPathMappings()
-        allArticlesPaths.extend(textToPdfFileMap)
     allArticlesPaths.extend(getArticlePathsForQuery(query, formats, path))
 
     for articlePath in allArticlesPaths:
-        originalArticlePath = (
-            textToPdfFileMap[articlePath]
-            if articlePath in textToPdfFileMap
-            else articlePath
-        )
         skipBecauseReadState = False
         if readState:
             if readState == "read":

@@ -10,6 +10,10 @@
     "enable_article_summarization": true,
     "summary_batch_size": 15,
     "ai_model": "google/gemini-2.0-flash-001",
+    "fileNamesToSkip": [
+        "fileNamesAndHashes.txt",
+        "articleUrls.txt"
+    ],
     "invalidBlogSubstrings": [
         "hackmd.io",
         "https://github.com/",
