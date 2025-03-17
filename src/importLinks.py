@@ -14,8 +14,10 @@ import multihash
 from cid import make_cid
 import base58
 from backupFileIndex import backup_file_index
-from articleSummary import summarize_articles
+from articleSummary import summarize_articles, add_files_to_database
 from articleTagging import main as tag_articles
+import cProfile
+import pstats
 
 sys.path.append(getConfig()["convertLinksDir"])
 from convertLinks import main as convertLinks
@@ -375,12 +377,17 @@ def deleteDuplicateFiles(directory_path):
 
 
 if __name__ == "__main__":
+    # profiler = cProfile.Profile()
+    # profiler.enable()
+
     print("download new articles")
     urlsToAdd = calcUrlsToAdd()
     urlsToAdd = urlsToAdd["AlreadyRead"] + urlsToAdd["UnRead"]
     downloadNewArticles(urlsToAdd)
     print("give files readable filenames")
     reTitlePDFs.retitleAllPDFs()
+    print("add files to database")
+    add_files_to_database()
     print("summarize articles")
     summarize_articles()
     print("tag articles")
@@ -418,3 +425,8 @@ if __name__ == "__main__":
     updateLists()
     print("backup file index")
     backup_file_index()
+
+    # profiler.disable()
+    # stats = pstats.Stats(profiler)
+    # stats.sort_stats(pstats.SortKey.CUMULATIVE)
+    # stats.print_stats("src")

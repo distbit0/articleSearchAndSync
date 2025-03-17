@@ -30,7 +30,7 @@ os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
 # Remove default handler and add custom handlers
 logger.remove()
 # Add stdout handler
-logger.add(sys.stdout, level="WARNING")
+logger.add(sys.stdout, level="INFO")
 # Add rotating file handler - 5MB max size, keep 3 backup files
 logger.add(
     log_file_path,
@@ -52,7 +52,7 @@ potential_env_paths = [
 for env_path in potential_env_paths:
     if os.path.exists(env_path):
         load_dotenv(dotenv_path=env_path)
-        print(f"Loaded environment from: {env_path}")
+        logger.debug(f"Loaded environment from: {env_path}")
         break
 
 
@@ -128,7 +128,7 @@ def summarize_with_openrouter(text: str) -> Tuple[str, bool]:
             },
         )
 
-        logger.info(f"Sending summary request to OpenRouter with model: {model}")
+        logger.debug(f"Sending summary request to OpenRouter with model: {model}")
 
         system_prompt = """You are a helpful system that generates concise summaries of academic or educational content. 
 You must first assess if the provided text contains sufficient content to generate a meaningful summary. 
@@ -172,7 +172,6 @@ novel arguments, novel ideas, and important details. The summary should be writt
         error_message = f"Error generating summary: {str(e)}"
         error_traceback = traceback.format_exc()
         logger.error(f"{error_message}\n{error_traceback}")
-        print(error_message)
         traceback.print_exc()
         return f"Failed to generate summary: {error_message}", False
 
@@ -209,7 +208,7 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
 
         # If summary is NULL, it means the file was added to the database but not yet summarized
         if summary is None:
-            logger.info(
+            logger.debug(
                 f"File {file_name} is in the database but has not been summarized yet"
             )
             # Close the current connection since we'll open a new one during summarization
@@ -256,7 +255,7 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
             )
         else:
             db_summary = summary
-            logger.info(f"Successfully created summary for file: {file_path}")
+            logger.debug(f"Successfully created summary for file: {file_path}")
 
         if existing_article:
             # Update existing record
@@ -268,7 +267,7 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
                 """,
                 (db_summary, extraction_method, word_count, file_hash),
             )
-            logger.info(f"Updated existing database entry for file: {file_path}")
+            logger.debug(f"Updated existing database entry for file: {file_path}")
         else:
             # Insert new record
             cursor.execute(
@@ -286,7 +285,7 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
                     word_count,
                 ),
             )
-            logger.info(f"Created new database entry for file: {file_path}")
+            logger.debug(f"Created new database entry for file: {file_path}")
 
         conn.commit()
         conn.close()
@@ -296,7 +295,7 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
                 f"Stored empty summary for file with insufficient text: {file_path}"
             )
         else:
-            logger.info(
+            logger.debug(
                 f"Successfully created and stored summary for file: {file_path}"
             )
 
@@ -306,7 +305,6 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
         error_message = f"Error summarizing article: {str(e)}"
         error_traceback = traceback.format_exc()
         logger.error(f"{error_message}\n{error_traceback}")
-        print(error_message)
         traceback.print_exc()
 
         # Ensure the database connection is closed in case of error
@@ -331,7 +329,6 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
         config = getConfig()
         articles_path = config.get("articleFileFolder", "")
         if not articles_path:
-            print("No articles directory specified in config or as argument")
             logger.error("No articles directory specified in config or as argument")
             return
 
@@ -357,15 +354,11 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
     articles_needing_summary = cursor.fetchall()
     conn.close()
 
-    print(
-        f"Found {len(articles_needing_summary)} articles in database that need summarization"
-    )
     logger.info(
         f"Found {len(articles_needing_summary)} articles in database that need summarization"
     )
 
     if not articles_needing_summary:
-        print("No articles need summarization")
         logger.info("No articles need summarization")
         return
 
@@ -382,9 +375,6 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
     for file_hash, file_name in articles_needing_summary:
         # Stop if we've reached the maximum number of articles to summarize
         if len(articles_to_summarize) >= max_summaries_per_session:
-            print(
-                f"Reached limit of {max_summaries_per_session} articles, stopping search"
-            )
             logger.info(
                 f"Reached limit of {max_summaries_per_session} articles, stopping search"
             )
@@ -397,18 +387,13 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
             # Use the first matching file path
             articles_to_summarize.append(file_paths[0])
         else:
-            print(
-                f"Warning: Could not find file path for {file_name} in {articles_path}"
-            )
             logger.warning(
                 f"Could not find file path for {file_name} in {articles_path}"
             )
 
-    print(f"{len(articles_to_summarize)} articles need summarization")
     logger.info(f"{len(articles_to_summarize)} articles need summarization")
 
     if not articles_to_summarize:
-        print("No articles to summarize")
         logger.info("No articles to summarize")
         return
 
@@ -439,36 +424,25 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
 
                 if success:
                     if is_sufficient:
-                        # print(f"[{i+1}/{total_articles}] {file_name}: {message}")
-                        logger.info(
+                        logger.debug(
                             f"Successfully summarized: {article_path} - {message}"
                         )
                         successful += 1
                     else:
-                        print(
-                            f"[{i+1}/{total_articles}] {file_name}: Insufficient text, storing empty summary"
-                        )
                         logger.warning(
                             f"Insufficient text in: {article_path} - storing empty summary"
                         )
                         insufficient += 1
                 else:
-                    print(f"[{i+1}/{total_articles}] {file_name}: FAILED - {message}")
                     logger.error(f"Failed to summarize: {article_path} - {message}")
                     failed += 1
             except Exception as e:
                 file_name = os.path.basename(article_path)
-                print(
-                    f"[{i+1}/{total_articles}] {file_name}: FAILED - Unexpected error: {str(e)}"
-                )
                 logger.error(
                     f"Unexpected error processing {article_path}: {str(e)}\n{traceback.format_exc()}"
                 )
                 failed += 1
 
-    print(
-        f"\nSummary: Processed {total_articles} articles - {successful} successful, {insufficient} insufficient text, {failed} failed"
-    )
     logger.info(
         f"Summary: Processed {total_articles} articles - {successful} successful, {insufficient} insufficient text, {failed} failed"
     )
@@ -519,7 +493,7 @@ def add_files_to_database(articles_path: Optional[str] = None) -> int:
             logger.error("Article file folder not found in config")
             return 0
 
-    logger.info(f"Adding files to database from: {articles_path}")
+    logger.debug(f"Adding files to database from: {articles_path}")
 
     # Setup database
     db_path = setup_database()
@@ -542,6 +516,7 @@ def add_files_to_database(articles_path: Optional[str] = None) -> int:
 
     # Use getArticlePathsForQuery to find all articles with supported formats in one call
     all_article_paths = getArticlePathsForQuery("*", supported_formats, articles_path)
+    logger.info(f"Found {len(all_article_paths)} files in {articles_path}.")
 
     # Process each file found
     for file_path in all_article_paths:
@@ -577,7 +552,7 @@ def add_files_to_database(articles_path: Optional[str] = None) -> int:
             added_count += 1
 
             if added_count % 100 == 0:
-                logger.info(f"Added {added_count} new files to database")
+                logger.debug(f"Added {added_count} new files to database")
                 conn.commit()  # Commit in batches
 
         except Exception as e:
@@ -593,9 +568,5 @@ def add_files_to_database(articles_path: Optional[str] = None) -> int:
 
 
 if __name__ == "__main__":
-    # If no arguments, summarize articles
-    if len(sys.argv) == 1:
-        summarize_articles()
-    # If --add-files argument is provided, add files to database without summarizing
-    elif len(sys.argv) > 1 and sys.argv[1] == "--add-files":
-        add_files_to_database()
+    add_files_to_database()
+    summarize_articles()

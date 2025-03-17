@@ -285,9 +285,8 @@ def check_all_articles(start_index: int = 0) -> None:
     print(
         f"Searching for articles in {articles_path} with formats: {supported_formats}"
     )
-    article_dict = utils.searchArticlesForQuery(
-        "*", formats=supported_formats, path=articles_path
-    )
+
+    article_dict = utils.getArticlePathsForQuery("*", supported_formats, articles_path)
 
     print(f"Found {len(article_dict)} articles to check")
     # Get maximum articles per session from config

@@ -94,9 +94,13 @@ def retitlePDFsInFolder(folderPath):
     newPdfPaths = []
     for pdfPath in pdfPaths:
         newPath = reTitlePDF(pdfPath).lstrip(".")
-        if newPath not in newPdfPaths:
-            newPdfPaths.append(newPath)
-            os.rename(pdfPath, newPath)
+        suffix = 1
+        base, ext = os.path.splitext(newPath)
+        while newPath in newPdfPaths or os.path.exists(newPath):
+            newPath = f"{base}_{suffix}{ext}"
+            suffix += 1
+        newPdfPaths.append(newPath)
+        os.rename(pdfPath, newPath)
 
 
 def retitleAllPDFs():

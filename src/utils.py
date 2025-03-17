@@ -368,46 +368,36 @@ def getArticlePathsForQuery(
     folderPath = folderPath if folderPath else getConfig()["articleFileFolder"]
     folderPath = (folderPath + "/").replace("//", "/")
     formats = getConfig()["docFormatsToMove"] if not formats else formats
-    formats = formats if query == "*" else ["html", "mhtml"]
+    formats = formats if query == "*" else ["html", "mhtml"]  # important!
     fileNamesToSkip = getConfig()["fileNamesToSkip"]
 
-    # Determine the glob pattern based on whether we're searching for a specific file
-    glob_patterns = []
+    # Treat fileName as a format if provided, otherwise use provided formats
+    search_targets = [glob.escape(fileName)] if fileName else formats
 
-    if fileName:
-        # Use glob.escape to properly escape special characters in the filename
-        escaped_file_name = glob.escape(fileName)
-
-        # Create a pattern to search for this specific file
-        glob_patterns = [os.path.join(folderPath, globWildcard, escaped_file_name)]
-    else:
-        # Original implementation for when no specific fileName is provided
-        glob_patterns = [
-            os.path.join(folderPath, globWildcard, f"*{docFormat}")
-            for docFormat in formats
-        ]
-
-    # Use a single approach to search using glob
+    # Create glob patterns for both root and recursive searches
+    glob_patterns = [
+        *(
+            os.path.join(folderPath, globWildcard, f"*{target}")
+            for target in search_targets
+        ),  # Recursively
+    ]
     allArticlesPaths = []
     for pattern in glob_patterns:
         try:
-            matching_paths = glob.glob(pattern, recursive=recursive)
-            # Filter out dot folders
+            matching_paths = glob.glob(
+                pattern, recursive=recursive, include_hidden=True
+            )
             matching_paths = [
                 path for path in matching_paths if not doesPathContainDotFolders(path)
             ]
             allArticlesPaths.extend(matching_paths)
         except Exception as e:
             print(f"Error in glob pattern {pattern}: {e}")
-
-    # Filter out files to skip
     allArticlesPaths = [
         path
         for path in allArticlesPaths
         if not any(skip in path for skip in fileNamesToSkip)
     ]
-
-    # Remove duplicates
     allArticlesPaths = list(set(allArticlesPaths))
     return allArticlesPaths
 
