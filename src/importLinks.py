@@ -10,9 +10,9 @@ from downloadNewArticles import downloadNewArticles
 import sys
 import shutil
 import hashlib
-import multihash
-from cid import make_cid
-import base58
+from typing import Iterable
+from io import BytesIO
+from ipfs_cid import cid_sha256_hash_chunked
 from backupFileIndex import backup_file_index
 from articleSummary import summarize_articles, add_files_to_database
 from articleTagging import main as tag_articles
@@ -24,20 +24,13 @@ from convertLinks import main as convertLinks
 
 
 def calculate_ipfs_hash(file_path):
-    # Read the file in binary mode
-    with open(file_path, "rb") as file:
-        file_data = file.read()
+    def as_chunks(stream: BytesIO, chunk_size: int) -> Iterable[bytes]:
+        while len((chunk := stream.read(chunk_size))) > 0:
+            yield chunk
 
-    # Calculate the SHA-256 hash of the file content
-    sha256_hash = hashlib.sha256(file_data).digest()
-
-    # Create a multihash from the SHA-256 hash
-    mh = multihash.encode(sha256_hash, "sha2-256")
-
-    # Create a CID (Content Identifier) from the multihash
-    cid = make_cid(1, "dag-pb", mh)
-
-    return str(cid)
+    with open(file_path, "rb") as f:
+        result = cid_sha256_hash_chunked(as_chunks(f, 4))
+        return result
 
 
 def getBookmarks():
