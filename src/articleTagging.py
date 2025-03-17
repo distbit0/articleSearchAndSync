@@ -12,7 +12,6 @@ from openai import OpenAI
 import concurrent.futures
 import argparse
 import time
-import utils
 from utils import getConfig, getArticlePathsForQuery
 from textExtraction import extract_text_from_file
 
@@ -20,6 +19,27 @@ from textExtraction import extract_text_from_file
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STORAGE_DIR = os.path.join(PROJECT_ROOT, "storage")
 DB_FILENAME = "article_summaries.db"
+
+# Configure loguru logger
+log_file_path = os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+    "logs",
+    "tagging.log",
+)
+os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
+
+# Remove default handler and add custom handlers
+logger.remove()
+# Add stdout handler
+logger.add(sys.stdout, level="INFO")
+# Add rotating file handler - 5MB max size, keep 3 backup files
+logger.add(
+    log_file_path,
+    rotation="5 MB",
+    retention=3,
+    level="WARNING",
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} - {message}",
+)
 
 
 def load_environment_variables() -> None:
@@ -33,7 +53,6 @@ def load_environment_variables() -> None:
     for env_path in potential_env_paths:
         if os.path.exists(env_path):
             load_dotenv(dotenv_path=env_path)
-            print(f"Loaded environment from: {env_path}")
             break
 
 
@@ -134,7 +153,9 @@ class TagManager:
         tag_config = config.get("article_tags", {})
 
         if not tag_config:
-            print("No tags found in config.json. Please add an 'article_tags' section.")
+            logger.error(
+                "No tags found in config.json. Please add an 'article_tags' section."
+            )
             return
 
         conn, cursor = self._get_connection()
@@ -192,7 +213,9 @@ class TagManager:
                     cursor.execute(
                         "DELETE FROM article_tags WHERE tag_id = ?", (tag_id,)
                     )
-                    print(f"Updated tag '{tag_name}' and cleared previous assignments")
+                    logger.debug(
+                        f"Updated tag '{tag_name}' and cleared previous assignments"
+                    )
             else:
                 # New tag, add to database
                 cursor.execute(
@@ -206,7 +229,7 @@ class TagManager:
                     "INSERT INTO tag_hashes (tag_id, property_hash) VALUES (?, ?)",
                     (tag_id, new_hash),
                 )
-                print(f"Added new tag '{tag_name}'")
+                logger.debug(f"Added new tag '{tag_name}'")
 
         # Important: We no longer remove tags from the database when they're removed from config
         # We'll handle disabled/removed tags during the evaluation process
@@ -250,12 +273,12 @@ class TagManager:
         articles = cursor.fetchall()
         if max_articles and len(articles) > max_articles:
             if debug:
-                print(
+                logger.debug(
                     f"Limiting to {max_articles} articles due to max_articles parameter"
                 )
             articles = articles[:max_articles]
         if debug:
-            print(f"Processing {len(articles)} articles for folder tagging")
+            logger.debug(f"Processing {len(articles)} articles for folder tagging")
         return articles
 
     def _build_file_lookup(self, articles_path, start_time, debug):
@@ -265,9 +288,10 @@ class TagManager:
         for file_path in article_paths:
             file_name = os.path.basename(file_path)
             lookup.setdefault(file_name, []).append(file_path)
-        if debug:
-            print(f"Found {len(lookup)} unique filenames in file system")
-            print(f"File lookup table built in {time.time() - start_time:.2f} seconds")
+        logger.debug(f"Found {len(lookup)} unique filenames in file system")
+        logger.debug(
+            f"File lookup table built in {time.time() - start_time:.2f} seconds"
+        )
         return lookup
 
     def _get_current_article_tags(self, cursor):
@@ -387,9 +411,8 @@ class TagManager:
             for article_id, folders in folder_locations.items():
                 if folder_path in folders:
                     new_associations.append((article_id, tag_id))
-        if debug:
-            tag_type = "prev_folder" if is_prev else "folder"
-            print(f"Created {len(tags_to_create)} new {tag_type} tags")
+        tag_type = "prev_folder" if is_prev else "folder"
+        logger.debug(f"Created {len(tags_to_create)} new {tag_type} tags")
         return new_associations
 
     def create_folder_tags(
@@ -412,7 +435,7 @@ class TagManager:
         """
         start_time = time.time()
         if debug:
-            print(f"Starting folder tagging at {start_time}")
+            logger.debug(f"Starting folder tagging at {start_time}")
 
         # Get the database path
         conn = sqlite3.connect(self.db_path)
@@ -471,7 +494,7 @@ class TagManager:
                 tags_to_remove,
             )
             if debug:
-                print(f"Removed {len(tags_to_remove)} folder tag associations")
+                logger.info(f"Removed {len(tags_to_remove)} folder tag associations")
 
         if article_tag_associations:
             cursor.executemany(
@@ -479,7 +502,7 @@ class TagManager:
                 article_tag_associations,
             )
             if debug:
-                print(
+                logger.info(
                     f"Created {len(article_tag_associations)} new folder tag associations"
                 )
 
@@ -489,7 +512,7 @@ class TagManager:
                 article_prev_tag_associations,
             )
             if debug:
-                print(
+                logger.info(
                     f"Created {len(article_prev_tag_associations)} new prev_folder tag associations"
                 )
 
@@ -498,7 +521,7 @@ class TagManager:
         conn.close()
 
         elapsed = time.time() - start_time
-        print(f"Folder tagging completed in {elapsed:.2f} seconds")
+        logger.info(f"Folder tagging completed in {elapsed:.2f} seconds")
 
 
 class TagEvaluator:
@@ -569,7 +592,7 @@ class TagEvaluator:
             tag_info_str = "\n\n".join(tag_info)
             tag_names = [tag_name for _, tag_name, _ in tags_to_evaluate]
 
-            logger.info(
+            logger.debug(
                 f"Evaluating article for tags: {', '.join(tag_names)} using model: {self.model}"
             )
 
@@ -632,7 +655,7 @@ Note: Only include actual tags in your response (do not include placeholder 'tag
                             )
                             results[tag_id] = False
 
-                    logger.info(f"Tag evaluation results: {result_json}")
+                    logger.debug(f"Tag evaluation results: {result_json}")
                     return results
 
                 except json.JSONDecodeError as e:
@@ -707,7 +730,7 @@ IMPORTANT: YOU MUST RETURN ONLY VALID JSON. No explanations or additional text."
         for i in range(0, len(tags_list), self.batch_size):
             tag_batches.append(tags_list[i : i + self.batch_size])
 
-        print(
+        logger.debug(
             f"  Processing {len(tags_list)} tags in {len(tag_batches)} batches (batch size: {self.batch_size})"
         )
 
@@ -716,7 +739,7 @@ IMPORTANT: YOU MUST RETURN ONLY VALID JSON. No explanations or additional text."
         for i, batch in enumerate(tag_batches):
             try:
                 batch_tag_names = [tag_name for _, tag_name, _ in batch]
-                print(
+                logger.debug(
                     f"  Batch {i+1}/{len(tag_batches)}: Evaluating tags {', '.join(batch_tag_names)}"
                 )
 
@@ -724,14 +747,12 @@ IMPORTANT: YOU MUST RETURN ONLY VALID JSON. No explanations or additional text."
                 batch_results = self.evaluate_tags(text, batch)
                 tag_results.update(batch_results)
 
-                print(
+                logger.debug(
                     f"  Batch {i+1}/{len(tag_batches)}: Completed evaluation of {len(batch)} tags"
                 )
             except Exception as e:
-                error_message = f"Error processing batch {i+1}: {str(e)}"
-                logger.error(error_message)
-                print(error_message)
-                # Continue with the next batch instead of failing the entire process
+                logger.error(f"Error processing batch {i+1}: {str(e)}")
+                traceback.print_exc()
 
         return tag_results
 
@@ -768,7 +789,7 @@ class ArticleTagger:
         for tag_name, tag_data in self.config.get("article_tags", {}).items():
             # Skip tags marked as disabled
             if not tag_data.get("enabled", True):
-                print(f"Skipping disabled tag '{tag_name}'")
+                logger.info(f"Skipping disabled tag '{tag_name}'")
                 continue
             active_tags[tag_name] = tag_data
 
@@ -788,7 +809,7 @@ class ArticleTagger:
         return set(active_tag_ids)
 
     def _get_articles_needing_tagging(self) -> List[Tuple[int, str, str, str]]:
-        """Get all articles that need tagging.
+        """Get articles that need tagging up to the max_articles_per_session limit.
 
         Returns:
             List[Tuple[int, str, str, str]]: List of articles (id, file_hash, file_name, summary)
@@ -796,24 +817,60 @@ class ArticleTagger:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        # Get all articles that need tagging
-        cursor.execute(
-            """
-            SELECT a.id, a.file_hash, a.file_name, a.summary 
-            FROM article_summaries a
-            WHERE EXISTS (
-                SELECT 1 FROM tags t
-                WHERE t.id NOT IN (
-                    SELECT tag_id FROM article_tags WHERE article_id = a.id
+        articles_to_tag = []
+        evaluated_count = 0
+
+        alreadySeen = set()
+        i = 1
+        while evaluated_count < self.max_articles_per_session:
+            # Fetch a batch of articles
+            cursor.execute(
+                """
+                SELECT a.id, a.file_hash, a.file_name, a.summary 
+                FROM article_summaries a
+                WHERE EXISTS (
+                    SELECT 1 FROM tags t
+                    WHERE t.id NOT IN (
+                        SELECT tag_id FROM article_tags WHERE article_id = a.id
+                    )
+                    AND NOT t.name LIKE 'folder_%'
+                    AND NOT t.name LIKE 'prev_folder_%'
                 )
+                LIMIT ?
+                """,
+                (self.max_articles_per_session * i,),
             )
-            """
-        )
-        articles = cursor.fetchall()
+            i += 1
+            batch_articles = cursor.fetchall()
+            logger.debug(f"Fetched {len(batch_articles)} articles")
+
+            batch_articles = [
+                article for article in batch_articles if article[0] not in alreadySeen
+            ]
+            if not batch_articles:
+                logger.debug("No more articles to tag")
+                break
+            for article in batch_articles:
+                alreadySeen.add(article[0])
+                article_id, file_hash, file_name, summary = article
+                # Prepare work units for each article
+                work_units = self._prepare_article_work_units(
+                    article, self._get_active_tag_ids()
+                )
+
+                if work_units:
+                    articles_to_tag.append(article)
+                    evaluated_count += 1
+
+                if evaluated_count >= self.max_articles_per_session:
+                    print(
+                        f"Reached max articles to tag per session: {self.max_articles_per_session}"
+                    )
+                    break
 
         conn.close()
 
-        return articles
+        return articles_to_tag
 
     def _get_tags_for_article(
         self, article_id: int, active_tag_ids: Set[int]
@@ -849,7 +906,9 @@ class ArticleTagger:
         return [
             (tag_id, tag_name, tag_description, use_summary)
             for tag_id, tag_name, tag_description, use_summary in tags_to_evaluate
-            if not tag_name.startswith("folder_") and tag_id in active_tag_ids
+            if not tag_name.startswith("folder_")
+            and not tag_name.startswith("prev_")
+            and tag_id in active_tag_ids
         ]
 
     def _prepare_article_work_units(
@@ -869,16 +928,19 @@ class ArticleTagger:
 
         # Get tags that need to be evaluated for this article
         tags_to_evaluate = self._get_tags_for_article(article_id, active_tag_ids)
+        logger.debug(f"Tags to evaluate for article {article_id}: {tags_to_evaluate}")
 
         if not tags_to_evaluate:
+            logger.debug(f"No tags to evaluate for article {article_id}")
             return work_units
 
-        print(f"Preparing article: {file_name}")
+        logger.debug(f"Preparing article: {file_name}")
 
         # Find the article path
         file_paths = getArticlePathsForQuery("*", [], self.articles_path, file_name)
+        logger.debug(f"File paths found for article {file_name}: {file_paths}")
         if not file_paths:
-            print(f"  Could not find article file: {file_name}")
+            logger.warning(f"  Could not find article file: {file_name}")
             return work_units
 
         file_path = file_paths[0]
@@ -889,17 +951,23 @@ class ArticleTagger:
             for tag_id, tag_name, tag_description, use_summary in tags_to_evaluate
             if use_summary
         ]
+        logger.debug(
+            f"Tags using summary for article {article_id}: {tags_using_summary}"
+        )
 
         tags_using_fulltext = [
             (tag_id, tag_name, tag_description)
             for tag_id, tag_name, tag_description, use_summary in tags_to_evaluate
             if not use_summary
         ]
+        logger.debug(
+            f"Tags using full text for article {article_id}: {tags_using_fulltext}"
+        )
 
         # Skip summary-based evaluation if no summary available
         if not summary and tags_using_summary:
-            print(
-                f"  Skipping {len(tags_using_summary)} summary-based tags because article has no summary yet"
+            logger.debug(
+                f"  Skipping {len(tags_using_summary)} summary-based tags ({tags_using_summary}) because article ({file_name}) has no summary yet"
             )
             tags_using_summary = []
 
@@ -909,15 +977,17 @@ class ArticleTagger:
             try:
                 article_text, _, _ = extract_text_from_file(file_path)
                 if not article_text or len(article_text.strip()) == 0:
-                    print(f"  Warning: Extracted text from {file_name} is empty")
+                    logger.warning(
+                        f"  Warning: Extracted text from {file_name} is empty"
+                    )
                     article_text = None
             except Exception as e:
-                print(f"  Error extracting text from {file_name}: {str(e)}")
+                logger.error(f"  Error extracting text from {file_name}: {str(e)}")
                 article_text = None
 
             # Skip full-text evaluation if text extraction failed
             if article_text is None and tags_using_fulltext:
-                print(
+                logger.warning(
                     f"  Skipping {len(tags_using_fulltext)} full-text tags due to text extraction failure"
                 )
                 tags_using_fulltext = []
@@ -937,6 +1007,7 @@ class ArticleTagger:
                 batch = tags_using_fulltext[i : i + batch_size]
                 work_units.append((article_id, file_name, article_text, batch))
 
+        logger.debug(f"Prepared work units for article {article_id}: {work_units}")
         return work_units
 
     def _process_work_units(self, work_units: List[Tuple]) -> Dict[int, Dict]:
@@ -949,10 +1020,10 @@ class ArticleTagger:
             Dict[int, Dict]: Results by article ID
         """
         if not work_units:
-            print("No work units to process")
+            logger.debug("No work units to process")
             return {}
 
-        print(f"Processing {len(work_units)} work units in parallel")
+        logger.info(f"Processing {len(work_units)} work units in parallel")
 
         # Track results by article ID
         results_by_article = {}
@@ -965,6 +1036,7 @@ class ArticleTagger:
             futures = {}
             for work_unit in work_units:
                 article_id, file_name, text, tags_batch = work_unit
+                logger.debug(f"Submitting work unit for article {article_id}")
                 future = executor.submit(
                     self._process_article_tag_batch,
                     article_id,
@@ -993,11 +1065,13 @@ class ArticleTagger:
                     # Update results
                     results_by_article[article_id]["results"].update(batch_results)
 
-                    print(
+                    logger.debug(
                         f"Progress: {units_processed}/{len(work_units)} work units completed"
                     )
                 except Exception as e:
-                    print(f"Error processing work unit: {str(e)}")
+                    logger.error(
+                        f"Error processing work unit for article {article_id}: {str(e)}"
+                    )
                     traceback.print_exc()
 
         return results_by_article
@@ -1013,7 +1087,7 @@ class ArticleTagger:
         if not results_by_article:
             return
 
-        print(f"Applying results to {len(results_by_article)} articles")
+        logger.info(f"Applying results to {len(results_by_article)} articles")
 
         for article_id, data in results_by_article.items():
             file_name = data["file_name"]
@@ -1022,16 +1096,16 @@ class ArticleTagger:
             if not tag_results:
                 continue
 
-            print(f"Applying tags for article: {file_name}")
+            logger.debug(f"Applying tags for article: {file_name}")
             matching_tags = self._apply_tag_results(article_id, tag_results)
             total_tags = len(tag_results)
 
             if matching_tags == 0:
-                print(
+                logger.debug(
                     f"  No matching tags found for this article (evaluated {total_tags} tags)"
                 )
             else:
-                print(
+                logger.debug(
                     f"  Successfully applied {matching_tags} matching tags to article (evaluated {total_tags} tags)"
                 )
 
@@ -1062,12 +1136,14 @@ class ArticleTagger:
             batch_results = self.tag_evaluator.batch_evaluate_tags(
                 article_id, file_name, text, tags_batch
             )
-            print(
+            logger.debug(
                 f"  Processed batch for article '{file_name}' with tags: {', '.join(batch_tag_names)}"
             )
             return batch_results
         except Exception as e:
-            print(f"  Error processing batch for article '{file_name}': {str(e)}")
+            logger.error(
+                f"  Error processing batch for article '{file_name}': {str(e)}"
+            )
             return {}
 
     def _apply_tag_results(self, article_id: int, tag_results: Dict[int, bool]) -> int:
@@ -1098,10 +1174,10 @@ class ArticleTagger:
                 tag_name = tag_name_result[0] if tag_name_result else f"ID:{tag_id}"
 
                 if matched:
-                    print(f"  Applied tag '{tag_name}' to article")
+                    logger.debug(f"  Applied tag '{tag_name}' to article")
                     matching_tags += 1
                 else:
-                    print(f"  Recorded non-match for tag '{tag_name}'")
+                    logger.debug(f"  Recorded non-match for tag '{tag_name}'")
 
                 tags_applied += 1
             except sqlite3.IntegrityError:
@@ -1117,10 +1193,10 @@ class ArticleTagger:
                 tag_name = tag_name_result[0] if tag_name_result else f"ID:{tag_id}"
 
                 if matched:
-                    print(f"  Updated tag '{tag_name}' to match article")
+                    logger.debug(f"  Updated tag '{tag_name}' to match article")
                     matching_tags += 1
                 else:
-                    print(f"  Updated tag '{tag_name}' to non-match")
+                    logger.debug(f"  Updated tag '{tag_name}' to non-match")
 
         conn.commit()
         conn.close()
@@ -1137,15 +1213,9 @@ class ArticleTagger:
 
         # Limit the number of articles to process
         if len(articles) > self.max_articles_per_session:
-            print(
-                f"Limiting to {self.max_articles_per_session} articles due to maxArticlesToTagPerSession config setting"
-            )
-            logger.info(
-                f"Limiting to {self.max_articles_per_session} articles due to maxArticlesToTagPerSession config setting"
-            )
             articles = articles[: self.max_articles_per_session]
 
-        print(f"Found {len(articles)} articles that need tagging")
+        logger.info(f"Found {len(articles)} articles that need tagging")
         if not articles:
             return
 
@@ -1158,10 +1228,10 @@ class ArticleTagger:
             all_work_units.extend(article_work_units)
 
         if not all_work_units:
-            print("No work units to process")
+            logger.info("No work units to process")
             return
 
-        print(f"Created {len(all_work_units)} work units for parallel processing")
+        logger.info(f"Created {len(all_work_units)} work units for parallel processing")
 
         # Step 2: Process all work units in parallel
         results_by_article = self._process_work_units(all_work_units)
@@ -1191,29 +1261,29 @@ def main():
         config = getConfig()
         articles_path = config.get("articleFileFolder", "")
         if not articles_path:
-            print("Error: articleFileFolder not specified in config.json")
+            logger.error("Error: articleFileFolder not specified in config.json")
             return
 
         # First, make sure all files are in the database (without summaries)
         # This ensures folder tagging will work for all files
         # Create folder tags
-        print("\nCreating folder tags...")
+        logger.info("\nCreating folder tags...")
         tag_manager = TagManager(db_path)
         tag_manager.sync_tags_from_config()
         tag_manager.create_folder_tags(articles_path)
 
         # Apply AI-based tags if not in folder-tags-only mode
         if not args.folder_tags_only:
-            print("\nApplying tags to articles...")
+            logger.info("\nApplying tags to articles...")
             article_tagger = ArticleTagger(db_path)
             article_tagger.apply_tags_to_articles()
         else:
-            print("\nSkipping AI-based tagging (folder-tags-only mode)")
+            logger.info("\nSkipping AI-based tagging (folder-tags-only mode)")
 
-        print("\nTagging process completed successfully")
+        logger.info("\nTagging process completed successfully")
 
     except Exception as e:
-        print(f"An error occurred: {str(e)}")
+        logger.error(f"An error occurred: {str(e)}")
         traceback.print_exc()
 
 
