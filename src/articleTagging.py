@@ -214,6 +214,184 @@ class TagManager:
         conn.commit()
         conn.close()
 
+    def _initialize_db(self, cursor):
+        # Create necessary indexes for performance
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_article_summaries_file_name ON article_summaries(file_name)"
+        )
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)")
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_article_tags_article_id ON article_tags(article_id)"
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_article_tags_tag_id ON article_tags(tag_id)"
+        )
+
+    def _get_excluded_folders(self) -> set:
+        # Retrieve folder exclusions from config.json via getConfig()
+        config = getConfig()
+        return set(config.get("folderTagExclusions", []))
+
+    def _fetch_existing_tags(self, cursor):
+        # Fetch all existing folder and prev_folder tags
+        cursor.execute(
+            "SELECT id, name FROM tags WHERE name LIKE 'folder_%' OR name LIKE 'prev_folder_%'"
+        )
+        rows = cursor.fetchall()
+        folder_tags = {row[1]: row[0] for row in rows if row[1].startswith("folder_")}
+        prev_folder_tags = {
+            row[1]: row[0] for row in rows if row[1].startswith("prev_folder_")
+        }
+        return folder_tags, prev_folder_tags
+
+    def _get_articles(self, cursor, max_articles, debug):
+        # Fetch all articles from the database and limit if necessary
+        cursor.execute("SELECT id, file_name FROM article_summaries")
+        articles = cursor.fetchall()
+        if max_articles and len(articles) > max_articles:
+            if debug:
+                print(
+                    f"Limiting to {max_articles} articles due to max_articles parameter"
+                )
+            articles = articles[:max_articles]
+        if debug:
+            print(f"Processing {len(articles)} articles for folder tagging")
+        return articles
+
+    def _build_file_lookup(self, articles_path, start_time, debug):
+        # Build a lookup table mapping filenames to their full paths using getArticlePathsForQuery
+        article_paths = getArticlePathsForQuery("*", [], folderPath=articles_path)
+        lookup = {}
+        for file_path in article_paths:
+            file_name = os.path.basename(file_path)
+            lookup.setdefault(file_name, []).append(file_path)
+        if debug:
+            print(f"Found {len(lookup)} unique filenames in file system")
+            print(f"File lookup table built in {time.time() - start_time:.2f} seconds")
+        return lookup
+
+    def _get_current_article_tags(self, cursor):
+        # Retrieve current folder tag associations for articles
+        cursor.execute(
+            """
+            SELECT at.article_id, t.name, t.id 
+            FROM article_tags at
+            JOIN tags t ON at.tag_id = t.id
+            WHERE t.name LIKE 'folder_%'
+        """
+        )
+        article_tags = {}
+        for article_id, tag_name, tag_id in cursor.fetchall():
+            article_tags.setdefault(article_id, {})[tag_name] = tag_id
+        return article_tags
+
+    def _process_articles(
+        self,
+        articles,
+        file_lookup,
+        articles_path,
+        exclusions,
+        current_article_tags,
+        folder_tags,
+        prev_folder_tags,
+        debug,
+        start_time,
+    ):
+        # Process each article to determine folder locations and tag operations
+        folder_locations = {}
+        tags_to_create = set()
+        prev_tags_to_create = set()
+        article_tag_associations = []
+        article_prev_tag_associations = []
+        tags_to_remove = []
+
+        for article_id, file_name in articles:
+            if not file_name:
+                continue
+            current_tags = current_article_tags.get(article_id, {})
+            keep_tags = set()
+            article_folders = set()
+
+            file_paths = file_lookup.get(file_name, [])
+            for file_path in file_paths:
+                rel_path = os.path.relpath(file_path, articles_path)
+                folder_path = os.path.dirname(rel_path)
+                if folder_path:
+                    path_parts = Path(folder_path).parts
+                    current_path = ""
+                    for folder in path_parts:
+                        if folder in exclusions or not folder:
+                            continue
+                        current_path = (
+                            f"{current_path}/{folder}" if current_path else folder
+                        )
+                        article_folders.add(current_path)
+
+                        folder_tag = f"folder_{current_path}"
+                        keep_tags.add(folder_tag)
+                        if folder_tag not in folder_tags:
+                            tags_to_create.add(
+                                (
+                                    folder_tag,
+                                    f"Articles located in the '{current_path}' folder",
+                                )
+                            )
+                        else:
+                            tag_id = folder_tags[folder_tag]
+                            article_tag_associations.append((article_id, tag_id))
+
+                        prev_tag = f"prev_folder_{current_path}"
+                        if prev_tag not in prev_folder_tags:
+                            prev_tags_to_create.add(
+                                (
+                                    prev_tag,
+                                    f"Articles previously located in the '{current_path}' folder",
+                                )
+                            )
+                        else:
+                            tag_id = prev_folder_tags[prev_tag]
+                            article_prev_tag_associations.append((article_id, tag_id))
+
+        folder_locations = {article_id: article_folders for article_id, _ in articles}
+
+        # Identify folder tags that should be removed
+        for article_id, current_tags in current_article_tags.items():
+            for tag_name, tag_id in current_tags.items():
+                ## we do not delete prev_folder_ tags. they are intended to be a permanent record
+                if tag_name.startswith("folder_") and tag_name not in keep_tags:
+                    tags_to_remove.append((article_id, tag_id))
+
+        return (
+            folder_locations,
+            tags_to_create,
+            prev_tags_to_create,
+            article_tag_associations,
+            article_prev_tag_associations,
+            tags_to_remove,
+        )
+
+    def _batch_create_tags(
+        self, cursor, tags_to_create, tags_dict, folder_locations, is_prev, debug
+    ):
+        # Batch create new tags and build associations based on folder locations
+        new_associations = []
+        cursor.executemany(
+            "INSERT INTO tags (name, description, use_summary) VALUES (?, ?, 1)",
+            [(name, desc) for name, desc in tags_to_create],
+        )
+        for name, _ in tags_to_create:
+            cursor.execute("SELECT id FROM tags WHERE name = ?", (name,))
+            tag_id = cursor.fetchone()[0]
+            tags_dict[name] = tag_id
+            folder_path = name[12:] if is_prev else name[7:]
+            for article_id, folders in folder_locations.items():
+                if folder_path in folders:
+                    new_associations.append((article_id, tag_id))
+        if debug:
+            tag_type = "prev_folder" if is_prev else "folder"
+            print(f"Created {len(tags_to_create)} new {tag_type} tags")
+        return new_associations
+
     def create_folder_tags(
         self,
         articles_path: str,
@@ -243,210 +421,50 @@ class TagManager:
         conn.execute("PRAGMA journal_mode = MEMORY")
         cursor = conn.cursor()
 
-        # Ensure we have proper indexes for faster queries
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_article_summaries_file_name ON article_summaries(file_name)"
+        self._initialize_db(cursor)
+
+        exclusions = self._get_excluded_folders()
+        folder_tags, prev_folder_tags = self._fetch_existing_tags(cursor)
+        articles = self._get_articles(cursor, max_articles, debug)
+        file_lookup = self._build_file_lookup(articles_path, start_time, debug)
+        current_article_tags = self._get_current_article_tags(cursor)
+
+        (
+            folder_locations,
+            tags_to_create,
+            prev_tags_to_create,
+            article_tag_associations,
+            article_prev_tag_associations,
+            tags_to_remove,
+        ) = self._process_articles(
+            articles,
+            file_lookup,
+            articles_path,
+            exclusions,
+            current_article_tags,
+            folder_tags,
+            prev_folder_tags,
+            debug,
+            start_time,
         )
-        cursor.execute("CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name)")
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_article_tags_article_id ON article_tags(article_id)"
-        )
-        cursor.execute(
-            "CREATE INDEX IF NOT EXISTS idx_article_tags_tag_id ON article_tags(tag_id)"
-        )
 
-        # Start a transaction
-        cursor.execute("BEGIN TRANSACTION")
-
-        # Get a list of folders to exclude as tags
-        config = getConfig()
-        folder_exclusions = set(config.get("folderTagExclusions", []))
-
-        # Fetch all existing folder tags and prev_folder tags at once
-        cursor.execute(
-            "SELECT id, name FROM tags WHERE name LIKE 'folder_%' OR name LIKE 'prev_folder_%'"
-        )
-        tag_rows = cursor.fetchall()
-        folder_tags = {
-            row[1]: row[0] for row in tag_rows if row[1].startswith("folder_")
-        }
-        prev_folder_tags = {
-            row[1]: row[0] for row in tag_rows if row[1].startswith("prev_folder_")
-        }
-
-        # Get all articles in a single query
-        cursor.execute("SELECT id, file_name FROM article_summaries")
-        all_articles = cursor.fetchall()
-
-        if max_articles and len(all_articles) > max_articles:
-            if debug:
-                print(
-                    f"Limiting to {max_articles} articles due to max_articles parameter"
-                )
-            all_articles = all_articles[:max_articles]
-
-        print(f"Processing {len(all_articles)} articles for folder tagging")
-
-        # This is a major optimization - instead of calling glob for each file,
-        # we'll get ALL files at once and build a lookup table
-        all_files = {}
-
-        # Use getArticlePathsForQuery to get all articles
-        article_paths = getArticlePathsForQuery("*", [], folderPath=articles_path)
-
-        # Build the lookup table from the search results
-        for file_path in article_paths:
-            file_name = os.path.basename(file_path)
-            if file_name not in all_files:
-                all_files[file_name] = []
-            all_files[file_name].append(file_path)
-
-        if debug:
-            print(f"Found {len(all_files)} unique filenames in file system")
-            print(f"File lookup table built in {time.time() - start_time:.2f} seconds")
-
-        # Batch collection for operations
-        tags_to_create = set()
-        prev_tags_to_create = set()
-        article_tag_associations = []
-        article_prev_tag_associations = []
-        tags_to_remove = []
-
-        # Get current article-tag associations for folder tags
-        cursor.execute(
-            """
-            SELECT at.article_id, t.name, t.id 
-            FROM article_tags at
-            JOIN tags t ON at.tag_id = t.id
-            WHERE t.name LIKE 'folder_%'
-        """
-        )
-        current_article_tags = {}
-        for article_id, tag_name, tag_id in cursor.fetchall():
-            if article_id not in current_article_tags:
-                current_article_tags[article_id] = {}
-            current_article_tags[article_id][tag_name] = tag_id
-
-        # Process all articles
-        for article_id, file_name in all_articles:
-            # Skip empty filenames
-            if not file_name:
-                continue
-
-            # Current tags for this article
-            current_tags = current_article_tags.get(article_id, {})
-            should_keep_tags = set()
-
-            # Find file paths from our lookup table
-            file_paths = all_files.get(file_name, [])
-
-            # Process each file path
-            for file_path in file_paths:
-                rel_path = os.path.relpath(file_path, articles_path)
-                folder_path = os.path.dirname(rel_path)
-
-                if folder_path:
-                    # Generate all folder tags for this path
-                    path_parts = Path(folder_path).parts
-                    current_path = ""
-                    for folder in path_parts:
-                        if folder in folder_exclusions or not folder:
-                            continue
-
-                        if current_path:
-                            current_path = f"{current_path}/{folder}"
-                        else:
-                            current_path = folder
-
-                        tag_name = f"folder_{current_path}"
-                        should_keep_tags.add(tag_name)
-
-                        # Mark tag for creation if it doesn't exist
-                        if tag_name not in folder_tags:
-                            tags_to_create.add(
-                                (
-                                    tag_name,
-                                    f"Articles located in the '{current_path}' folder",
-                                )
-                            )
-
-            # Add new tag associations
-            for tag_name in should_keep_tags:
-                if tag_name not in current_tags:
-                    if tag_name in folder_tags:
-                        tag_id = folder_tags[tag_name]
-                        article_tag_associations.append((article_id, tag_id))
-
-            # Handle removed folders - create prev_folder tags for any folder tags being removed
-            for tag_name, tag_id in current_tags.items():
-                if tag_name not in should_keep_tags:
-                    # Article is no longer in this folder, remove folder tag and add prev_folder tag
-                    folder_path = tag_name[7:]  # Remove 'folder_' prefix
-                    prev_tag_name = f"prev_folder_{folder_path}"
-
-                    # Record tag removal
-                    tags_to_remove.append((article_id, tag_id))
-
-                    # Create prev_folder tag if it doesn't exist
-                    if prev_tag_name not in prev_folder_tags:
-                        prev_tags_to_create.add(
-                            (
-                                prev_tag_name,
-                                f"Articles previously located in the '{folder_path}' folder",
-                            )
-                        )
-                        # We'll add the associations after creating the tags
-                    else:
-                        # Use existing prev_folder tag
-                        prev_tag_id = prev_folder_tags[prev_tag_name]
-                        article_prev_tag_associations.append((article_id, prev_tag_id))
-
-        # Create folder tags in a batch
         if tags_to_create:
-            cursor.executemany(
-                "INSERT INTO tags (name, description, use_summary) VALUES (?, ?, 1)",
-                [(name, desc) for name, desc in tags_to_create],
+            new_assocs = self._batch_create_tags(
+                cursor, tags_to_create, folder_tags, folder_locations, False, debug
             )
-            # Update our folder_tags dictionary
-            for name, _ in tags_to_create:
-                cursor.execute("SELECT id FROM tags WHERE name = ?", (name,))
-                tag_id = cursor.fetchone()[0]
-                folder_tags[name] = tag_id
+            article_tag_associations.extend(new_assocs)
 
-            if debug:
-                print(f"Created {len(tags_to_create)} new folder tags")
-
-        # Create prev_folder tags in a batch
         if prev_tags_to_create:
-            cursor.executemany(
-                "INSERT INTO tags (name, description, use_summary) VALUES (?, ?, 1)",
-                [(name, desc) for name, desc in prev_tags_to_create],
+            new_assocs = self._batch_create_tags(
+                cursor,
+                prev_tags_to_create,
+                prev_folder_tags,
+                folder_locations,
+                True,
+                debug,
             )
+            article_prev_tag_associations.extend(new_assocs)
 
-            # Now that we've created the prev_folder tags, get their IDs and create associations
-            for prev_tag_name, _ in prev_tags_to_create:
-                cursor.execute("SELECT id FROM tags WHERE name = ?", (prev_tag_name,))
-                prev_tag_id = cursor.fetchone()[0]
-                prev_folder_tags[prev_tag_name] = prev_tag_id
-
-                # Find which articles need this prev_folder tag
-                # (those that had the corresponding folder tag removed)
-                folder_path = prev_tag_name[12:]  # Remove 'prev_folder_' prefix
-                folder_tag_name = f"folder_{folder_path}"
-
-                if folder_tag_name in folder_tags:
-                    folder_tag_id = folder_tags[folder_tag_name]
-                    # Find which articles had this folder tag removed
-                    for article_id, tag_id in tags_to_remove:
-                        if tag_id == folder_tag_id:
-                            article_prev_tag_associations.append(
-                                (article_id, prev_tag_id)
-                            )
-
-            if debug:
-                print(f"Created {len(prev_tags_to_create)} new prev_folder tags")
-
-        # Execute tag removals in a batch
         if tags_to_remove:
             cursor.executemany(
                 "DELETE FROM article_tags WHERE article_id = ? AND tag_id = ?",
@@ -455,7 +473,6 @@ class TagManager:
             if debug:
                 print(f"Removed {len(tags_to_remove)} folder tag associations")
 
-        # Insert article-tag associations in a batch
         if article_tag_associations:
             cursor.executemany(
                 "INSERT OR IGNORE INTO article_tags (article_id, tag_id, matches) VALUES (?, ?, 1)",
@@ -466,7 +483,6 @@ class TagManager:
                     f"Created {len(article_tag_associations)} new folder tag associations"
                 )
 
-        # Insert article-prev_tag associations in a batch
         if article_prev_tag_associations:
             cursor.executemany(
                 "INSERT OR IGNORE INTO article_tags (article_id, tag_id, matches) VALUES (?, ?, 1)",
