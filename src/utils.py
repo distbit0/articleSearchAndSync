@@ -541,7 +541,9 @@ def getSrcUrlOfGitbook(articlePath):
     return None
 
 
-def searchArticlesByTags(all_tags=[], any_tags=[], readState="", formats=[], path=""):
+def searchArticlesByTags(
+    all_tags=[], any_tags=[], readState="", formats=[], path="", cursor=None
+):
     """
     Search for articles that match specified tags.
 
@@ -555,7 +557,14 @@ def searchArticlesByTags(all_tags=[], any_tags=[], readState="", formats=[], pat
     Returns:
         Dict of article paths with their URLs
     """
-    # Connect to the database first to avoid processing unnecessary files
+    # Early return conditions
+    is_format_specific = (
+        formats and len(formats) > 0 and formats != getConfig()["docFormatsToMove"]
+    )
+    if not all_tags and not any_tags and not is_format_specific:
+        return {}
+
+    # Get database path
     db_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "storage",
@@ -565,141 +574,114 @@ def searchArticlesByTags(all_tags=[], any_tags=[], readState="", formats=[], pat
         print(f"Tag database not found at {db_path}")
         return {}
 
-    # Special case: If both all_tags and any_tags are empty, but we're not filtering by format only,
-    # this is likely a misconfiguration. Return an empty result to avoid returning all files.
-    is_format_specific = (
-        formats and len(formats) > 0 and formats != getConfig()["docFormatsToMove"]
-    )
-    if not all_tags and not any_tags and not is_format_specific:
-        return {}
-
-    # Get all articles matching the format criteria - don't filter by filename prefix yet
-    # so we can find all possible articles first
-    matchingArticles = {}
-    allArticlesPaths = []
-    if (
-        "pdf" in formats and path == ""
-    ):  # i.e. if we want to search in the text of the pdf files
+    # Handle format filtering for PDFs
+    if "pdf" in formats and path == "":
         formats.remove("pdf")
-    allArticlesPaths.extend(getArticlePathsForQuery("*", formats, path))
 
-    # Helper function to check if an article should be included based on read state
-    def should_include_by_read_state(article_path):
-        # If no read state filter, include all articles
-        if not readState:
-            return True
+    # Get all article paths that match the format criteria
+    article_paths = getArticlePathsForQuery("*", formats, path)
 
-        filename = os.path.basename(article_path)
-        is_read = filename[0] == "."
-
-        if readState == "read":
-            return is_read
-        elif readState == "unread":
-            return not is_read
-
-        return True
-
-    # If only filtering by format (no tags), apply read state filter and return
+    # If no tags specified and only filtering by format, just apply read state filter and return
     if not all_tags and not any_tags:
-        for articlePath in allArticlesPaths:
-            if should_include_by_read_state(articlePath):
+        matchingArticles = {}
+        for articlePath in article_paths:
+            if _should_include_by_read_state(articlePath, readState):
                 matchingArticles[articlePath] = getUrlOfArticle(articlePath)
         return matchingArticles
 
-    # Open DB connection for tag filtering
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
+    # Create DB connection if not provided
+    close_conn = False
+    if not cursor:
+        conn = sqlite3.connect(db_path)
+        cursor = conn.cursor()
+        close_conn = True
 
-    # Collect tag IDs to avoid repeated lookups
-    tag_id_mapping = {}
-    if all_tags or any_tags:
-        tags_to_check = list(set(all_tags + any_tags))  # Combine and deduplicate
+    try:
+        # Extract filenames from paths for efficient filtering
+        filenames = {os.path.basename(path): path for path in article_paths}
 
-        for tag in tags_to_check:
-            cursor.execute("SELECT id FROM tags WHERE name = ?", (tag,))
-            tag_id_result = cursor.fetchone()
+        # Build SQL query for tag filtering
+        query_params = []
 
-            if tag_id_result:
-                tag_id_mapping[tag] = tag_id_result[0]
-
-    # If we're using tag filtering and none of the requested tags exist in the database,
-    # return an empty result to avoid unnecessary processing
-    if (all_tags or any_tags) and not tag_id_mapping:
-        conn.close()
-        return {}
-
-    # Get a list of all articles in the database to filter paths efficiently
-    cursor.execute("SELECT file_name FROM article_summaries")
-    db_articles = {
-        row[0]: None for row in cursor.fetchall()
-    }  # Use dict for faster lookups
-
-    # Process each article path
-    for articlePath in allArticlesPaths:
-        # Skip based on read state
-        if not should_include_by_read_state(articlePath):
-            continue
-
-        # Skip if not in database
-        filename = os.path.basename(articlePath)
-        if filename not in db_articles:
-            continue
-
-        # Get article ID
-        cursor.execute(
-            "SELECT id FROM article_summaries WHERE file_name = ?", (filename,)
+        # Base SQL query to get article summaries
+        sql = """
+        SELECT as1.file_name, as1.id 
+        FROM article_summaries as1
+        WHERE as1.file_name IN ({})
+        """.format(
+            ",".join(["?"] * len(filenames))
         )
-        article_id_result = cursor.fetchone()
-        if not article_id_result:
-            continue
 
-        article_id = article_id_result[0]
+        query_params.extend(filenames.keys())
 
-        # Check if article matches all required tags (AND logic)
-        matches_all = True
+        # Filter by all_tags (AND logic)
         if all_tags:
-            for tag in all_tags:
-                tag_id = tag_id_mapping.get(tag)
-                if not tag_id:
-                    matches_all = False
-                    break
-
-                # Check if article has this tag
-                cursor.execute(
-                    "SELECT matches FROM article_tags WHERE article_id = ? AND tag_id = ?",
-                    (article_id, tag_id),
+            # For each required tag, join to article_tags and check for match
+            for i, tag in enumerate(all_tags):
+                tag_alias = f"at{i}"
+                tag_join = f"""
+                JOIN article_tags {tag_alias} ON as1.id = {tag_alias}.article_id
+                JOIN tags t{i} ON {tag_alias}.tag_id = t{i}.id AND t{i}.name = ? AND {tag_alias}.matches = 1
+                """
+                sql = sql.replace(
+                    "FROM article_summaries as1",
+                    f"FROM article_summaries as1 {tag_join}",
                 )
-                tag_match = cursor.fetchone()
+                query_params.append(tag)
 
-                if not tag_match or not tag_match[0]:
-                    matches_all = False
-                    break
-
-        if not matches_all:
-            continue
-
-        # Check if article matches any of the "any" tags (OR logic)
-        matches_any = len(any_tags) == 0  # True if no any_tags (no requirement)
-        if any_tags and not matches_any:
+        # Filter by any_tags (OR logic)
+        if any_tags:
+            or_conditions = []
             for tag in any_tags:
-                tag_id = tag_id_mapping.get(tag)
-                if not tag_id:
-                    continue
+                or_conditions.append("(t_any.name = ? AND at_any.matches = 1)")
+                query_params.append(tag)
 
-                # Check if article has this tag
-                cursor.execute(
-                    "SELECT matches FROM article_tags WHERE article_id = ? AND tag_id = ?",
-                    (article_id, tag_id),
+            if or_conditions:
+                any_tag_join = """
+                JOIN article_tags at_any ON as1.id = at_any.article_id
+                JOIN tags t_any ON at_any.tag_id = t_any.id
+                """
+                any_tag_where = " AND (" + " OR ".join(or_conditions) + ")"
+
+                # Add the join to the FROM clause
+                sql = sql.replace(
+                    "FROM article_summaries as1",
+                    f"FROM article_summaries as1 {any_tag_join}",
                 )
-                tag_match = cursor.fetchone()
+                # Add the OR conditions to the WHERE clause
+                sql += any_tag_where
 
-                if tag_match and tag_match[0]:
-                    matches_any = True
-                    break
+        # Execute query
+        cursor.execute(sql, query_params)
+        matching_files = cursor.fetchall()
 
-        # Include article if it passes both all_tags and any_tags filters
-        if matches_all and matches_any:
-            matchingArticles[articlePath] = getUrlOfArticle(articlePath)
+        # Build result dictionary
+        matchingArticles = {}
+        for filename, _ in matching_files:
+            if filename in filenames:
+                article_path = filenames[filename]
+                if _should_include_by_read_state(article_path, readState):
+                    matchingArticles[article_path] = getUrlOfArticle(article_path)
 
-    conn.close()
-    return matchingArticles
+        return matchingArticles
+
+    finally:
+        if close_conn and cursor:
+            cursor.connection.close()
+
+
+def _should_include_by_read_state(article_path, readState):
+    """Helper function to check if an article should be included based on read state"""
+    # If no read state filter, include all articles
+    if not readState:
+        return True
+
+    filename = os.path.basename(article_path)
+    is_read = filename[0] == "."
+
+    if readState == "read":
+        return is_read
+    elif readState == "unread":
+        return not is_read
+
+    return True

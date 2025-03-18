@@ -1,4 +1,7 @@
 from ctypes import util
+import sqlite3
+import re
+from pathlib import Path
 import json
 import utils
 from utils import getConfig
@@ -13,7 +16,6 @@ import hashlib
 from typing import Iterable
 from io import BytesIO
 from ipfs_cid import cid_sha256_hash_chunked
-from backupFileIndex import backup_file_index
 from articleSummary import summarize_articles, add_files_to_database
 from articleTagging import main as tag_articles
 import cProfile
@@ -178,51 +180,130 @@ def hideArticlesMarkedAsRead():
     utils.deleteAllArticlesInList("_READ")
 
 
-def updatePerFolderUrlListFiles(folder_path):
-    # Loop over all subdirectories using os.walk
-    for dirpath, dirs, files in os.walk(folder_path):
-        # Filter out the html and mhtml files
-        html_files = [f for f in files if f.endswith((".html", ".mhtml"))]
+def updatePerTagFiles(root_folder):
+    """Generate file lists per tag for both URLs and file names/hashes.
+
+    This function queries the database for all tags, then for each tag:
+    1. Creates a file containing the URLs of HTML/MHTML articles with that tag
+    2. Creates a file containing names and hashes of all articles with that tag
+
+    All files are stored in a single "tag_files" subdirectory.
+
+    Args:
+        root_folder: Path to the root folder where articles are stored
+    """
+
+    # Get the database path
+    db_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "storage",
+        "article_summaries.db",
+    )
+
+    if not os.path.exists(db_path):
+        print(f"Tag database not found at {db_path}")
+        return
+
+    # Create tag_files directory if it doesn't exist
+    tag_files_dir = os.path.join(root_folder, "tag_files")
+    os.makedirs(tag_files_dir, exist_ok=True)
+
+    # Connect to the database
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Query all active tags
+    cursor.execute(
+        """
+        SELECT id, name FROM tags 
+        WHERE name NOT LIKE 'prev_folder_%'
+        """
+    )
+    tags = cursor.fetchall()
+
+    # Total number of tags processed
+    total_tags = len(tags)
+    tags_processed = 0
+
+    # Process each tag
+    for tag_id, tag_name in tags:
+        tags_processed += 1
+        print(f"Processing tag {tags_processed}/{total_tags}: {tag_name}")
+
+        # Use searchArticlesByTags to get articles with this tag
+        articles_with_tag = utils.searchArticlesByTags(
+            any_tags=[tag_name], formats=[], path=root_folder, cursor=cursor
+        )
+
+        # Skip if no articles have this tag
+        if not articles_with_tag:
+            print(f"  - No articles found with tag '{tag_name}'")
+            continue
+
+        # Lists to store URLs and file data
         urls = []
+        file_data = {}
 
-        # If there are html or mhtml files in the directory
-        if html_files:
-            # Loop over each file
-            for file in html_files:
-                # Full file path
-                file_path = os.path.join(dirpath, file)
-                # Get url of file
-                url = utils.getUrlOfArticle(file_path)
-                urls.append(url)
+        # Process each article
+        for article_path, article_url in articles_with_tag.items():
+            try:
+                # Calculate hash for all files
+                file_hash = calculate_ipfs_hash(article_path)
+                file_data[article_path] = file_hash
 
-            # Write the urls to a text file in the directory
-            with open(os.path.join(dirpath, "articleUrls.txt"), "w") as f:
+                # Add URL if available
+                if article_url:
+                    urls.append(article_url)
+            except Exception as e:
+                print(f"Error processing {article_path}: {e}")
+
+        # Sanitize tag name for file system
+        safe_tag_name = re.sub(r"[^\w\-_\.]", "_", tag_name)
+
+        # Write URL file if we found any URLs
+        if urls:
+            tag_url_file_path = os.path.join(tag_files_dir, f"{safe_tag_name}_urls.txt")
+
+            with open(tag_url_file_path, "w") as f:
                 for url in urls:
                     f.write(f"{url}\n")
 
+            print(
+                f"  - Created URL file with {len(urls)} URLs: {os.path.basename(tag_url_file_path)}"
+            )
 
-def updatePerFolderFileNamesAndHashes(folder_path):
-    # Loop over all subdirectories using os.walk
-    for dirpath, dirs, files in os.walk(folder_path):
-        # Filter out the html, mhtml, and txt files
-        non_excluded_files = [
-            f for f in files if not f.endswith((".html", ".mhtml", ".txt"))
-        ]
-        file_data = {}
+        # Write file data if we found any files
+        if file_data:
+            tag_file_path = os.path.join(
+                tag_files_dir, f"{safe_tag_name}_files_and_hashes.json"
+            )
 
-        # If there are non-excluded files in the directory
-        if non_excluded_files:
-            # Loop over each file
-            for file in non_excluded_files:
-                # Full file path
-                file_path = os.path.join(dirpath, file)
-                # Calculate IPFS-compatible hash
-                file_hash = calculate_ipfs_hash(file_path)
-                file_data[file] = file_hash
-
-            # Write the file names and hashes to a JSON file in the directory
-            with open(os.path.join(dirpath, "fileNamesAndHashes.txt"), "w") as f:
+            with open(tag_file_path, "w") as f:
                 json.dump(file_data, f, indent=2)
+
+            print(
+                f"  - Created file hash data with {len(file_data)} files: {os.path.basename(tag_file_path)}"
+            )
+
+    conn.close()
+    print(f"Finished processing {total_tags} tags")
+    print(f"All tag files have been generated in: {tag_files_dir}")
+
+
+def updatePerTagUrlListFiles(root_folder):
+    """This function is deprecated. Use updatePerTagFiles() instead."""
+    print(
+        "WARNING: updatePerTagUrlListFiles is deprecated. Using updatePerTagFiles instead."
+    )
+    updatePerTagFiles(root_folder)
+
+
+def updatePerTagFileNamesAndHashes(root_folder):
+    """This function is deprecated. Use updatePerTagFiles() instead."""
+    print(
+        "WARNING: updatePerTagFileNamesAndHashes is deprecated. Using updatePerTagFiles instead."
+    )
+    updatePerTagFiles(root_folder)
 
 
 def deleteDuplicateArticleFiles(urls_to_filenames):
@@ -388,9 +469,7 @@ if __name__ == "__main__":
     print("move docs to target folder")
     moveDocsToTargetFolder()
     print("update urlList files")
-    updatePerFolderUrlListFiles(getConfig()["articleFileFolder"])
-    print("update file names and hashes")
-    updatePerFolderFileNamesAndHashes(getConfig()["articleFileFolder"])
+    updatePerTagFiles(getConfig()["articleFileFolder"])
     print("act on requests to delete/hide articles from atVoice app\n\n")
     print("delete files marked to delete")
     deleteFilesMarkedToDelete()
@@ -416,8 +495,6 @@ if __name__ == "__main__":
     )
     print("update @voice lists")
     updateLists()
-    print("backup file index")
-    backup_file_index()
 
     # profiler.disable()
     # stats = pstats.Stats(profiler)
