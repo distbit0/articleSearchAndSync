@@ -1,4 +1,7 @@
 import re
+import hashlib
+from io import StringIO, BytesIO
+from ipfs_cid import cid_sha256_hash_chunked
 from eldar import Query
 import glob
 import urlexpander
@@ -732,3 +735,32 @@ def _should_include_by_read_state(article_path, readState):
         return not is_read
 
     return True
+
+
+def calculate_ipfs_hash(file_path):
+    """Calculate IPFS hash for a file."""
+
+    def as_chunks(stream: BytesIO, chunk_size: int) -> Iterable[bytes]:
+        while len((chunk := stream.read(chunk_size))) > 0:
+            yield chunk
+
+    with open(file_path, "rb") as f:
+        # Use a larger chunk size for better performance (64KB instead of 4 bytes)
+        result = cid_sha256_hash_chunked(as_chunks(f, 65536))
+        return result
+
+
+def calculate_normal_hash(file_path):
+    hasher = hashlib.sha256()
+    file_size = os.path.getsize(file_path)
+
+    if file_size < 4096:
+        with open(file_path, "rb") as f:
+            hasher.update(f.read())
+    else:
+        offset = (file_size - 4096) // 2
+        with open(file_path, "rb") as f:
+            f.seek(offset)
+            hasher.update(f.read(4096))
+
+    return hasher.hexdigest()

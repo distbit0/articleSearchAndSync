@@ -1,25 +1,19 @@
-from ctypes import util
 import sqlite3
 import re
 from pathlib import Path
 import json
 from . import utils
-from .utils import getConfig
+from .utils import getConfig, calculate_normal_hash, calculate_ipfs_hash
 import os
 from collections import defaultdict
 from . import reTitlePDFs
 from .generateLists import updateLists
 from .downloadNewArticles import downloadNewArticles
 import sys
-import time
-import datetime
 import cProfile
 import pstats
 import shutil
-import hashlib
 from typing import Iterable
-from io import StringIO, BytesIO
-from ipfs_cid import cid_sha256_hash_chunked
 from .articleSummary import (
     summarize_articles,
     add_files_to_database,
@@ -34,19 +28,6 @@ logger.add(sys.stdout, level="INFO")
 
 sys.path.append(getConfig()["convertLinksDir"])
 from convertLinks import main as convertLinks
-
-
-def calculate_ipfs_hash(file_path):
-    """Calculate IPFS hash for a file."""
-
-    def as_chunks(stream: BytesIO, chunk_size: int) -> Iterable[bytes]:
-        while len((chunk := stream.read(chunk_size))) > 0:
-            yield chunk
-
-    with open(file_path, "rb") as f:
-        # Use a larger chunk size for better performance (64KB instead of 4 bytes)
-        result = cid_sha256_hash_chunked(as_chunks(f, 65536))
-        return result
 
 
 def getBookmarks():
@@ -101,22 +82,6 @@ def addReadFilesHashesToMarkedAsRead():
 
     fileHashes = [calculate_normal_hash(filePath) for filePath in matchingArticles]
     utils.addUrlToUrlFile(fileHashes, listFile)
-
-
-def calculate_normal_hash(file_path):
-    hasher = hashlib.sha256()
-    file_size = os.path.getsize(file_path)
-
-    if file_size < 4096:
-        with open(file_path, "rb") as f:
-            hasher.update(f.read())
-    else:
-        offset = (file_size - 4096) // 2
-        with open(file_path, "rb") as f:
-            f.seek(offset)
-            hasher.update(f.read(4096))
-
-    return hasher.hexdigest()
 
 
 def calcUrlsToAdd(onlyRead=False):

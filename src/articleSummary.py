@@ -9,6 +9,8 @@ from loguru import logger
 from dotenv import load_dotenv
 from openai import OpenAI
 import os
+from . import utils
+from .utils import calculate_normal_hash
 
 # Import utils properly based on how it's structured in the project
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -16,7 +18,6 @@ from src.utils import getConfig, getArticlePathsForQuery
 from src.textExtraction import (
     extract_text_from_file,
     TextExtractionError,
-    calculate_normal_hash,
 )
 
 # Configure loguru logger
@@ -112,7 +113,6 @@ def summarize_with_openrouter(text: str) -> Tuple[str, bool]:
     # Get configuration from config.json
     config = getConfig()
     model = config.get("ai_model", "openai/o3-mini")
-    max_tokens = int(config.get("summary_out_max_tokens", 300))
 
     # Get optional referer info from environment variables
     referer = os.getenv("OPENROUTER_REFERER", "articleSearchAndSync")
@@ -132,7 +132,10 @@ def summarize_with_openrouter(text: str) -> Tuple[str, bool]:
 
         system_prompt = """You are a helpful system that generates concise summaries of academic or educational content. 
 You must first assess if the provided text contains sufficient content to generate a meaningful summary. 
-If the text is too short, fragmented, or lacks substantive content, respond with "[INSUFFICIENT_TEXT]" at the beginning of your response. DO NOT respond with [INSUFFICIENT_TEXT] if there is substantive content but the text merely ends abruptly/not at the end of a sentence."""
+If the text is too short, fragmented, or lacks substantive content, respond with "<summary>[INSUFFICIENT_TEXT]</summary>" at the beginning of your response.
+DO NOT respond with [INSUFFICIENT_TEXT] if there is substantive content but the text merely ends abruptly/not at the end of a sentence.
+ALWAYS return your summary enclosed within <summary></summary> tags.
+ONLY put the summary itself inside these tags, not any other part of your response."""
 
         user_prompt = f"""Please analyze the following text:
 
@@ -140,10 +143,11 @@ If the text is too short, fragmented, or lacks substantive content, respond with
 
 First, determine if the text provides enough substantial content to write a meaningful summary. 
 If the text is too short, fragmented, or clearly not the full article (e.g., just metadata, table of contents, or a small snippet), 
-respond with "[INSUFFICIENT_TEXT]" followed by a brief explanation of why the text is insufficient.
+respond with "<summary>[INSUFFICIENT_TEXT]</summary>" followed by a brief explanation of why the text is insufficient.
 
-If the text IS sufficient, please summarize it in a concise but informative way that captures the main points, topics, concepts, 
-novel arguments, novel ideas, and important details. The summary should be written from the same perspective as the article i.e. first person."""
+If the text IS sufficient, please summarize it in a concise but informative way that captures the main arguments, concepts, intuitions, and conclusions. The summary should be written in first person.
+
+IMPORTANT: Return ONLY your summary enclosed within <summary></summary> tags. Do not include any other text outside these tags."""
 
         response = client.chat.completions.create(
             extra_headers={
@@ -155,11 +159,23 @@ novel arguments, novel ideas, and important details. The summary should be writt
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": user_prompt},
             ],
-            max_tokens=max_tokens,
         )
 
         # Extract the summary from the response
-        summary = response.choices[0].message.content
+        full_response = response.choices[0].message.content
+
+        # Extract content between <summary> and </summary> tags
+        import re
+
+        summary_match = re.search(r"<summary>(.*?)</summary>", full_response, re.DOTALL)
+
+        if summary_match:
+            summary = summary_match.group(1).strip()
+        else:
+            # If tags aren't found, log error and skip this article
+            error_message = "Summary tags not found in model response"
+            logger.error(f"{error_message}. Response: {full_response}")
+            return f"Failed to generate summary: {error_message}", False
 
         # Check if the summary indicates insufficient text
         if summary.strip().startswith("[INSUFFICIENT_TEXT]"):

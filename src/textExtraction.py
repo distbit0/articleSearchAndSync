@@ -1,17 +1,13 @@
 import os
 import re
 import tempfile
-import hashlib
 import subprocess
 import traceback
-from typing import Optional, Dict, Any, List, Tuple
+from typing import List, Tuple
 from pathlib import Path
 from loguru import logger
 import sys
-
-# Import utils properly based on how it's structured in the project
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src import utils
+from . import utils
 
 # Configure loguru logger
 log_file_path = os.path.join(
@@ -105,13 +101,13 @@ def extract_text_from_pdf(
             else:
                 error_msg = f"{method_name}: Empty text"
                 errors.append(error_msg)
-                logger.warning(
+                logger.debug(
                     f"PDF extraction method '{method_name}' returned empty text for {file_path}"
                 )
         except Exception as e:
             error_msg = f"{method_name}: {str(e)}"
             errors.append(error_msg)
-            logger.error(
+            logger.debug(
                 f"PDF extraction method '{method_name}' failed for {file_path}: {str(e)}\n{traceback.format_exc()}"
             )
 
@@ -257,13 +253,13 @@ def extract_text_from_html(
             else:
                 error_msg = f"{method_name}: Empty text"
                 errors.append(error_msg)
-                logger.warning(
+                logger.debug(
                     f"HTML extraction method '{method_name}' returned empty text for {file_path}"
                 )
         except Exception as e:
             error_msg = f"{method_name}: {str(e)}"
             errors.append(error_msg)
-            logger.error(
+            logger.debug(
                 f"HTML extraction method '{method_name}' failed for {file_path}: {str(e)}\n{traceback.format_exc()}"
             )
 
@@ -605,13 +601,13 @@ def extract_text_from_epub(
             else:
                 error_msg = f"{method_name}: Empty text"
                 errors.append(error_msg)
-                logger.warning(
+                logger.debug(
                     f"EPUB extraction method '{method_name}' returned empty text for {file_path}"
                 )
         except Exception as e:
             error_msg = f"{method_name}: {str(e)}"
             errors.append(error_msg)
-            logger.error(
+            logger.debug(
                 f"EPUB extraction method '{method_name}' failed for {file_path}: {str(e)}\n{traceback.format_exc()}"
             )
 
@@ -912,28 +908,3 @@ def extract_text_from_file(
             f"Text extraction failed for {file_path}: {str(e)}\n{traceback.format_exc()}"
         )
         raise
-
-
-def calculate_normal_hash(file_path: str) -> str:
-    """Calculate a hash for the file to uniquely identify it.
-
-    Args:
-        file_path: Path to the file
-
-    Returns:
-        str: Hexadecimal hash of the file
-    """
-    # Hash function to uniquely identify a file
-    hasher = hashlib.sha256()
-    file_size = os.path.getsize(file_path)
-
-    if file_size < 4096:
-        with open(file_path, "rb") as f:
-            hasher.update(f.read())
-    else:
-        offset = (file_size - 4096) // 2
-        with open(file_path, "rb") as f:
-            f.seek(offset)
-            hasher.update(f.read(4096))
-
-    return hasher.hexdigest()
