@@ -1,5 +1,5 @@
-import utils
-from utils import getConfig
+from . import utils
+from .utils import getConfig
 import os
 import requests
 import re

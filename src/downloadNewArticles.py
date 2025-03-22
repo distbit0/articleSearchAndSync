@@ -1,4 +1,3 @@
-import html
 import os
 import ssl
 import time
@@ -10,7 +9,7 @@ from selenium.webdriver.common.by import By
 import requests
 from selenium import webdriver
 from urllib.parse import urlparse
-from utils import getConfig, addUrlToUrlFile, getAbsPath
+from .utils import getConfig, addUrlToUrlFile, getAbsPath
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import markdown

@@ -1,5 +1,5 @@
-from utils import getConfig
-import utils
+from .utils import getConfig
+from . import utils
 import os
 
 

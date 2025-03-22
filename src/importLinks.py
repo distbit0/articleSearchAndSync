@@ -3,35 +3,49 @@ import sqlite3
 import re
 from pathlib import Path
 import json
-import utils
-from utils import getConfig
+from . import utils
+from .utils import getConfig
 import os
 from collections import defaultdict
-import reTitlePDFs
-from generateLists import updateLists
-from downloadNewArticles import downloadNewArticles
+from . import reTitlePDFs
+from .generateLists import updateLists
+from .downloadNewArticles import downloadNewArticles
 import sys
+import time
+import datetime
+import cProfile
+import pstats
 import shutil
 import hashlib
 from typing import Iterable
-from io import BytesIO
+from io import StringIO, BytesIO
 from ipfs_cid import cid_sha256_hash_chunked
-from articleSummary import summarize_articles, add_files_to_database
-from articleTagging import main as tag_articles
-import cProfile
-import pstats
+from .articleSummary import (
+    summarize_articles,
+    add_files_to_database,
+    remove_nonexistent_files_from_database,
+    remove_orphaned_tags_from_database,
+)
+from .articleTagging import main as tag_articles
+from loguru import logger
+
+# Configure loguru logger
+logger.add(sys.stdout, level="INFO")
 
 sys.path.append(getConfig()["convertLinksDir"])
 from convertLinks import main as convertLinks
 
 
 def calculate_ipfs_hash(file_path):
+    """Calculate IPFS hash for a file."""
+
     def as_chunks(stream: BytesIO, chunk_size: int) -> Iterable[bytes]:
         while len((chunk := stream.read(chunk_size))) > 0:
             yield chunk
 
     with open(file_path, "rb") as f:
-        result = cid_sha256_hash_chunked(as_chunks(f, 4))
+        # Use a larger chunk size for better performance (64KB instead of 4 bytes)
+        result = cid_sha256_hash_chunked(as_chunks(f, 65536))
         return result
 
 
@@ -47,18 +61,16 @@ def addFileHashesToAlreadyAdded():
     nonHtmlFormats = getConfig()["docFormatsToMove"]
     nonHtmlFormats = [fmt for fmt in nonHtmlFormats if fmt not in ["html", "mhtml"]]
     listFile = utils.getAbsPath("../storage/alreadyAddedArticles.txt")
-    matchingArticles = utils.searchArticlesForQuery(
-        "*", formats=nonHtmlFormats, path=articleFolder
-    )
+    matchingArticles = utils.getArticlePathsForQuery("*", formats=nonHtmlFormats)
     alreadyAddedFileNames = str(utils.getUrlsFromFile(listFile)).lower()
     fileNames = [
         os.path.basename(filePath)
-        for filePath in matchingArticles.keys()
+        for filePath in matchingArticles
         if os.path.basename(filePath) not in alreadyAddedFileNames
     ]
     fileHashes = [
-        calculate_file_hash(filePath)
-        for filePath in matchingArticles.keys()
+        calculate_normal_hash(filePath)
+        for filePath in matchingArticles
         if os.path.basename(filePath) not in alreadyAddedFileNames
     ]
     itemsToAdd = list(set(fileNames + fileHashes))
@@ -66,32 +78,32 @@ def addFileHashesToAlreadyAdded():
 
 
 def addReadFilesHashesToMarkedAsRead():
-    articleFolder = getConfig()["articleFileFolder"]
-    nonHtmlFormats = getConfig()["docFormatsToMove"]
-    nonHtmlFormats = [fmt for fmt in nonHtmlFormats if fmt not in ["html", "mhtml"]]
+    nonHtmlFormats = [
+        fmt for fmt in getConfig()["docFormatsToMove"] if fmt not in ["html", "mhtml"]
+    ]
     listFile = utils.getAbsPath("../storage/alreadyAddedArticles.txt")
-    matchingArticles = utils.searchArticlesForQuery(
-        "*", formats=nonHtmlFormats, path=articleFolder, readState="read"
+    matchingArticles = utils.getArticlePathsForQuery(
+        "*", formats=nonHtmlFormats, readState="read"
     )
     alreadyMarkedAsReadFileNames = utils.getUrlsFromFile(listFile)
     fileNames = [
         os.path.basename(filePath)
-        for filePath in matchingArticles.keys()
+        for filePath in matchingArticles
         if os.path.basename(filePath) not in alreadyMarkedAsReadFileNames
     ]
     fileHashes = [
-        calculate_file_hash(filePath)
-        for filePath in matchingArticles.keys()
+        calculate_normal_hash(filePath)
+        for filePath in matchingArticles
         if os.path.basename(filePath) not in alreadyMarkedAsReadFileNames
     ]
     itemsToAdd = list(set(fileNames + fileHashes))
     utils.addUrlToUrlFile(itemsToAdd, listFile)
 
-    fileHashes = [calculate_file_hash(filePath) for filePath in matchingArticles.keys()]
+    fileHashes = [calculate_normal_hash(filePath) for filePath in matchingArticles]
     utils.addUrlToUrlFile(fileHashes, listFile)
 
 
-def calculate_file_hash(file_path):
+def calculate_normal_hash(file_path):
     hasher = hashlib.sha256()
     file_size = os.path.getsize(file_path)
 
@@ -144,7 +156,7 @@ def calcUrlsToAdd(onlyRead=False):
                                     and url.lower() in "\n".join(allAddedUrls).lower()
                                 ):
                                     urlsToAdd[subject].append(url)
-                                    print("added url: ", url)
+                                    logger.info("added url: ", url)
                     else:
                         if url.lower() not in "\n".join(allAddedUrls).lower():
                             url = convertLinks(url, False, True)
@@ -152,7 +164,7 @@ def calcUrlsToAdd(onlyRead=False):
                                 url = url[0]
                                 if url.lower() not in "\n".join(allAddedUrls).lower():
                                     urlsToAdd[subject].append(url)
-                                    print("added url: ", url)
+                                    logger.info("added url: ", url)
 
     return urlsToAdd
 
@@ -176,7 +188,8 @@ def hideArticlesMarkedAsRead():
     for fileName in markedAsReadFiles:
         if "articleUrls" in fileName:
             continue
-        utils.hideFilesWithName(articleFileFolder, fileName)
+        filePath = os.path.join(articleFileFolder, fileName)
+        utils.hideFile(filePath)
     utils.deleteAllArticlesInList("_READ")
 
 
@@ -184,7 +197,7 @@ def updatePerTagFiles(root_folder):
     """Generate file lists per tag for both URLs and file names/hashes.
 
     This function queries the database for all tags, then for each tag:
-    1. Creates a file containing the URLs of HTML/MHTML articles with that tag
+    1. Creates a file containing the URLs and titles of HTML/MHTML articles with that tag
     2. Creates a file containing names and hashes of all articles with that tag
 
     All files are stored in a single "tag_files" subdirectory.
@@ -201,22 +214,38 @@ def updatePerTagFiles(root_folder):
     )
 
     if not os.path.exists(db_path):
-        print(f"Tag database not found at {db_path}")
+        logger.info(f"Tag database not found at {db_path}")
         return
 
     # Create tag_files directory if it doesn't exist
     tag_files_dir = os.path.join(root_folder, "tag_files")
     os.makedirs(tag_files_dir, exist_ok=True)
 
+    # Load existing hash data from all JSON files to avoid recalculating hashes
+    existing_hash_data = {}
+    for file_name in os.listdir(tag_files_dir):
+        if file_name.endswith("_files_and_hashes.json"):
+            file_path = os.path.join(tag_files_dir, file_name)
+            try:
+                with open(file_path, "r") as f:
+                    tag_hash_data = json.load(f)
+                    # Add to our master dictionary of file paths and their hashes
+                    existing_hash_data.update(tag_hash_data)
+            except (json.JSONDecodeError, IOError):
+                # If file is corrupted, skip it
+                pass
+
     # Connect to the database
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # Query all active tags
+    # Get all tags, including the number of articles with each tag
     cursor.execute(
         """
-        SELECT id, name FROM tags 
-        WHERE name NOT LIKE 'prev_folder_%'
+        SELECT t.id, t.name, COUNT(at.article_id) as article_count
+        FROM tags t
+        LEFT JOIN article_tags at ON t.id = at.tag_id AND at.matches = 1
+        GROUP BY t.id, t.name
         """
     )
     tags = cursor.fetchall()
@@ -224,52 +253,77 @@ def updatePerTagFiles(root_folder):
     # Total number of tags processed
     total_tags = len(tags)
     tags_processed = 0
+    skipped_tags = 0
 
     # Process each tag
-    for tag_id, tag_name in tags:
-        tags_processed += 1
-        print(f"Processing tag {tags_processed}/{total_tags}: {tag_name}")
-
-        # Use searchArticlesByTags to get articles with this tag
-        articles_with_tag = utils.searchArticlesByTags(
-            any_tags=[tag_name], formats=[], path=root_folder, cursor=cursor
-        )
-
-        # Skip if no articles have this tag
-        if not articles_with_tag:
-            print(f"  - No articles found with tag '{tag_name}'")
+    for tag_id, tag_name, article_count in tags:
+        # Skip tags with 0 articles
+        if article_count == 0:
+            skipped_tags += 1
             continue
 
+        tags_processed += 1
+        logger.debug(
+            f"Processing tag {tags_processed}/{total_tags}: {tag_name} ({article_count} articles)"
+        )
+
+        # For each tag, get the articles that have this tag
+        cursor.execute(
+            """
+            SELECT a.file_name
+            FROM article_summaries a
+            JOIN article_tags at ON a.id = at.article_id
+            WHERE at.tag_id = ? AND at.matches = 1
+            """,
+            (tag_id,),
+        )
+        tagged_articles = cursor.fetchall()
+
         # Lists to store URLs and file data
-        urls = []
+        urls_with_titles = []
         file_data = {}
 
         # Process each article
-        for article_path, article_url in articles_with_tag.items():
+        for (file_name,) in tagged_articles:
             try:
-                # Calculate hash for all files
-                file_hash = calculate_ipfs_hash(article_path)
+                # Find the full path of the article
+                article_path = os.path.join(root_folder, file_name)
+
+                # Check if we already have hash for this file
+                if article_path in existing_hash_data and os.path.exists(article_path):
+                    # Use existing hash if file exists
+                    file_hash = existing_hash_data[article_path]
+                else:
+                    # Calculate hash only for new or modified files
+                    file_hash = calculate_ipfs_hash(article_path)
+
                 file_data[article_path] = file_hash
 
-                # Add URL if available
-                if article_url:
-                    urls.append(article_url)
+                # Add URL and title if available (only for HTML/MHTML files)
+                if article_path.lower().endswith((".html", ".mhtml")):
+                    article_url = utils.getUrlOfArticle(article_path)
+                    if article_url:
+                        # Try to extract a title from the file if possible
+                        title_display = os.path.splitext(
+                            os.path.basename(article_path)
+                        )[0]
+                        urls_with_titles.append((article_url, title_display))
             except Exception as e:
-                print(f"Error processing {article_path}: {e}")
+                logger.info(f"Error processing {file_name}: {e}")
 
         # Sanitize tag name for file system
         safe_tag_name = re.sub(r"[^\w\-_\.]", "_", tag_name)
 
         # Write URL file if we found any URLs
-        if urls:
+        if urls_with_titles:
             tag_url_file_path = os.path.join(tag_files_dir, f"{safe_tag_name}_urls.txt")
 
             with open(tag_url_file_path, "w") as f:
-                for url in urls:
-                    f.write(f"{url}\n")
+                for url, title in urls_with_titles:
+                    f.write(f"# {title}\n{url}\n\n")
 
-            print(
-                f"  - Created URL file with {len(urls)} URLs: {os.path.basename(tag_url_file_path)}"
+            logger.debug(
+                f"  - Created URL file with {len(urls_with_titles)} URLs: {os.path.basename(tag_url_file_path)}"
             )
 
         # Write file data if we found any files
@@ -281,18 +335,34 @@ def updatePerTagFiles(root_folder):
             with open(tag_file_path, "w") as f:
                 json.dump(file_data, f, indent=2)
 
-            print(
+            logger.debug(
                 f"  - Created file hash data with {len(file_data)} files: {os.path.basename(tag_file_path)}"
             )
 
+    # Clean up empty tags in the database
+    cursor.execute(
+        """
+        DELETE FROM tags 
+        WHERE id NOT IN (
+            SELECT DISTINCT tag_id FROM article_tags
+        )
+        """
+    )
+    deleted_tags = cursor.rowcount
+    if deleted_tags > 0:
+        logger.info(f"Removed {deleted_tags} tags with no associated articles")
+
+    conn.commit()
     conn.close()
-    print(f"Finished processing {total_tags} tags")
-    print(f"All tag files have been generated in: {tag_files_dir}")
+    logger.info(
+        f"Finished processing {tags_processed} tags ({skipped_tags} tags with 0 articles skipped)"
+    )
+    logger.info(f"All tag files have been generated in: {tag_files_dir}")
 
 
 def updatePerTagUrlListFiles(root_folder):
     """This function is deprecated. Use updatePerTagFiles() instead."""
-    print(
+    logger.info(
         "WARNING: updatePerTagUrlListFiles is deprecated. Using updatePerTagFiles instead."
     )
     updatePerTagFiles(root_folder)
@@ -300,7 +370,7 @@ def updatePerTagUrlListFiles(root_folder):
 
 def updatePerTagFileNamesAndHashes(root_folder):
     """This function is deprecated. Use updatePerTagFiles() instead."""
-    print(
+    logger.info(
         "WARNING: updatePerTagFileNamesAndHashes is deprecated. Using updatePerTagFiles instead."
     )
     updatePerTagFiles(root_folder)
@@ -324,7 +394,7 @@ def deleteDuplicateArticleFiles(urls_to_filenames):
             dir_seen_urls[directory] = {url}
         elif url in dir_seen_urls[directory] and url:
             # If url has been seen in this directory, delete the file
-            print("deleting because duplicate", fileName, url)
+            logger.info("deleting because duplicate", fileName, url)
             homeDir = os.path.expanduser("~")
             dest = os.path.join(
                 homeDir, ".local/share/Trash/files/", fileName.split("/")[-1]
@@ -338,15 +408,12 @@ def deleteDuplicateArticleFiles(urls_to_filenames):
 def moveDocsToTargetFolder():
     docPaths = []
     PDFFolders = getConfig()["pdfSourceFolders"]
-    docFormatsToMove = getConfig()["docFormatsToMove"]
     targetFolder = getConfig()["articleFileFolder"]
 
     for folderPath in PDFFolders:
-        docPaths += utils.getArticlePathsForQuery(
-            "*", docFormatsToMove, folderPath, recursive=False
-        )
+        docPaths += utils.getArticlePathsForQuery("*", folderPath, recursive=False)
 
-    print("LEN OF docPath", len(docPaths))
+    logger.info("LEN OF docPath", len(docPaths))
 
     alreadyAddedHashes = str(
         utils.getUrlsFromFile(utils.getAbsPath("../storage/alreadyAddedArticles.txt"))
@@ -356,9 +423,11 @@ def moveDocsToTargetFolder():
     )
 
     for docPath in docPaths:
-        docHash = calculate_file_hash(docPath)
+        if "tag_files" in docPath:
+            continue
+        docHash = calculate_normal_hash(docPath)
         if docHash in alreadyAddedHashes:
-            print("Skipping importing duplicate file:", docPath)
+            logger.info("Skipping importing duplicate file:", docPath)
             docFileName = docPath.split("/")[-1]
             homeDir = os.path.expanduser("~")
             erroDocPath = os.path.join(
@@ -381,9 +450,9 @@ def moveDocsToTargetFolder():
 
         if docHash in markedAsReadHashes:
             targetPath = os.path.join(targetFolder, "." + uniqueName)
-            print("Marking as read:", docName)
+            logger.info("Marking as read:", docName)
 
-        print("Moving", docName, "to", targetPath, "derived from", docPath)
+        logger.info("Moving", docName, "to", targetPath, "derived from", docPath)
         shutil.move(docPath, targetPath)
 
         utils.addUrlToUrlFile(
@@ -402,7 +471,7 @@ def deleteDuplicateFiles(directory_path):
         for filename in filenames:
             full_path = os.path.join(root, filename)
             file_size = os.path.getsize(full_path)
-            file_hash = calculate_file_hash(full_path)
+            file_hash = calculate_normal_hash(full_path)
             unique_key = f"{file_size}_{file_hash}_{root}"
 
             duplicate_size_files[unique_key].append(full_path)
@@ -433,7 +502,7 @@ def deleteDuplicateFiles(directory_path):
                 )
             else:
                 files_to_remove = non_root_files[:-1]
-            print(
+            logger.info(
                 "files_to_remove",
                 files_to_remove,
                 "root files",
@@ -442,7 +511,7 @@ def deleteDuplicateFiles(directory_path):
                 non_root_files,
             )
             for file_path in files_to_remove:
-                print("removed", file_path)
+                logger.info("removed", file_path)
                 homeDir = os.path.expanduser("~")
                 dest = os.path.join(
                     homeDir, ".local/share/Trash/files/", file_path.split("/")[-1]
@@ -454,46 +523,51 @@ if __name__ == "__main__":
     # profiler = cProfile.Profile()
     # profiler.enable()
 
-    print("download new articles")
+    logger.info("remove nonexistent files from database")
+    remove_nonexistent_files_from_database()
+    logger.info("remove orphaned tags from database")
+    remove_orphaned_tags_from_database()
+
+    logger.info("download new articles")
     urlsToAdd = calcUrlsToAdd()
     urlsToAdd = urlsToAdd["AlreadyRead"] + urlsToAdd["UnRead"]
     downloadNewArticles(urlsToAdd)
-    print("give files readable filenames")
+    logger.info("give files readable filenames")
     reTitlePDFs.retitleAllPDFs()
-    print("add files to database")
+    logger.info("add files to database")
     add_files_to_database()
-    print("summarize articles")
+    logger.info("summarize articles")
     summarize_articles()
-    print("tag articles")
+    logger.info("tag articles")
     tag_articles()
-    print("move docs to target folder")
+    logger.info("move docs to target folder")
     moveDocsToTargetFolder()
-    print("update urlList files")
+    logger.info("update urlList files")
     updatePerTagFiles(getConfig()["articleFileFolder"])
-    print("act on requests to delete/hide articles from atVoice app\n\n")
-    print("delete files marked to delete")
+    logger.info("act on requests to delete/hide articles from atVoice app\n\n")
+    logger.info("delete files marked to delete")
     deleteFilesMarkedToDelete()
-    print("hide articles marked as read")
+    logger.info("hide articles marked as read")
     hideArticlesMarkedAsRead()
-    print("mark read bookmarks as read")
+    logger.info("mark read bookmarks as read")
     markReadBookmarksAsRead()
-    print("add file hashes to already added files")
+    logger.info("add file hashes to already added files")
     addFileHashesToAlreadyAdded()
-    print("add read file hashes to marked as read files")
+    logger.info("add read file hashes to marked as read files")
     addReadFilesHashesToMarkedAsRead()
-    print("delete duplicate files")
+    logger.info("delete duplicate files")
     articles = utils.searchArticlesForQuery(
         "*", [], readState="", formats=["html", "mhtml"]
     )
     articleUrls = [url for url in articles.values() if url]
     deleteDuplicateArticleFiles(articles)
     deleteDuplicateFiles(getConfig()["articleFileFolder"])
-    print("update alreadyAddedArticles.txt")
+    logger.info("update alreadyAddedArticles.txt")
     utils.addUrlToUrlFile(
         articleUrls,
         utils.getAbsPath("../storage/alreadyAddedArticles.txt"),
     )
-    print("update @voice lists")
+    logger.info("update @voice lists")
     updateLists()
 
     # profiler.disable()

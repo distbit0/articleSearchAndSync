@@ -16,7 +16,7 @@ from src.utils import getConfig, getArticlePathsForQuery
 from src.textExtraction import (
     extract_text_from_file,
     TextExtractionError,
-    calculate_file_hash,
+    calculate_normal_hash,
 )
 
 # Configure loguru logger
@@ -186,7 +186,7 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
         Tuple[str, bool]: Article summary and a flag indicating if text was sufficient
     """
     # Calculate file hash
-    file_hash = calculate_file_hash(file_path)
+    file_hash = calculate_normal_hash(file_path)
     file_name = os.path.basename(file_path)
     file_format = os.path.splitext(file_path)[1].lower()
     if file_format.startswith("."):
@@ -381,11 +381,11 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
             break
 
         # Find the article path using the helper function
-        file_paths = getArticlePathsForQuery("*", [], articles_path, file_name)
+        file_path = os.path.join(articles_path, file_name)
 
-        if file_paths:
+        if file_path:
             # Use the first matching file path
-            articles_to_summarize.append(file_paths[0])
+            articles_to_summarize.append(file_path)
         else:
             logger.warning(
                 f"Could not find file path for {file_name} in {articles_path}"
@@ -502,9 +502,6 @@ def add_files_to_database(articles_path: Optional[str] = None) -> int:
 
     # Get list of supported file formats from config
     config = getConfig()
-    supported_formats = config.get(
-        "docFormatsToMove", ["pdf", "djvu", "epub", "mobi", "html", "mhtml"]
-    )
     file_names_to_skip = config.get("fileNamesToSkip", [])
 
     # Get all existing file hashes to avoid duplicates
@@ -514,8 +511,7 @@ def add_files_to_database(articles_path: Optional[str] = None) -> int:
     # Add all files to database with NULL summary
     added_count = 0
 
-    # Use getArticlePathsForQuery to find all articles with supported formats in one call
-    all_article_paths = getArticlePathsForQuery("*", supported_formats, articles_path)
+    all_article_paths = getArticlePathsForQuery("*")
     logger.info(f"Found {len(all_article_paths)} files in {articles_path}.")
 
     # Process each file found
@@ -528,7 +524,7 @@ def add_files_to_database(articles_path: Optional[str] = None) -> int:
 
         try:
             # Calculate file hash to check if already in DB
-            file_hash = calculate_file_hash(file_path)
+            file_hash = calculate_normal_hash(file_path)
 
             # Skip if already in database
             if file_hash in existing_hashes:
@@ -565,6 +561,127 @@ def add_files_to_database(articles_path: Optional[str] = None) -> int:
 
     logger.info(f"Added a total of {added_count} new files to database")
     return added_count
+
+
+def remove_nonexistent_files_from_database(articles_path: Optional[str] = None) -> int:
+    """Remove database entries for files that no longer exist on the filesystem.
+
+    This function checks all file entries in the database and removes those
+    where the corresponding file no longer exists in the articles directory.
+
+    Args:
+        articles_path: Path to the articles directory
+
+    Returns:
+        int: Number of files removed from the database
+    """
+    # Get articles path from config if not provided
+    if not articles_path:
+        config = getConfig()
+        articles_path = config.get("articleFileFolder", "")
+        if not articles_path:
+            logger.error("Article file folder not found in config")
+            return 0
+
+    logger.debug(f"Checking for nonexistent files in database from: {articles_path}")
+
+    # Setup database
+    db_path = setup_database()
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Get all file entries from the database
+    cursor.execute("SELECT id, file_name FROM article_summaries")
+    db_files = cursor.fetchall()
+
+    # Get all actual files in the articles directory
+    existing_files = set(
+        os.path.basename(path) for path in getArticlePathsForQuery("*")
+    )
+
+    # Find files in database that don't exist on filesystem
+    removed_count = 0
+    files_to_remove = []
+
+    for file_id, file_name in db_files:
+        if file_name not in existing_files:
+            files_to_remove.append(file_id)
+
+    # Remove files in batches
+    if files_to_remove:
+        # First, remove entries from article_tags
+        for file_id in files_to_remove:
+            cursor.execute("DELETE FROM article_tags WHERE article_id = ?", (file_id,))
+
+        # Then remove from article_summaries
+        placeholder = ",".join(["?"] * len(files_to_remove))
+        cursor.execute(
+            f"DELETE FROM article_summaries WHERE id IN ({placeholder})",
+            files_to_remove,
+        )
+        removed_count = len(files_to_remove)
+
+        logger.info(
+            f"Removed {removed_count} entries for nonexistent files from database"
+        )
+    else:
+        logger.info("No nonexistent files found in database")
+
+    # Commit changes and close connection
+    conn.commit()
+    conn.close()
+
+    return removed_count
+
+
+def remove_orphaned_tags_from_database() -> int:
+    """Remove tags from the database that don't have any associated articles.
+
+    This function identifies and removes tags that no longer have any
+    associated articles in the article_tags table.
+
+    Returns:
+        int: Number of orphaned tags removed from the database
+    """
+    logger.debug("Checking for orphaned tags in database")
+
+    # Setup database
+    db_path = setup_database()
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Find tags that don't have any entries in article_tags
+    cursor.execute(
+        """
+        SELECT id, name FROM tags 
+        WHERE id NOT IN (
+            SELECT DISTINCT tag_id FROM article_tags
+        )
+    """
+    )
+
+    orphaned_tags = cursor.fetchall()
+
+    # Remove orphaned tags
+    removed_count = 0
+    if orphaned_tags:
+        tag_ids = [tag[0] for tag in orphaned_tags]
+        tag_names = [tag[1] for tag in orphaned_tags]
+
+        # Delete orphaned tags
+        placeholder = ",".join(["?"] * len(tag_ids))
+        cursor.execute(f"DELETE FROM tags WHERE id IN ({placeholder})", tag_ids)
+        removed_count = len(tag_ids)
+
+        logger.info(f"Removed {removed_count} orphaned tags: {', '.join(tag_names)}")
+    else:
+        logger.info("No orphaned tags found in database")
+
+    # Commit changes and close connection
+    conn.commit()
+    conn.close()
+
+    return removed_count
 
 
 if __name__ == "__main__":

@@ -1,10 +1,8 @@
 import re
-from unittest import skip
 from eldar import Query
 import glob
-from matplotlib import lines
 import urlexpander
-from os import path, read
+from os import path
 import json
 from pathlib import Path
 import os
@@ -47,26 +45,24 @@ def handle_cache(file_name, key, value=None):
 
 def delete_files_with_name(folder, file_name):
     # Find all files with the file name in the folder using our enhanced function
-    matching_files = getArticlePathsForQuery("*", [], folder, file_name)
+    matching_file = os.path.join(folder, file_name)
 
     # Delete all found files
-    for f in matching_files:
-        try:
-            homeDir = os.path.expanduser("~")
-            dest = os.path.join(homeDir, ".local/share/Trash/files/", f.split("/")[-1])
-            shutil.move(f, dest)
-            print(f"Deleted {f}")
-        except OSError as e:
-            print(f"Error deleting {f}: {e}")
+    try:
+        homeDir = os.path.expanduser("~")
+        dest = os.path.join(homeDir, ".local/share/Trash/files/", file_name)
+        shutil.move(matching_file, dest)
+        print(f"Deleted {matching_file}")
+    except OSError as e:
+        print(f"Error deleting {matching_file}: {e}")
 
 
 def hideFilesWithName(folder, file_name):
     # Find all files with the file name in the folder using our enhanced function
-    matching_files = getArticlePathsForQuery("*", [], folder, file_name)
+    matching_file = os.path.join(folder, file_name)
 
     # Hide all found files
-    for f in matching_files:
-        hideFile(f)
+    hideFile(matching_file)
 
 
 def hideFile(f):
@@ -313,8 +309,35 @@ def getArticlesFromList(listName):
     if not os.path.exists(listPath):
         return []
 
+    # Read the main list file content
     listText = open(listPath).read().strip()
-    if listText == "":
+
+    # Only process conflict files if the list name starts with an underscore
+    has_conflicts = False
+    if listName.startswith("_"):
+        # Find and process Syncthing conflict files
+        baseName = os.path.basename(listPath)
+        dirName = os.path.dirname(listPath)
+        conflict_pattern = f"{baseName}.sync-conflict-*"
+        conflict_files = glob.glob(os.path.join(dirName, conflict_pattern))
+
+        if conflict_files:
+            has_conflicts = True
+            # Read all conflict files content
+            for conflict_file in conflict_files:
+                try:
+                    conflict_text = open(conflict_file).read().strip()
+                    if conflict_text:
+                        # Append conflict content to main content
+                        if listText:
+                            listText += "\n" + conflict_text
+                        else:
+                            listText = conflict_text
+                except Exception as e:
+                    print(f"Error reading conflict file {conflict_file}: {e}")
+
+    # If list text is still empty after adding conflict files, return empty list
+    if not listText:
         return []
 
     # Split the text into lines
@@ -327,6 +350,7 @@ def getArticlesFromList(listName):
         # Simple format with no headers
         listArticles = lines
 
+    # Process article file names, removing duplicates
     articleFileNames = []
     for articleLine in listArticles:
         if not articleLine.strip():  # Skip empty lines
@@ -337,7 +361,25 @@ def getArticlesFromList(listName):
             path_parts = parts[0].split("/")
             if path_parts:
                 articleFileName = path_parts[-1]
-                articleFileNames.append(articleFileName)
+                if articleFileName not in articleFileNames:
+                    articleFileNames.append(articleFileName)
+
+    # If we found conflict files, save the merged content back to the main file
+    # and delete the conflict files
+    if has_conflicts:
+        try:
+            # Save the merged content
+            with open(listPath, "w") as f:
+                f.write(listText)
+
+            # Delete the conflict files
+            for conflict_file in conflict_files:
+                try:
+                    os.remove(conflict_file)
+                except Exception as e:
+                    print(f"Error deleting conflict file {conflict_file}: {e}")
+        except Exception as e:
+            print(f"Error saving merged content to {listPath}: {e}")
 
     return articleFileNames
 
@@ -350,7 +392,7 @@ def doesPathContainDotFolders(path):
 
 
 def getArticlePathsForQuery(
-    query, formats, folderPath="", fileName=None, recursive=True
+    query, formats=[], folderPath="", fileName=None, recursive=True, readState=None
 ):
     """
     Get article paths matching the query, formats, and optional fileName.
@@ -373,11 +415,20 @@ def getArticlePathsForQuery(
 
     # Treat fileName as a format if provided, otherwise use provided formats
     search_targets = [glob.escape(fileName)] if fileName else formats
-
     # Create glob patterns for both root and recursive searches
+
+    # Determine file prefix pattern based on read state
+    file_prefix = ""
+    if readState == "read":
+        file_prefix = "."  # For read files (dot files)
+    elif readState == "unread":
+        file_prefix = "[^.]"  # For unread files (non-dot files)
+    # Default is empty string - no additional prefix needed
+
+    # Create the glob patterns using the determined prefix
     glob_patterns = [
         *(
-            os.path.join(folderPath, globWildcard, f"*{target}")
+            os.path.join(folderPath, globWildcard, f"{file_prefix}*{target}")
             for target in search_targets
         ),  # Recursively
     ]
@@ -542,7 +593,7 @@ def getSrcUrlOfGitbook(articlePath):
 
 
 def searchArticlesByTags(
-    all_tags=[], any_tags=[], readState="", formats=[], path="", cursor=None
+    all_tags=[], any_tags=[], readState="", formats=[], cursor=None
 ):
     """
     Search for articles that match specified tags.
@@ -574,12 +625,8 @@ def searchArticlesByTags(
         print(f"Tag database not found at {db_path}")
         return {}
 
-    # Handle format filtering for PDFs
-    if "pdf" in formats and path == "":
-        formats.remove("pdf")
-
     # Get all article paths that match the format criteria
-    article_paths = getArticlePathsForQuery("*", formats, path)
+    article_paths = getArticlePathsForQuery("*", formats)
 
     # If no tags specified and only filtering by format, just apply read state filter and return
     if not all_tags and not any_tags:

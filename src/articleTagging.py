@@ -12,8 +12,8 @@ from openai import OpenAI
 import concurrent.futures
 import argparse
 import time
-from utils import getConfig, getArticlePathsForQuery
-from textExtraction import extract_text_from_file
+from .utils import getConfig
+from .textExtraction import extract_text_from_file
 
 # Constants
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -281,19 +281,6 @@ class TagManager:
             logger.debug(f"Processing {len(articles)} articles for folder tagging")
         return articles
 
-    def _build_file_lookup(self, articles_path, start_time, debug):
-        # Build a lookup table mapping filenames to their full paths using getArticlePathsForQuery
-        article_paths = getArticlePathsForQuery("*", [], folderPath=articles_path)
-        lookup = {}
-        for file_path in article_paths:
-            file_name = os.path.basename(file_path)
-            lookup.setdefault(file_name, []).append(file_path)
-        logger.debug(f"Found {len(lookup)} unique filenames in file system")
-        logger.debug(
-            f"File lookup table built in {time.time() - start_time:.2f} seconds"
-        )
-        return lookup
-
     def _get_current_article_tags(self, cursor):
         # Retrieve current folder tag associations for articles
         cursor.execute(
@@ -312,14 +299,11 @@ class TagManager:
     def _process_articles(
         self,
         articles,
-        file_lookup,
         articles_path,
         exclusions,
         current_article_tags,
         folder_tags,
         prev_folder_tags,
-        debug,
-        start_time,
     ):
         # Process each article to determine folder locations and tag operations
         folder_locations = {}
@@ -336,45 +320,44 @@ class TagManager:
             keep_tags = set()
             article_folders = set()
 
-            file_paths = file_lookup.get(file_name, [])
-            for file_path in file_paths:
-                rel_path = os.path.relpath(file_path, articles_path)
-                folder_path = os.path.dirname(rel_path)
-                if folder_path:
-                    path_parts = Path(folder_path).parts
-                    current_path = ""
-                    for folder in path_parts:
-                        if folder in exclusions or not folder:
-                            continue
-                        current_path = (
-                            f"{current_path}/{folder}" if current_path else folder
+            file_path = os.path.join(articles_path, file_name)
+            rel_path = os.path.relpath(file_path, articles_path)
+            folder_path = os.path.dirname(rel_path)
+            if folder_path:
+                path_parts = Path(folder_path).parts
+                current_path = ""
+                for folder in path_parts:
+                    if folder in exclusions or not folder:
+                        continue
+                    current_path = (
+                        f"{current_path}/{folder}" if current_path else folder
+                    )
+                    article_folders.add(current_path)
+
+                    folder_tag = f"folder_{current_path}"
+                    keep_tags.add(folder_tag)
+                    if folder_tag not in folder_tags:
+                        tags_to_create.add(
+                            (
+                                folder_tag,
+                                f"Articles located in the '{current_path}' folder",
+                            )
                         )
-                        article_folders.add(current_path)
+                    else:
+                        tag_id = folder_tags[folder_tag]
+                        article_tag_associations.append((article_id, tag_id))
 
-                        folder_tag = f"folder_{current_path}"
-                        keep_tags.add(folder_tag)
-                        if folder_tag not in folder_tags:
-                            tags_to_create.add(
-                                (
-                                    folder_tag,
-                                    f"Articles located in the '{current_path}' folder",
-                                )
+                    prev_tag = f"prev_folder_{current_path}"
+                    if prev_tag not in prev_folder_tags:
+                        prev_tags_to_create.add(
+                            (
+                                prev_tag,
+                                f"Articles previously located in the '{current_path}' folder",
                             )
-                        else:
-                            tag_id = folder_tags[folder_tag]
-                            article_tag_associations.append((article_id, tag_id))
-
-                        prev_tag = f"prev_folder_{current_path}"
-                        if prev_tag not in prev_folder_tags:
-                            prev_tags_to_create.add(
-                                (
-                                    prev_tag,
-                                    f"Articles previously located in the '{current_path}' folder",
-                                )
-                            )
-                        else:
-                            tag_id = prev_folder_tags[prev_tag]
-                            article_prev_tag_associations.append((article_id, tag_id))
+                        )
+                    else:
+                        tag_id = prev_folder_tags[prev_tag]
+                        article_prev_tag_associations.append((article_id, tag_id))
 
         folder_locations = {article_id: article_folders for article_id, _ in articles}
 
@@ -449,7 +432,6 @@ class TagManager:
         exclusions = self._get_excluded_folders()
         folder_tags, prev_folder_tags = self._fetch_existing_tags(cursor)
         articles = self._get_articles(cursor, max_articles, debug)
-        file_lookup = self._build_file_lookup(articles_path, start_time, debug)
         current_article_tags = self._get_current_article_tags(cursor)
 
         (
@@ -461,14 +443,11 @@ class TagManager:
             tags_to_remove,
         ) = self._process_articles(
             articles,
-            file_lookup,
             articles_path,
             exclusions,
             current_article_tags,
             folder_tags,
             prev_folder_tags,
-            debug,
-            start_time,
         )
 
         if tags_to_create:
@@ -937,13 +916,11 @@ class ArticleTagger:
         logger.debug(f"Preparing article: {file_name}")
 
         # Find the article path
-        file_paths = getArticlePathsForQuery("*", [], self.articles_path, file_name)
-        logger.debug(f"File paths found for article {file_name}: {file_paths}")
-        if not file_paths:
+        file_path = os.path.join(self.articles_path, file_name)
+        logger.debug(f"File path found for article {file_name}: {file_path}")
+        if not file_path:
             logger.warning(f"  Could not find article file: {file_name}")
             return work_units
-
-        file_path = file_paths[0]
 
         # Group tags by whether they use summary or full text
         tags_using_summary = [

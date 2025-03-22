@@ -914,7 +914,7 @@ def extract_text_from_file(
         raise
 
 
-def calculate_file_hash(file_path: str) -> str:
+def calculate_normal_hash(file_path: str) -> str:
     """Calculate a hash for the file to uniquely identify it.
 
     Args:

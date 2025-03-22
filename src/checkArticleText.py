@@ -19,7 +19,7 @@ from src.utils import getConfig
 from src.textExtraction import (
     extract_text_from_file,
     TextExtractionError,
-    calculate_file_hash,
+    calculate_normal_hash,
 )
 
 # Load environment variables from the correct path
@@ -286,7 +286,7 @@ def check_all_articles(start_index: int = 0) -> None:
         f"Searching for articles in {articles_path} with formats: {supported_formats}"
     )
 
-    article_dict = utils.getArticlePathsForQuery("*", supported_formats, articles_path)
+    article_dict = utils.getArticlePathsForQuery("*")
 
     print(f"Found {len(article_dict)} articles to check")
     # Get maximum articles per session from config
