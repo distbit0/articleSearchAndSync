@@ -422,6 +422,8 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
     successful = 0
     failed = 0
     insufficient = 0
+    # List to track word lengths for calculating average
+    summary_word_lengths = []
 
     # Use ThreadPoolExecutor to process multiple articles in parallel
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -435,7 +437,7 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
         for i, future in enumerate(concurrent.futures.as_completed(future_to_article)):
             article_path = future_to_article[future]
             try:
-                success, message, is_sufficient = future.result()
+                success, message, is_sufficient, summary = future.result()
                 file_name = os.path.basename(article_path)
 
                 if success:
@@ -444,6 +446,12 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
                             f"Successfully summarized: {article_path} - {message}"
                         )
                         successful += 1
+                        
+                        # Calculate average word length directly from the summary
+                        words = summary.split()
+                        if words:
+                            avg_word_length = sum(len(word) for word in words) / len(words)
+                            summary_word_lengths.append(avg_word_length)
                     else:
                         logger.warning(
                             f"Insufficient text in: {article_path} - storing empty summary"
@@ -459,33 +467,39 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
                 )
                 failed += 1
 
+    # Calculate and print the average word length if any successful summaries
+    if summary_word_lengths:
+        avg_word_length = sum(summary_word_lengths) / len(summary_word_lengths)
+        print(f"Average word length in generated summaries: {avg_word_length:.2f} characters")
+        logger.info(f"Average word length in generated summaries: {avg_word_length:.2f} characters")
+
     logger.info(
         f"Summary: Processed {total_articles} articles - {successful} successful, {insufficient} insufficient text, {failed} failed"
     )
 
 
-def process_single_article(article_path: str) -> Tuple[bool, str, bool]:
+def process_single_article(article_path: str) -> Tuple[bool, str, bool, str]:
     """Process a single article for summarization.
 
     Args:
         article_path: Path to the article file
 
     Returns:
-        Tuple[bool, str, bool]: Success status, result message, and flag indicating if text was sufficient
+        Tuple[bool, str, bool, str]: Success status, result message, flag indicating if text was sufficient, and the summary
     """
     try:
         summary, is_sufficient = get_article_summary(article_path)
         if summary.startswith("Failed to summarize article:"):
-            return False, summary, False
+            return False, summary, False, ""
 
         if not is_sufficient:
-            return True, f"Insufficient text detected ({len(summary)} chars)", False
+            return True, f"Insufficient text detected ({len(summary)} chars)", False, summary
 
-        return True, f"Summary generated ({len(summary)} chars)", True
+        return True, f"Summary generated ({len(summary)} chars)", True, summary
     except Exception as e:
         error_message = f"Error processing article: {str(e)}"
         logger.error(f"{error_message}\n{traceback.format_exc()}")
-        return False, error_message, False
+        return False, error_message, False, ""
 
 
 def add_files_to_database(articles_path: Optional[str] = None) -> int:

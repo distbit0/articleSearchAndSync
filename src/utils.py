@@ -3,6 +3,7 @@ import hashlib
 from io import StringIO, BytesIO
 from ipfs_cid import cid_sha256_hash_chunked
 from eldar import Query
+from typing import Iterable
 import glob
 import urlexpander
 from os import path

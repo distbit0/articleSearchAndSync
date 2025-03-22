@@ -183,7 +183,7 @@ def updatePerTagFiles(root_folder):
         return
 
     # Create tag_files directory if it doesn't exist
-    tag_files_dir = os.path.join(root_folder, "tag_files")
+    tag_files_dir = getConfig()["backupFolderPath"]
     os.makedirs(tag_files_dir, exist_ok=True)
 
     # Load existing hash data from all JSON files to avoid recalculating hashes
@@ -282,12 +282,11 @@ def updatePerTagFiles(root_folder):
         # Write URL file if we found any URLs
         if urls_with_titles:
             tag_url_file_path = os.path.join(tag_files_dir, f"{safe_tag_name}_urls.txt")
-
             with open(tag_url_file_path, "w") as f:
                 for url, title in urls_with_titles:
                     f.write(f"# {title}\n{url}\n\n")
 
-            logger.debug(
+            logger.info(
                 f"  - Created URL file with {len(urls_with_titles)} URLs: {os.path.basename(tag_url_file_path)}"
             )
 
@@ -300,7 +299,7 @@ def updatePerTagFiles(root_folder):
             with open(tag_file_path, "w") as f:
                 json.dump(file_data, f, indent=2)
 
-            logger.debug(
+            logger.info(
                 f"  - Created file hash data with {len(file_data)} files: {os.path.basename(tag_file_path)}"
             )
 
@@ -388,8 +387,6 @@ def moveDocsToTargetFolder():
     )
 
     for docPath in docPaths:
-        if "tag_files" in docPath:
-            continue
         docHash = calculate_normal_hash(docPath)
         if docHash in alreadyAddedHashes:
             logger.info("Skipping importing duplicate file:", docPath)
