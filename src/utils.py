@@ -432,10 +432,15 @@ def getArticlePathsForQuery(
     # Create the glob patterns using the determined prefix
     glob_patterns = [
         *(
-            os.path.join(folderPath, globWildcard, f"{file_prefix}*{target}")
+            (
+                os.path.join(folderPath, globWildcard, f"{file_prefix}*{target}")
+                if recursive
+                else os.path.join(folderPath, f"{file_prefix}*{target}")
+            )
             for target in search_targets
         ),  # Recursively
     ]
+
     allArticlesPaths = []
     for pattern in glob_patterns:
         try:
