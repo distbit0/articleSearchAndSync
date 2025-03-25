@@ -376,9 +376,7 @@ def moveDocsToTargetFolder():
     targetFolder = getConfig()["articleFileFolder"]
 
     for folderPath in PDFFolders:
-        docPaths += utils.getArticlePathsForQuery(
-            "*", folderPath=folderPath, recursive=False
-        )
+        docPaths += utils.getArticlePathsForQuery("*", folderPath=folderPath)
 
     logger.info(f"Number of docPaths: {len(docPaths)}")
 
@@ -539,17 +537,17 @@ def main():
 
 
 if __name__ == "__main__":
-    moveDocsToTargetFolder()
-    # remove_nonexistent_files_from_database()
-    # summarize_articles()
     # profiler = cProfile.Profile()
     # profiler.enable()
 
     # main()
+    # moveDocsToTargetFolder()
+    # remove_nonexistent_files_from_database()
+    # summarize_articles()
     # deleteFilesMarkedToDelete()
     # hideArticlesMarkedAsRead()
-    # tag_articles()
-    # updateLists()
+    tag_articles()
+    updateLists()
 
     # profiler.disable()
     # stats = pstats.Stats(profiler)

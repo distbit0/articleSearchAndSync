@@ -286,24 +286,6 @@ def getConfig():
     return config
 
 
-def getPdfText(pdf, pages=None):
-    pdfText = []
-    try:
-        pdfFileObj = open(pdf, "rb")
-        pdfReader = PyPDF2.PdfReader(pdfFileObj)
-        pages = len(pdfReader.pages) if not pages else min(pages, len(pdfReader.pages))
-        for pageNumber in range(pages):
-            pageObj = pdfReader.pages[pageNumber]
-            pdfText.append(pageObj.extract_text())
-        pdfFileObj.close()
-    except PyPDF2.errors.PdfReadError:
-        traceback.print_exc()
-        print("Error in pdf: ", pdf)
-        return None
-    pdfText = "\n".join(pdfText)
-    return pdfText
-
-
 def getArticlesFromList(listName):
     listPath = os.path.join(
         getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"
@@ -396,7 +378,7 @@ def doesPathContainDotFolders(path):
 
 
 def getArticlePathsForQuery(
-    query, formats=[], folderPath="", fileName=None, recursive=True, readState=None
+    query, formats=[], folderPath="", fileName=None, recursive=False, readState=None
 ):
     """
     Get article paths matching the query, formats, and optional fileName.
@@ -602,7 +584,7 @@ def getSrcUrlOfGitbook(articlePath):
 
 
 def searchArticlesByTags(
-    all_tags=[], any_tags=[], readState="", formats=[], cursor=None
+    all_tags=[], any_tags=[], not_any_tags=[], readState="", formats=[], cursor=None
 ):
     """
     Search for articles that match specified tags.
@@ -610,6 +592,7 @@ def searchArticlesByTags(
     Args:
         all_tags: List of tags where all must match (AND logic)
         any_tags: List of tags where any must match (OR logic)
+        not_any_tags: List of tags where none should match (NOT ANY logic)
         readState: Filter by read state ('read', 'unread', or '') - empty string means no filtering
         formats: List of file formats to include
         path: Base path to search in
@@ -621,7 +604,7 @@ def searchArticlesByTags(
     is_format_specific = (
         formats and len(formats) > 0 and formats != getConfig()["docFormatsToMove"]
     )
-    if not all_tags and not any_tags and not is_format_specific:
+    if not all_tags and not any_tags and not not_any_tags and not is_format_specific:
         return {}
 
     # Get database path
@@ -635,14 +618,13 @@ def searchArticlesByTags(
         return {}
 
     # Get all article paths that match the format criteria
-    article_paths = getArticlePathsForQuery("*", formats)
+    article_paths = getArticlePathsForQuery("*", formats, readState=readState)
 
     # If no tags specified and only filtering by format, just apply read state filter and return
-    if not all_tags and not any_tags:
-        matchingArticles = {}
-        for articlePath in article_paths:
-            if _should_include_by_read_state(articlePath, readState):
-                matchingArticles[articlePath] = getUrlOfArticle(articlePath)
+    if not all_tags and not any_tags and not not_any_tags:
+        matchingArticles = {
+            articlePath: getUrlOfArticle(articlePath) for articlePath in article_paths
+        }
         return matchingArticles
 
     # Create DB connection if not provided
@@ -707,40 +689,40 @@ def searchArticlesByTags(
                 # Add the OR conditions to the WHERE clause
                 sql += any_tag_where
 
+        # Filter by not_any_tags (NOT ANY logic)
+        if not_any_tags:
+            # Create a subquery to exclude articles that have any of the excluded tags
+            not_any_subquery = """
+            NOT EXISTS (
+                SELECT 1 
+                FROM article_tags at_not 
+                JOIN tags t_not ON at_not.tag_id = t_not.id 
+                WHERE as1.id = at_not.article_id 
+                AND at_not.matches = 1 
+                AND t_not.name IN ({})
+            )
+            """.format(
+                ",".join(["?"] * len(not_any_tags))
+            )
+
+            query_params.extend(not_any_tags)
+            sql += " AND " + not_any_subquery
+
         # Execute query
         cursor.execute(sql, query_params)
         matching_files = cursor.fetchall()
 
         # Build result dictionary
-        matchingArticles = {}
-        for filename, _ in matching_files:
-            if filename in filenames:
-                article_path = filenames[filename]
-                if _should_include_by_read_state(article_path, readState):
-                    matchingArticles[article_path] = getUrlOfArticle(article_path)
-
+        matchingArticles = {
+            filenames[filename]: getUrlOfArticle(filenames[filename])
+            for filename, _ in matching_files
+            if filename in filenames
+        }
         return matchingArticles
 
     finally:
         if close_conn and cursor:
             cursor.connection.close()
-
-
-def _should_include_by_read_state(article_path, readState):
-    """Helper function to check if an article should be included based on read state"""
-    # If no read state filter, include all articles
-    if not readState:
-        return True
-
-    filename = os.path.basename(article_path)
-    is_read = filename[0] == "."
-
-    if readState == "read":
-        return is_read
-    elif readState == "unread":
-        return not is_read
-
-    return True
 
 
 def calculate_ipfs_hash(file_path):

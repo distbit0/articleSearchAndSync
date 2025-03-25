@@ -7,9 +7,10 @@ def updateLists():
     listToTagMappings = getConfig()["listToTagMappings"]
 
     for listName, listInfo in listToTagMappings.items():
-        all_tags, any_tags, readState, disabled, formats = (
+        all_tags, any_tags, not_any_tags, readState, disabled, formats = (
             listInfo.get("all_tags", []),
             listInfo.get("any_tags", []),
+            listInfo.get("not_any_tags", []),
             listInfo.get("readState", "unread"),
             listInfo.get("disabled", False),
             listInfo.get("formats", getConfig()["docFormatsToMove"]),
@@ -22,6 +23,7 @@ def updateLists():
         articlePathsForList = utils.searchArticlesByTags(
             all_tags=all_tags,
             any_tags=any_tags,
+            not_any_tags=not_any_tags,
             readState=readState,
             formats=formats,
         )

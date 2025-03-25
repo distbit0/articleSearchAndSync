@@ -50,6 +50,24 @@ class TextExtractionError(Exception):
         super().__init__(message)
 
 
+def getPdfText(pdf, pages=None):
+    pdfText = []
+    try:
+        pdfFileObj = open(pdf, "rb")
+        pdfReader = PyPDF2.PdfReader(pdfFileObj)
+        pages = len(pdfReader.pages) if not pages else min(pages, len(pdfReader.pages))
+        for pageNumber in range(pages):
+            pageObj = pdfReader.pages[pageNumber]
+            pdfText.append(pageObj.extract_text())
+        pdfFileObj.close()
+    except PyPDF2.errors.PdfReadError:
+        traceback.print_exc()
+        print("Error in pdf: ", pdf)
+        return None
+    pdfText = "\n".join(pdfText)
+    return pdfText
+
+
 def extract_error_message(error_text: str) -> str:
     """Extract the essential error message from stderr output.
 
@@ -122,7 +140,7 @@ def extract_text_from_pdf(
     extraction_methods = [
         ("pdftotext", extract_pdf_with_pdftotext),
         ("PyPDF2", extract_pdf_with_pypdf2),
-        ("utils.getPdfText", extract_pdf_with_utils),
+        ("getPdfText", extract_pdf_with_getPdfText),
     ]
 
     errors = []
@@ -216,8 +234,8 @@ def extract_pdf_with_pypdf2(file_path: str) -> str:
     return text
 
 
-def extract_pdf_with_utils(file_path: str) -> str:
-    """Extract text from PDF using the existing utils.getPdfText function.
+def extract_pdf_with_getPdfText(file_path: str) -> str:
+    """Extract text from PDF using the existing getPdfText function.
 
     Args:
         file_path: Path to the PDF file
@@ -226,10 +244,10 @@ def extract_pdf_with_utils(file_path: str) -> str:
         str: Extracted text
     """
     try:
-        text = utils.getPdfText(file_path)
+        text = getPdfText(file_path)
         return text
     except Exception as e:
-        raise TextExtractionError(f"utils.getPdfText failed: {str(e)}")
+        raise TextExtractionError(f"getPdfText failed: {str(e)}")
 
 
 def extract_text_from_html(
@@ -613,7 +631,7 @@ def extract_text_from_epub(
         Tuple[str, str, int]: Extracted text, method used, word count
     """
     errors = []
-    
+
     # Try ebooklib first (direct Python library approach)
     try:
         text = extract_epub_with_ebooklib(file_path)
@@ -640,7 +658,7 @@ def extract_text_from_epub(
         logger.debug(
             f"EPUB extraction method 'ebooklib' failed for {file_path}: {str(e)}"
         )
-    
+
     # Fallback to external tools if ebooklib fails
     extraction_methods = [
         ("calibre", extract_epub_with_calibre),
@@ -693,18 +711,23 @@ def extract_epub_with_ebooklib(file_path: str) -> str:
     try:
         # Suppress specific warnings from ebooklib
         import warnings
-        
+
         # Store original filters
         original_filters = warnings.filters.copy()
-        
+
         # Add filters for the specific warnings from ebooklib
-        warnings.filterwarnings("ignore", message="In the future version we will turn default option ignore_ncx to True")
-        warnings.filterwarnings("ignore", message="This search incorrectly ignores the root element")
-        
+        warnings.filterwarnings(
+            "ignore",
+            message="In the future version we will turn default option ignore_ncx to True",
+        )
+        warnings.filterwarnings(
+            "ignore", message="This search incorrectly ignores the root element"
+        )
+
         try:
             # Explicitly set ignore_ncx=True to address the future change warning
             book = epub.read_epub(file_path, ignore_ncx=True)
-            
+
             # Extract text from all HTML items
             all_text = []
             for item in book.get_items():
@@ -713,9 +736,11 @@ def extract_epub_with_ebooklib(file_path: str) -> str:
                     content = item.get_content()
                     if content:
                         # Simple HTML cleaning - remove HTML tags
-                        text = re.sub(r'<[^>]+>', ' ', content.decode('utf-8', errors='replace'))
+                        text = re.sub(
+                            r"<[^>]+>", " ", content.decode("utf-8", errors="replace")
+                        )
                         all_text.append(text)
-            
+
             return "\n\n".join(all_text)
         finally:
             # Restore original warning filters
@@ -781,7 +806,7 @@ def extract_text_from_mobi(
         Tuple[str, str, int]: Extracted text, method used, word count
     """
     errors = []
-    
+
     # First try direct conversion to EPUB in memory and then extract
     try:
         text = convert_mobi_and_extract(file_path)
@@ -803,7 +828,7 @@ def extract_text_from_mobi(
         error_msg = f"mobi_direct: {str(e)}"
         errors.append(error_msg)
         logger.debug(f"Direct MOBI extraction failed for {file_path}: {str(e)}")
-    
+
     # Fallback to calibre conversion if direct method fails
     try:
         # Create a temp dir for conversion
@@ -840,26 +865,26 @@ def extract_text_from_mobi(
 
 def convert_mobi_and_extract(file_path: str) -> str:
     """Convert MOBI to EPUB then extract text using ebooklib.
-    
+
     This is an optimized function that tries to minimize disk I/O
     by using memory operations where possible.
-    
+
     Args:
         file_path: Path to the MOBI file
-        
+
     Returns:
         str: Extracted text
     """
     # First try direct conversion with calibre
     with tempfile.TemporaryDirectory() as temp_dir:
         epub_path = os.path.join(temp_dir, "temp.epub")
-        
+
         # Convert MOBI to EPUB using Calibre
         success, output = run_command(["ebook-convert", file_path, epub_path])
-        
+
         if not success:
             raise TextExtractionError(f"MOBI conversion failed: {output}")
-            
+
         # Use ebooklib to extract text from the EPUB
         return extract_epub_with_ebooklib(epub_path)
 
