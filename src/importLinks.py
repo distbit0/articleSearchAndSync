@@ -547,7 +547,7 @@ if __name__ == "__main__":
     # deleteFilesMarkedToDelete()
     # hideArticlesMarkedAsRead()
     tag_articles()
-    updateLists()
+    # updateLists()
 
     # profiler.disable()
     # stats = pstats.Stats(profiler)
