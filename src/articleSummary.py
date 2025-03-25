@@ -9,16 +9,8 @@ from loguru import logger
 from dotenv import load_dotenv
 from openai import OpenAI
 import os
-from . import utils
-from .utils import calculate_normal_hash
-
-# Import utils properly based on how it's structured in the project
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from src.utils import getConfig, getArticlePathsForQuery
-from src.textExtraction import (
-    extract_text_from_file,
-    TextExtractionError,
-)
+from .utils import calculate_normal_hash, getConfig, getArticlePathsForQuery
+from .textExtraction import extract_text_from_file, TextExtractionError
 
 # Configure loguru logger
 log_file_path = os.path.join(
@@ -112,7 +104,7 @@ def summarize_with_openrouter(text: str) -> Tuple[str, bool]:
 
     # Get configuration from config.json
     config = getConfig()
-    model = config.get("ai_model", "openai/o3-mini")
+    model = config.get("ai_model")
 
     # Get optional referer info from environment variables
     referer = os.getenv("OPENROUTER_REFERER", "articleSearchAndSync")
@@ -145,7 +137,7 @@ First, determine if the text provides enough substantial content to write a mean
 If the text is too short, fragmented, or clearly not the full article (e.g., just metadata, table of contents, or a small snippet), 
 respond with "<summary>[INSUFFICIENT_TEXT]</summary>" followed by a brief explanation of why the text is insufficient.
 
-If the text IS sufficient, please summarize it in a concise but informative way that captures the main arguments, concepts, intuitions, and conclusions. The summary should be written in first person.
+If the text IS sufficient, please summarize it in a concise but informative way that captures the main arguments, principles, concepts, cruxes, intuitions, explanations and conclusions. Do not say things like "the author argues that..." or "the text explains how...".  
 
 IMPORTANT: Return ONLY your summary enclosed within <summary></summary> tags. Do not include any other text outside these tags."""
 
@@ -223,23 +215,28 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
         summary = result[0]
 
         # If summary is NULL, it means the file was added to the database but not yet summarized
-        if summary is None:
+        if summary is None or summary == "":
             logger.debug(
                 f"File {file_name} is in the database but has not been summarized yet"
             )
-            # Close the current connection since we'll open a new one during summarization
-            conn.close()
             # Proceed with summarization (same logic as below)
         else:
-            conn.close()
-            # Check if summary indicates insufficient text (empty string)
-            is_sufficient = bool(
-                summary
-            )  # Empty string means insufficient, anything else is sufficient
-            return summary, is_sufficient
-    else:
-        # Article not in database, so no existing summary
-        conn.close()
+            # Check if summary indicates a previous insufficient text failure
+            if summary == "failed_to_summarise":
+                logger.debug(
+                    f"Skipping file {file_name} due to insufficient text previously detected"
+                )
+                # Return the failure message and mark as insufficient
+                return summary, False
+            # Check if summary indicates a text extraction failure
+            elif summary == "failed_to_extract":
+                logger.debug(
+                    f"File {file_name} previously had extraction issues, attempting to summarize again"
+                )
+                # We'll try again since this might be a temporary issue
+            else:
+                return summary, True
+    conn.close()
 
     # Extract text from the file
     try:
@@ -263,11 +260,12 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
         )
         existing_article = cursor.fetchone()
 
-        # If text is insufficient, set summary to empty string
-        if not is_sufficient:
-            db_summary = ""
+        # ONLY set failed_to_summarise when the model specifically reports insufficient text
+        # All other errors should be considered temporary
+        if not is_sufficient and "[INSUFFICIENT_TEXT]" in summary:
+            db_summary = "failed_to_summarise"
             logger.warning(
-                f"Insufficient text for summary in file: {file_path}, storing empty summary"
+                f"Insufficient text for summary in file: {file_path}, marking as failed_to_summarise"
             )
         else:
             db_summary = summary
@@ -306,22 +304,67 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
         conn.commit()
         conn.close()
 
-        if not is_sufficient:
-            logger.warning(
-                f"Stored empty summary for file with insufficient text: {file_path}"
-            )
-        else:
-            logger.debug(
-                f"Successfully created and stored summary for file: {file_path}"
-            )
-
         return summary, is_sufficient
+    except TextExtractionError as te:
+        # Check if this error has already been logged to avoid duplication
+        if not hasattr(te, "already_logged") or not te.already_logged:
+            error_message = f"Error extracting text from article: {str(te)}"
+            logger.error(error_message)
 
+        # DO NOT mark as permanently failed in the database
+        # This might be a temporary issue that could be resolved later
+        try:
+            conn = sqlite3.connect(db_path)
+            cursor = conn.cursor()
+
+            # Check if the article is already in the database with a valid summary
+            cursor.execute(
+                "SELECT id, summary FROM article_summaries WHERE file_hash = ?",
+                (file_hash,),
+            )
+            existing_article = cursor.fetchone()
+
+            # Only update if there's no existing article or if the existing summary isn't set
+            # This prevents overwriting a good summary with an error
+            if not existing_article:
+                # Insert new record with a NULL summary so it will be attempted again later
+                cursor.execute(
+                    """
+                    INSERT INTO article_summaries 
+                    (file_hash, file_name, file_format, summary, extraction_method, word_count)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        file_hash,
+                        file_name,
+                        file_format,
+                        None,  # Set to NULL instead of "failed_to_extract"
+                        "none",
+                        0,
+                    ),
+                )
+            elif existing_article[1] is None or existing_article[1] == "":
+                # Keep it as NULL so it will be retried later
+                pass
+
+            conn.commit()
+            conn.close()
+        except Exception as db_error:
+            logger.error(
+                f"Error updating database after extraction attempt: {str(db_error)}"
+            )
+            try:
+                conn.close()
+            except:
+                pass
+
+        return "Temporary text extraction error", False
     except Exception as e:
         error_message = f"Error summarizing article: {str(e)}"
-        error_traceback = traceback.format_exc()
-        logger.error(f"{error_message}\n{error_traceback}")
-        traceback.print_exc()
+        logger.error(f"{error_message}")
+
+        if os.environ.get("DEBUG", "false").lower() == "true":
+            logger.debug(traceback.format_exc())
 
         # Ensure the database connection is closed in case of error
         try:
@@ -329,7 +372,8 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
         except:
             pass
 
-        return f"Failed to summarize article: {error_message}", False
+        # Return a temporary error message, but don't permanently mark in the database
+        return f"Temporary error: {error_message}", False
 
 
 def summarize_articles(articles_path: Optional[str] = None, query: str = "*") -> None:
@@ -359,12 +403,12 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # Get list of articles that need summarization (NULL summary)
+    # Get list of articles that need summarization (NULL or empty summary)
     cursor.execute(
         """
         SELECT file_hash, file_name
         FROM article_summaries
-        WHERE summary IS NULL
+        WHERE summary IS NULL OR summary = ''
     """
     )
     articles_needing_summary = cursor.fetchall()
@@ -422,8 +466,8 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
     successful = 0
     failed = 0
     insufficient = 0
-    # List to track word lengths for calculating average
-    summary_word_lengths = []
+    # List to track word counts for calculating average
+    summary_word_counts = []
 
     # Use ThreadPoolExecutor to process multiple articles in parallel
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -446,32 +490,42 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
                             f"Successfully summarized: {article_path} - {message}"
                         )
                         successful += 1
-                        
-                        # Calculate average word length directly from the summary
+
+                        # Calculate average word count directly from the summary
                         words = summary.split()
                         if words:
-                            avg_word_length = sum(len(word) for word in words) / len(words)
-                            summary_word_lengths.append(avg_word_length)
+                            word_count = len(words)
+                            summary_word_counts.append(word_count)
                     else:
-                        logger.warning(
-                            f"Insufficient text in: {article_path} - storing empty summary"
-                        )
+                        # Don't log warning here as it's already logged in get_article_summary()
                         insufficient += 1
                 else:
-                    logger.error(f"Failed to summarize: {article_path} - {message}")
+                    logger.debug(f"Failed to summarize: {article_path} - {message}")
                     failed += 1
             except Exception as e:
                 file_name = os.path.basename(article_path)
-                logger.error(
-                    f"Unexpected error processing {article_path}: {str(e)}\n{traceback.format_exc()}"
-                )
-                failed += 1
+                # Check if this is a TextExtractionError that's already been logged
+                if (
+                    isinstance(e, TextExtractionError)
+                    and hasattr(e, "already_logged")
+                    and e.already_logged
+                ):
+                    # Just count the failure without duplicating the error log
+                    failed += 1
+                else:
+                    # Log new errors that haven't been logged yet
+                    logger.error(f"Failed to summarize: {article_path} - {str(e)}")
+                    if os.environ.get("DEBUG", "false").lower() == "true":
+                        logger.debug(f"Detailed error: {traceback.format_exc()}")
+                    failed += 1
 
-    # Calculate and print the average word length if any successful summaries
-    if summary_word_lengths:
-        avg_word_length = sum(summary_word_lengths) / len(summary_word_lengths)
-        print(f"Average word length in generated summaries: {avg_word_length:.2f} characters")
-        logger.info(f"Average word length in generated summaries: {avg_word_length:.2f} characters")
+    # Calculate and print the average word count if any successful summaries
+    if summary_word_counts:
+        avg_word_count = sum(summary_word_counts) / len(summary_word_counts)
+        print(f"Average word count in generated summaries: {avg_word_count:.2f} words")
+        logger.info(
+            f"Average word count in generated summaries: {avg_word_count:.2f} words"
+        )
 
     logger.info(
         f"Summary: Processed {total_articles} articles - {successful} successful, {insufficient} insufficient text, {failed} failed"
@@ -493,7 +547,12 @@ def process_single_article(article_path: str) -> Tuple[bool, str, bool, str]:
             return False, summary, False, ""
 
         if not is_sufficient:
-            return True, f"Insufficient text detected ({len(summary)} chars)", False, summary
+            return (
+                True,
+                f"Insufficient text detected ({len(summary)} chars)",
+                False,
+                summary,
+            )
 
         return True, f"Summary generated ({len(summary)} chars)", True, summary
     except Exception as e:
@@ -712,8 +771,3 @@ def remove_orphaned_tags_from_database() -> int:
     conn.close()
 
     return removed_count
-
-
-if __name__ == "__main__":
-    add_files_to_database()
-    summarize_articles()

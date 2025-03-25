@@ -517,6 +517,7 @@ def addArticlesToList(listName, articlePathsForList):
     )
     createListIfNotExists(listPath)
     articleNamesInList = getArticlesFromList(listName)
+    # print("articleNamesInList", articleNamesInList, "\n\n\n")
     droidEbooksFolderPath = getConfig()["droidEbooksFolderPath"]
     articleFileFolder = getConfig()["articleFileFolder"]
     linesToAppend = []
@@ -583,8 +584,7 @@ def deleteAllArticlesInList(listName):
         )
 
     with open(listPath, "w") as f:
-        print("about to write: ", textWithArticlesRemoved)
-        # f.write(textWithArticlesRemoved)
+        f.write(textWithArticlesRemoved)
 
 
 def getSrcUrlOfGitbook(articlePath):

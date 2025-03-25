@@ -3,11 +3,13 @@ import re
 import tempfile
 import subprocess
 import traceback
-from typing import List, Tuple
+from typing import List, Tuple, Optional
 from pathlib import Path
 from loguru import logger
 import sys
 from . import utils
+import ebooklib
+from ebooklib import epub
 
 # Configure loguru logger
 log_file_path = os.path.join(
@@ -19,9 +21,6 @@ os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
 
 # Remove default handler and add custom handlers
 logger.remove()
-# Add stdout handler
-logger.add(sys.stdout, level="WARNING")
-# Add rotating file handler - 5MB max size, keep 3 backup files
 logger.add(
     log_file_path,
     rotation="5 MB",
@@ -32,9 +31,55 @@ logger.add(
 
 
 class TextExtractionError(Exception):
-    """Custom exception for text extraction errors."""
+    """Custom exception for text extraction errors.
 
-    pass
+    This class includes a flag to track whether the error has already been logged,
+    which helps prevent duplicate error messages when the exception propagates
+    through multiple functions.
+    """
+
+    def __init__(self, message, already_logged=False):
+        """Initialize a TextExtractionError.
+
+        Args:
+            message: The error message
+            already_logged: Flag indicating if this error has already been logged
+        """
+        self.message = message
+        self.already_logged = already_logged
+        super().__init__(message)
+
+
+def extract_error_message(error_text: str) -> str:
+    """Extract the essential error message from stderr output.
+
+    Args:
+        error_text: Error text, potentially containing a traceback
+
+    Returns:
+        str: Concise error message
+    """
+    # For empty or short messages, return as is
+    if not error_text or len(error_text.strip().splitlines()) <= 2:
+        return error_text
+
+    # Find the most relevant error lines
+    lines = error_text.strip().splitlines()
+
+    # Look for common error patterns - the last line with Error/Exception
+    for line in reversed(lines):
+        # Match "ErrorType: message" format
+        if re.search(r"[A-Za-z0-9_.]+(?:Error|Exception):", line):
+            return line.strip()
+
+    # No specific error pattern found, return the last meaningful line
+    for line in reversed(lines):
+        line = line.strip()
+        if line and not line.startswith("^") and not line.startswith("~"):
+            return line
+
+    # Fallback - the last line is often a good summary
+    return lines[-1] if lines else error_text
 
 
 def run_command(cmd: List[str], timeout: int = 60) -> Tuple[bool, str]:
@@ -52,16 +97,13 @@ def run_command(cmd: List[str], timeout: int = 60) -> Tuple[bool, str]:
         if result.returncode == 0:
             return True, result.stdout
         else:
-            error_msg = f"Error: {result.stderr}"
-            logger.error(f"Command failed: {' '.join(cmd)}\n{error_msg}")
+            error_msg = extract_error_message(result.stderr)
             return False, error_msg
     except subprocess.TimeoutExpired:
         error_msg = f"Command timed out after {timeout} seconds: {' '.join(cmd)}"
-        logger.error(error_msg)
         return False, error_msg
     except Exception as e:
         error_msg = f"Exception running command: {str(e)}"
-        logger.error(f"{error_msg}\n{traceback.format_exc()}")
         return False, error_msg
 
 
@@ -108,13 +150,14 @@ def extract_text_from_pdf(
             error_msg = f"{method_name}: {str(e)}"
             errors.append(error_msg)
             logger.debug(
-                f"PDF extraction method '{method_name}' failed for {file_path}: {str(e)}\n{traceback.format_exc()}"
+                f"PDF extraction method '{method_name}' failed for {file_path}: {str(e)}"
             )
 
-    error_msg = "\n".join(errors)
-    log_error = f"All PDF extraction methods failed for {file_path}:\n{error_msg}"
+    # Only log errors if all methods failed
+    error_details = "\n".join([f"  - {err}" for err in errors])
+    log_error = f"All PDF extraction methods failed for file: {file_path}\nDetailed errors:\n{error_details}"
     logger.error(log_error)
-    raise TextExtractionError(log_error)
+    raise TextExtractionError(log_error, already_logged=True)
 
 
 def extract_pdf_with_pdftotext(file_path: str) -> str:
@@ -133,7 +176,6 @@ def extract_pdf_with_pdftotext(file_path: str) -> str:
 
     if not success:
         os.unlink(temp_path)
-        logger.error(f"pdftotext extraction failed for {file_path}: {output}")
         raise TextExtractionError(f"pdftotext failed: {output}")
 
     with open(temp_path, "r", errors="replace") as f:
@@ -155,7 +197,6 @@ def extract_pdf_with_pypdf2(file_path: str) -> str:
     try:
         import PyPDF2
     except ImportError:
-        logger.error(f"PyPDF2 is not installed, cannot extract {file_path}")
         raise TextExtractionError("PyPDF2 is not installed")
 
     text = ""
@@ -170,9 +211,6 @@ def extract_pdf_with_pypdf2(file_path: str) -> str:
                 if page_text:
                     text += page_text + "\n\n"
     except Exception as e:
-        logger.error(
-            f"PyPDF2 extraction failed for {file_path}: {str(e)}\n{traceback.format_exc()}"
-        )
         raise TextExtractionError(f"PyPDF2 extraction failed: {str(e)}")
 
     return text
@@ -191,9 +229,6 @@ def extract_pdf_with_utils(file_path: str) -> str:
         text = utils.getPdfText(file_path)
         return text
     except Exception as e:
-        logger.error(
-            f"utils.getPdfText failed for {file_path}: {str(e)}\n{traceback.format_exc()}"
-        )
         raise TextExtractionError(f"utils.getPdfText failed: {str(e)}")
 
 
@@ -209,6 +244,8 @@ def extract_text_from_html(
     Returns:
         Tuple[str, str, int]: Extracted text, method used, word count
     """
+    errors = []
+
     # Special handling for MHTML files
     if file_path.lower().endswith(".mhtml") or file_path.lower().endswith(".mht"):
         try:
@@ -224,8 +261,10 @@ def extract_text_from_html(
 
                 return text, "mhtml_specialized", word_count
         except Exception as e:
-            logger.error(
-                f"MHTML specialized extraction failed for {file_path}: {str(e)}\n{traceback.format_exc()}"
+            error_msg = f"mhtml_specialized: {str(e)}"
+            errors.append(error_msg)
+            logger.debug(
+                f"MHTML specialized extraction failed for {file_path}: {str(e)}"
             )
             # Continue with regular HTML extraction methods
 
@@ -235,7 +274,6 @@ def extract_text_from_html(
         ("regex", extract_html_with_regex),
     ]
 
-    errors = []
     for method_name, method_func in extraction_methods:
         try:
             text = method_func(file_path)
@@ -260,13 +298,14 @@ def extract_text_from_html(
             error_msg = f"{method_name}: {str(e)}"
             errors.append(error_msg)
             logger.debug(
-                f"HTML extraction method '{method_name}' failed for {file_path}: {str(e)}\n{traceback.format_exc()}"
+                f"HTML extraction method '{method_name}' failed for {file_path}: {str(e)}"
             )
 
-    error_msg = "\n".join(errors)
-    log_error = f"All HTML extraction methods failed for {file_path}:\n{error_msg}"
+    # Only log errors if all methods failed
+    error_details = "\n".join([f"  - {err}" for err in errors])
+    log_error = f"All HTML extraction methods failed for file: {file_path}\nDetailed errors:\n{error_details}"
     logger.error(log_error)
-    raise TextExtractionError(log_error)
+    raise TextExtractionError(log_error, already_logged=True)
 
 
 def extract_html_with_html2text(file_path: str) -> str:
@@ -281,7 +320,6 @@ def extract_html_with_html2text(file_path: str) -> str:
     success, output = run_command(["html2text", file_path])
 
     if not success:
-        logger.error(f"html2text extraction failed for {file_path}: {output}")
         raise TextExtractionError(f"html2text failed: {output}")
 
     return output
@@ -299,7 +337,6 @@ def extract_html_with_bs4(file_path: str) -> str:
     try:
         from bs4 import BeautifulSoup
     except ImportError:
-        logger.error(f"BeautifulSoup is not installed, cannot extract {file_path}")
         raise TextExtractionError("BeautifulSoup is not installed")
 
     with open(file_path, "r", errors="replace") as f:
@@ -388,8 +425,7 @@ def extract_mhtml_specialized(file_path: str) -> str:
         import base64
         from email.parser import Parser
     except ImportError:
-        logger.error(f"Failed to import email module, cannot extract {file_path}")
-        raise TextExtractionError("Failed to import email module")
+        raise TextExtractionError("Failed to import email module, cannot extract MHTML")
 
     # Open with binary mode to properly handle MIME encoded content
     with open(file_path, "rb") as f:
@@ -405,7 +441,6 @@ def extract_mhtml_specialized(file_path: str) -> str:
                 content = f.read()
             msg = email.message_from_string(content)
         except Exception as inner_e:
-            logger.error(f"Failed to parse MHTML: {str(e)} and {str(inner_e)}")
             raise TextExtractionError(
                 f"Failed to parse MHTML: {str(e)} and {str(inner_e)}"
             )
@@ -452,7 +487,8 @@ def extract_mhtml_specialized(file_path: str) -> str:
 
                     html_parts.append(decoded_html)
             except Exception as e:
-                logger.error(f"Error processing HTML part: {str(e)}")
+                # Log to debug but continue processing
+                logger.debug(f"Error processing HTML part: {str(e)}")
 
         # Process multipart messages
         if part.is_multipart():
@@ -467,7 +503,6 @@ def extract_mhtml_specialized(file_path: str) -> str:
         try:
             from bs4 import BeautifulSoup, Comment
         except ImportError:
-            logger.error(f"BeautifulSoup is not installed, cannot extract {file_path}")
             raise TextExtractionError("BeautifulSoup is not installed")
 
         text_parts = []
@@ -560,9 +595,8 @@ def extract_mhtml_specialized(file_path: str) -> str:
                     plain_text = re.sub(r"=\r?\n", "", plain_text)
                     return plain_text
             except Exception as e:
-                logger.error(f"Error processing plain text part: {str(e)}")
+                logger.debug(f"Error processing plain text part: {str(e)}")
 
-    logger.error(f"No suitable content found in MHTML file {file_path}")
     raise TextExtractionError("No suitable content found in MHTML file")
 
 
@@ -578,12 +612,41 @@ def extract_text_from_epub(
     Returns:
         Tuple[str, str, int]: Extracted text, method used, word count
     """
+    errors = []
+    
+    # Try ebooklib first (direct Python library approach)
+    try:
+        text = extract_epub_with_ebooklib(file_path)
+        if text and len(text.strip()) > 0:
+            # Clean the text
+            text = clean_text(text)
+            words = text.split()
+            word_count = len(words)
+
+            if max_words is not None and word_count > max_words:
+                text = " ".join(words[:max_words])
+                word_count = max_words
+
+            return text, "ebooklib", word_count
+        else:
+            error_msg = "ebooklib: Empty text"
+            errors.append(error_msg)
+            logger.debug(
+                f"EPUB extraction method 'ebooklib' returned empty text for {file_path}"
+            )
+    except Exception as e:
+        error_msg = f"ebooklib: {str(e)}"
+        errors.append(error_msg)
+        logger.debug(
+            f"EPUB extraction method 'ebooklib' failed for {file_path}: {str(e)}"
+        )
+    
+    # Fallback to external tools if ebooklib fails
     extraction_methods = [
         ("calibre", extract_epub_with_calibre),
         ("epub2txt", extract_epub_with_epub2txt),
     ]
 
-    errors = []
     for method_name, method_func in extraction_methods:
         try:
             text = method_func(file_path)
@@ -608,13 +671,57 @@ def extract_text_from_epub(
             error_msg = f"{method_name}: {str(e)}"
             errors.append(error_msg)
             logger.debug(
-                f"EPUB extraction method '{method_name}' failed for {file_path}: {str(e)}\n{traceback.format_exc()}"
+                f"EPUB extraction method '{method_name}' failed for {file_path}: {str(e)}"
             )
 
-    error_msg = "\n".join(errors)
-    log_error = f"All EPUB extraction methods failed for {file_path}:\n{error_msg}"
+    # Only log errors if all methods failed
+    error_details = "\n".join([f"  - {err}" for err in errors])
+    log_error = f"All EPUB extraction methods failed for file: {file_path}\nDetailed errors:\n{error_details}"
     logger.error(log_error)
-    raise TextExtractionError(log_error)
+    raise TextExtractionError(log_error, already_logged=True)
+
+
+def extract_epub_with_ebooklib(file_path: str) -> str:
+    """Extract text from EPUB using ebooklib Python library.
+
+    Args:
+        file_path: Path to the EPUB file
+
+    Returns:
+        str: Extracted text
+    """
+    try:
+        # Suppress specific warnings from ebooklib
+        import warnings
+        
+        # Store original filters
+        original_filters = warnings.filters.copy()
+        
+        # Add filters for the specific warnings from ebooklib
+        warnings.filterwarnings("ignore", message="In the future version we will turn default option ignore_ncx to True")
+        warnings.filterwarnings("ignore", message="This search incorrectly ignores the root element")
+        
+        try:
+            # Explicitly set ignore_ncx=True to address the future change warning
+            book = epub.read_epub(file_path, ignore_ncx=True)
+            
+            # Extract text from all HTML items
+            all_text = []
+            for item in book.get_items():
+                if item.get_type() == ebooklib.ITEM_DOCUMENT:
+                    # Get content as bytes and decode
+                    content = item.get_content()
+                    if content:
+                        # Simple HTML cleaning - remove HTML tags
+                        text = re.sub(r'<[^>]+>', ' ', content.decode('utf-8', errors='replace'))
+                        all_text.append(text)
+            
+            return "\n\n".join(all_text)
+        finally:
+            # Restore original warning filters
+            warnings.filters = original_filters
+    except Exception as e:
+        raise TextExtractionError(f"ebooklib extraction failed: {str(e)}")
 
 
 def extract_epub_with_calibre(file_path: str) -> str:
@@ -635,7 +742,6 @@ def extract_epub_with_calibre(file_path: str) -> str:
 
     if not success:
         os.unlink(temp_path)
-        logger.error(f"Calibre extraction failed for {file_path}: {output}")
         raise TextExtractionError(f"Calibre ebook-convert failed: {output}")
 
     with open(temp_path, "r", encoding="utf-8", errors="replace") as f:
@@ -657,7 +763,6 @@ def extract_epub_with_epub2txt(file_path: str) -> str:
     success, output = run_command(["epub2txt", file_path])
 
     if not success:
-        logger.error(f"epub2txt extraction failed for {file_path}: {output}")
         raise TextExtractionError(f"epub2txt failed: {output}")
 
     return output
@@ -675,7 +780,31 @@ def extract_text_from_mobi(
     Returns:
         Tuple[str, str, int]: Extracted text, method used, word count
     """
-    # For MOBI, we first convert to EPUB then extract text
+    errors = []
+    
+    # First try direct conversion to EPUB in memory and then extract
+    try:
+        text = convert_mobi_and_extract(file_path)
+        if text and len(text.strip()) > 0:
+            # Clean the text
+            text = clean_text(text)
+            words = text.split()
+            word_count = len(words)
+
+            if max_words is not None and word_count > max_words:
+                text = " ".join(words[:max_words])
+                word_count = max_words
+
+            return text, "mobi_direct", word_count
+        else:
+            error_msg = "mobi_direct: Empty text"
+            errors.append(error_msg)
+    except Exception as e:
+        error_msg = f"mobi_direct: {str(e)}"
+        errors.append(error_msg)
+        logger.debug(f"Direct MOBI extraction failed for {file_path}: {str(e)}")
+    
+    # Fallback to calibre conversion if direct method fails
     try:
         # Create a temp dir for conversion
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -685,9 +814,8 @@ def extract_text_from_mobi(
             success, output = run_command(["ebook-convert", file_path, epub_path])
 
             if not success:
-                logger.error(
-                    f"MOBI to EPUB conversion failed for {file_path}: {output}"
-                )
+                error_msg = f"mobi_conversion: {output}"
+                errors.append(error_msg)
                 raise TextExtractionError(f"MOBI to EPUB conversion failed: {output}")
 
             # Then extract text from the EPUB
@@ -695,17 +823,97 @@ def extract_text_from_mobi(
                 text, method, word_count = extract_text_from_epub(epub_path, max_words)
                 return text, f"mobi_via_{method}", word_count
             except Exception as e:
-                logger.error(
-                    f"EPUB extraction after MOBI conversion failed for {file_path}: {str(e)}\n{traceback.format_exc()}"
-                )
+                error_msg = f"epub_extraction_after_conversion: {str(e)}"
+                errors.append(error_msg)
                 raise TextExtractionError(
                     f"EPUB extraction after MOBI conversion failed: {str(e)}"
                 )
     except Exception as e:
-        logger.error(
-            f"MOBI extraction failed for {file_path}: {str(e)}\n{traceback.format_exc()}"
-        )
-        raise TextExtractionError(f"MOBI extraction failed: {str(e)}")
+        # If we got here, all methods failed
+        error_details = "\n".join([f"  - {err}" for err in errors])
+        if not errors:
+            error_details = f"  - general_mobi_error: {str(e)}"
+        log_error = f"All MOBI extraction methods failed for file: {file_path}\nDetailed errors:\n{error_details}"
+        logger.error(log_error)
+        raise TextExtractionError(log_error, already_logged=True)
+
+
+def convert_mobi_and_extract(file_path: str) -> str:
+    """Convert MOBI to EPUB then extract text using ebooklib.
+    
+    This is an optimized function that tries to minimize disk I/O
+    by using memory operations where possible.
+    
+    Args:
+        file_path: Path to the MOBI file
+        
+    Returns:
+        str: Extracted text
+    """
+    # First try direct conversion with calibre
+    with tempfile.TemporaryDirectory() as temp_dir:
+        epub_path = os.path.join(temp_dir, "temp.epub")
+        
+        # Convert MOBI to EPUB using Calibre
+        success, output = run_command(["ebook-convert", file_path, epub_path])
+        
+        if not success:
+            raise TextExtractionError(f"MOBI conversion failed: {output}")
+            
+        # Use ebooklib to extract text from the EPUB
+        return extract_epub_with_ebooklib(epub_path)
+
+
+def extract_text_from_file(
+    file_path: str, max_words: int = None
+) -> Tuple[str, str, int]:
+    """Extract text from a file based on its format.
+
+    Args:
+        file_path: Path to the file
+        max_words: Maximum number of words to extract
+
+    Returns:
+        Tuple[str, str, int]: Extracted text, method used, word count
+    """
+    file_path = os.path.abspath(file_path)
+    file_ext = os.path.splitext(file_path)[1].lower()
+
+    try:
+        if file_ext in [".pdf"]:
+            return extract_text_from_pdf(file_path, max_words)
+        elif file_ext in [".html", ".htm", ".mhtml", ".mht"]:
+            return extract_text_from_html(file_path, max_words)
+        elif file_ext in [".epub"]:
+            return extract_text_from_epub(file_path, max_words)
+        elif file_ext in [".mobi", ".azw", ".azw3"]:
+            return extract_text_from_mobi(file_path, max_words)
+        elif file_ext in [".txt", ".md"]:
+            # For plain text files, just read them directly
+            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
+                text = f.read()
+
+            text = clean_text(text)
+            words = text.split()
+            word_count = len(words)
+
+            if max_words is not None and word_count > max_words:
+                text = " ".join(words[:max_words]) + "..."
+                word_count = max_words
+
+            return text, "direct_read", word_count
+        else:
+            error_msg = f"Unsupported file format: {file_ext} for file {file_path}"
+            logger.error(error_msg)
+            raise TextExtractionError(error_msg, already_logged=True)
+    except TextExtractionError as e:
+        if not e.already_logged:
+            logger.error(e.message)
+        raise
+    except Exception as e:
+        error_msg = f"Unexpected error during text extraction for file: {file_path}\nError: {str(e)}"
+        logger.error(error_msg)
+        raise TextExtractionError(error_msg, already_logged=True)
 
 
 def clean_text(text: str) -> str:
@@ -859,52 +1067,3 @@ def clean_text(text: str) -> str:
     text = text.strip()
 
     return text
-
-
-def extract_text_from_file(
-    file_path: str, max_words: int = None
-) -> Tuple[str, str, int]:
-    """Extract text from a file based on its format.
-
-    Args:
-        file_path: Path to the file
-        max_words: Maximum number of words to extract
-
-    Returns:
-        Tuple[str, str, int]: Extracted text, method used, word count
-    """
-    file_path = os.path.abspath(file_path)
-    file_ext = os.path.splitext(file_path)[1].lower()
-
-    try:
-        if file_ext in [".pdf"]:
-            return extract_text_from_pdf(file_path, max_words)
-        elif file_ext in [".html", ".htm", ".mhtml", ".mht"]:
-            return extract_text_from_html(file_path, max_words)
-        elif file_ext in [".epub"]:
-            return extract_text_from_epub(file_path, max_words)
-        elif file_ext in [".mobi", ".azw", ".azw3"]:
-            return extract_text_from_mobi(file_path, max_words)
-        elif file_ext in [".txt", ".md"]:
-            # For plain text files, just read them directly
-            with open(file_path, "r", encoding="utf-8", errors="replace") as f:
-                text = f.read()
-
-            text = clean_text(text)
-            words = text.split()
-            word_count = len(words)
-
-            if max_words is not None and word_count > max_words:
-                text = " ".join(words[:max_words]) + "..."
-                word_count = max_words
-
-            return text, "direct_read", word_count
-        else:
-            error_msg = f"Unsupported file format: {file_ext}"
-            logger.error(f"{error_msg} for file {file_path}")
-            raise TextExtractionError(error_msg)
-    except Exception as e:
-        logger.error(
-            f"Text extraction failed for {file_path}: {str(e)}\n{traceback.format_exc()}"
-        )
-        raise

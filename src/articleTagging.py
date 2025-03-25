@@ -513,6 +513,7 @@ class TagEvaluator:
         self.batch_size = int(
             self.config.get("tag_batch_size", 3)
         )  # Default to 3 tags per batch
+        print(f"Tag batch size set to {self.batch_size}")
 
         # Load API key
         self.api_key = os.getenv("OPENROUTER_API_KEY")
@@ -576,10 +577,17 @@ class TagEvaluator:
             )
 
             system_prompt = """You are a helpful system that evaluates whether a text matches given tag descriptions. 
-Your task is to determine if the article text is related to each of the provided tag descriptions.
+Your task is to determine if the article text is described by each of the provided tag descriptions. Interpret them literally.
 You MUST respond in valid JSON format only."""
 
-            user_prompt = f"""Please analyze the following text to determine if it matches each of the tag descriptions provided below. 
+            # Create a dynamic JSON example with only the actual tags
+            json_format_example = (
+                "{\n"
+                + ",\n".join([f'  "{tag}": true or false' for tag in tag_names])
+                + "\n}"
+            )
+
+            user_prompt = f"""Please analyze the following text to determine if it matches/is described by each of the tag descriptions provided below. Interpret the tag descriptions literally.
 Respond in JSON format with the tag name as key and boolean true/false as value.
 
 Tags to evaluate:
@@ -591,12 +599,7 @@ Text to evaluate:
 
 Based on the tag descriptions, determine if this text matches each tag.
 Your response must be valid JSON in this exact format:
-{{
-  "{tag_names[0]}": true or false,
-  "{tag_names[1] if len(tag_names) > 1 else 'tag2'}": true or false,
-  "{tag_names[2] if len(tag_names) > 2 else 'tag3'}": true or false
-}}
-Note: Only include actual tags in your response (do not include placeholder 'tag2' or 'tag3' if they weren't in the input).
+{json_format_example}
 """
 
             response = client.chat.completions.create(
@@ -814,7 +817,10 @@ class ArticleTagger:
                     )
                     AND NOT t.name LIKE 'folder_%'
                     AND NOT t.name LIKE 'prev_folder_%'
+                    -- Exclude error-flagged articles from summary-based tagging
+                    AND NOT (t.use_summary = 1 AND (a.summary = 'failed_to_extract' OR a.summary = 'failed_to_summarise'))
                 )
+                ORDER BY RANDOM()
                 LIMIT ?
                 """,
                 (self.max_articles_per_session * i,),
@@ -945,6 +951,16 @@ class ArticleTagger:
         if not summary and tags_using_summary:
             logger.debug(
                 f"  Skipping {len(tags_using_summary)} summary-based tags ({tags_using_summary}) because article ({file_name}) has no summary yet"
+            )
+            tags_using_summary = []
+
+        # Skip summary-based evaluation if summary contains error flags
+        if (
+            summary in ["failed_to_extract", "failed_to_summarise"]
+            and tags_using_summary
+        ):
+            logger.debug(
+                f"  Skipping {len(tags_using_summary)} summary-based tags ({tags_using_summary}) because article ({file_name}) has error flag in summary: {summary}"
             )
             tags_using_summary = []
 
@@ -1217,6 +1233,92 @@ class ArticleTagger:
         self._apply_tag_results_to_articles(results_by_article)
 
 
+def analyze_tag_results(tag_name: str) -> None:
+    """Analyze which articles match or don't match a specific tag and save results to TAG_ANALYSE.md.
+
+    Args:
+        tag_name: Name of the tag to analyze
+    """
+    logger.info(f"Analyzing results for tag: {tag_name}")
+    db_path = setup_tag_database()
+
+    # Connect to the database
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Get tag ID from tag name
+    cursor.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
+    tag_result = cursor.fetchone()
+
+    if not tag_result:
+        logger.error(f"Tag '{tag_name}' not found in the database")
+        conn.close()
+        return
+
+    tag_id = tag_result[0]
+
+    # Get articles that match the tag
+    cursor.execute(
+        """
+        SELECT a.file_name 
+        FROM article_summaries a
+        JOIN article_tags t ON a.id = t.article_id
+        WHERE t.tag_id = ? AND t.matches = 1
+        ORDER BY a.file_name
+    """,
+        (tag_id,),
+    )
+    matching_articles = [row[0] for row in cursor.fetchall()]
+
+    # Get articles that explicitly don't match the tag
+    cursor.execute(
+        """
+        SELECT a.file_name 
+        FROM article_summaries a
+        JOIN article_tags t ON a.id = t.article_id
+        WHERE t.tag_id = ? AND t.matches = 0
+        ORDER BY a.file_name
+    """,
+        (tag_id,),
+    )
+    non_matching_articles = [row[0] for row in cursor.fetchall()]
+
+    # Close connection
+    conn.close()
+
+    # Create markdown content
+    markdown_content = f"# Tag Analysis: {tag_name}\n\n"
+    markdown_content += (
+        f"Analysis generated on: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+    )
+
+    markdown_content += f"## Articles Matching Tag ({len(matching_articles)})\n\n"
+    if matching_articles:
+        for article in matching_articles:
+            markdown_content += f"- {article}\n"
+    else:
+        markdown_content += "No articles match this tag.\n"
+
+    markdown_content += (
+        f"\n## Articles Explicitly Not Matching Tag ({len(non_matching_articles)})\n\n"
+    )
+    if non_matching_articles:
+        for article in non_matching_articles:
+            markdown_content += f"- {article}\n"
+    else:
+        markdown_content += (
+            "No articles have been explicitly categorized as not matching this tag.\n"
+        )
+
+    # Save to markdown file
+    output_path = os.path.join(PROJECT_ROOT, "TAG_ANALYSE.md")
+    with open(output_path, "w") as f:
+        f.write(markdown_content)
+
+    logger.info(f"Tag analysis saved to {output_path}")
+    print(f"Tag analysis completed. Results saved to {output_path}")
+
+
 def main():
     """Main function to run the tagging process."""
     # Load environment variables
@@ -1227,6 +1329,11 @@ def main():
         "--folder-tags-only",
         action="store_true",
         help="Only create folder tags without applying other tags",
+    )
+    parser.add_argument(
+        "--analyze-tag",
+        type=str,
+        help="Analyze a specific tag and save results to TAG_ANALYSE.md",
     )
     args = parser.parse_args()
 
@@ -1256,6 +1363,9 @@ def main():
             article_tagger.apply_tags_to_articles()
         else:
             logger.info("\nSkipping AI-based tagging (folder-tags-only mode)")
+
+        if args.analyze_tag:
+            analyze_tag_results(args.analyze_tag)
 
         logger.info("\nTagging process completed successfully")
 

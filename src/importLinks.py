@@ -24,6 +24,7 @@ from .articleTagging import main as tag_articles
 from loguru import logger
 
 # Configure loguru logger
+logger.remove()
 logger.add(sys.stdout, level="INFO")
 
 sys.path.append(getConfig()["convertLinksDir"])
@@ -286,7 +287,7 @@ def updatePerTagFiles(root_folder):
                 for url, title in urls_with_titles:
                     f.write(f"# {title}\n{url}\n\n")
 
-            logger.info(
+            logger.debug(
                 f"  - Created URL file with {len(urls_with_titles)} URLs: {os.path.basename(tag_url_file_path)}"
             )
 
@@ -299,7 +300,7 @@ def updatePerTagFiles(root_folder):
             with open(tag_file_path, "w") as f:
                 json.dump(file_data, f, indent=2)
 
-            logger.info(
+            logger.debug(
                 f"  - Created file hash data with {len(file_data)} files: {os.path.basename(tag_file_path)}"
             )
 
@@ -481,10 +482,7 @@ def deleteDuplicateFiles(directory_path):
                 shutil.move(file_path, dest)
 
 
-if __name__ == "__main__":
-    # profiler = cProfile.Profile()
-    # profiler.enable()
-
+def main():
     logger.info("remove nonexistent files from database")
     remove_nonexistent_files_from_database()
     logger.info("remove orphaned tags from database")
@@ -498,8 +496,8 @@ if __name__ == "__main__":
     reTitlePDFs.retitleAllPDFs()
     logger.info("add files to database")
     add_files_to_database()
-    logger.info("summarize articles")
-    summarize_articles()
+    # logger.info("summarize articles") <-------------------------------------------------------------------------------
+    # summarize_articles()
     logger.info("tag articles")
     tag_articles()
     logger.info("move docs to target folder")
@@ -531,6 +529,24 @@ if __name__ == "__main__":
     )
     logger.info("update @voice lists")
     updateLists()
+
+    # profiler.disable()
+    # stats = pstats.Stats(profiler)
+    # stats.sort_stats(pstats.SortKey.CUMULATIVE)
+    # stats.print_stats("src")
+
+
+if __name__ == "__main__":
+    remove_nonexistent_files_from_database()
+    summarize_articles()
+    # profiler = cProfile.Profile()
+    # profiler.enable()
+
+    # main()
+    # deleteFilesMarkedToDelete()
+    # hideArticlesMarkedAsRead()
+    # tag_articles()
+    # updateLists()
 
     # profiler.disable()
     # stats = pstats.Stats(profiler)
