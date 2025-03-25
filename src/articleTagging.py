@@ -1,7 +1,6 @@
 import os
 import sys
 import json
-import sqlite3
 import hashlib
 import traceback
 import time
@@ -14,11 +13,11 @@ from dotenv import load_dotenv
 from openai import OpenAI
 from .utils import getConfig, searchArticlesByTags
 from .textExtraction import extract_text_from_file
+from . import db
+import re
 
 # Constants
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-STORAGE_DIR = PROJECT_ROOT / "storage"
-DB_FILENAME = "article_summaries.db"
 LOG_DIR = PROJECT_ROOT / "logs"
 LOG_FILE_PATH = LOG_DIR / "tagging.log"
 
@@ -46,56 +45,7 @@ def load_environment_variables() -> None:
 
 def setup_tag_database() -> str:
     """Setup the SQLite database and create necessary tables."""
-    STORAGE_DIR.mkdir(exist_ok=True)
-    db_path = STORAGE_DIR / DB_FILENAME
-    with sqlite3.connect(str(db_path)) as conn:
-        cursor = conn.cursor()
-        cursor.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS tags (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE,
-                description TEXT,
-                use_summary BOOLEAN,
-                any_tags TEXT,
-                and_tags TEXT,
-                not_any_tags TEXT,
-                last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            CREATE TABLE IF NOT EXISTS article_tags (
-                article_id INTEGER,
-                tag_id INTEGER,
-                matches BOOLEAN NOT NULL DEFAULT 1,
-                PRIMARY KEY (article_id, tag_id),
-                FOREIGN KEY (article_id) REFERENCES article_summaries(id),
-                FOREIGN KEY (tag_id) REFERENCES tags(id)
-            );
-            CREATE TABLE IF NOT EXISTS tag_hashes (
-                tag_id INTEGER PRIMARY KEY,
-                property_hash TEXT,
-                FOREIGN KEY (tag_id) REFERENCES tags(id)
-            );
-        """
-        )
-        conn.commit()
-    return str(db_path)
-
-
-def get_tag_property_hash(
-    description: str,
-    use_summary: bool,
-    any_tags: List[str] = None,
-    and_tags: List[str] = None,
-    not_any_tags: List[str] = None,
-) -> str:
-    """Compute an MD5 hash from tag properties."""
-    any_tags_str = "|".join(sorted(any_tags or []))
-    and_tags_str = "|".join(sorted(and_tags or []))
-    not_any_tags_str = "|".join(sorted(not_any_tags or []))
-    property_string = (
-        f"{description}|{use_summary}|{any_tags_str}|{and_tags_str}|{not_any_tags_str}"
-    )
-    return hashlib.md5(property_string.encode()).hexdigest()
+    return db.setup_database()
 
 
 class TagManager:
@@ -105,157 +55,55 @@ class TagManager:
         self.db_path = db_path
 
     def _with_connection(self):
-        return sqlite3.connect(self.db_path)
+        return db.get_connection()
 
     def sync_tags_from_config(self) -> None:
         """Synchronize tag definitions from config.json into the database."""
         config = getConfig()
-        tag_config = config.get("article_tags", {})
-        if not tag_config:
-            logger.error("No 'article_tags' section found in config.json")
-            return
-        with self._with_connection() as conn:
-            cursor = conn.cursor()
-            # Ensure filtering columns exist
-            cursor.execute("PRAGMA table_info(tags)")
-            columns = {row[1] for row in cursor.fetchall()}
-            for col in ("any_tags", "and_tags", "not_any_tags"):
-                if col not in columns:
-                    cursor.execute(f"ALTER TABLE tags ADD COLUMN {col} TEXT")
-            # Load existing tags
-            cursor.execute(
-                "SELECT id, name, description, use_summary, any_tags, and_tags, not_any_tags FROM tags"
-            )
-            existing_tags = {
-                row[1]: {
-                    "id": row[0],
-                    "description": row[2],
-                    "use_summary": bool(row[3]),
-                    "any_tags": json.loads(row[4]) if row[4] else [],
-                    "and_tags": json.loads(row[5]) if row[5] else [],
-                    "not_any_tags": json.loads(row[6]) if row[6] else [],
-                }
-                for row in cursor.fetchall()
-            }
-            # Load property hashes for existing tags
-            cursor.execute("SELECT tag_id, property_hash FROM tag_hashes")
-            property_hashes = {row[0]: row[1] for row in cursor.fetchall()}
-            # Process each tag from config
-            for tag_name, tag_data in tag_config.items():
-                if isinstance(tag_data, list):
-                    continue
-                description = tag_data.get("description", "")
-                use_summary = tag_data.get("use_summary", True)
-                any_tags = tag_data.get("any_tags", [])
-                and_tags = tag_data.get("and_tags", [])
-                not_any_tags = tag_data.get("not_any_tags", [])
-                new_hash = get_tag_property_hash(
-                    description, use_summary, any_tags, and_tags, not_any_tags
-                )
-                if tag_name in existing_tags:
-                    tag_id = existing_tags[tag_name]["id"]
-                    if property_hashes.get(tag_id) != new_hash:
-                        cursor.execute(
-                            """UPDATE tags SET description = ?, use_summary = ?, any_tags = ?, and_tags = ?, not_any_tags = ?, 
-                               last_updated = CURRENT_TIMESTAMP WHERE id = ?""",
-                            (
-                                description,
-                                use_summary,
-                                json.dumps(any_tags) if any_tags else None,
-                                json.dumps(and_tags) if and_tags else None,
-                                json.dumps(not_any_tags) if not_any_tags else None,
-                                tag_id,
-                            ),
-                        )
-                        if property_hashes.get(tag_id):
-                            cursor.execute(
-                                "UPDATE tag_hashes SET property_hash = ? WHERE tag_id = ?",
-                                (new_hash, tag_id),
-                            )
-                        else:
-                            cursor.execute(
-                                "INSERT INTO tag_hashes (tag_id, property_hash) VALUES (?, ?)",
-                                (tag_id, new_hash),
-                            )
-                        cursor.execute(
-                            "DELETE FROM article_tags WHERE tag_id = ?", (tag_id,)
-                        )
-                        logger.debug(
-                            f"Updated tag '{tag_name}' and cleared previous assignments"
-                        )
-                else:
-                    cursor.execute(
-                        "INSERT INTO tags (name, description, use_summary, any_tags, and_tags, not_any_tags) VALUES (?, ?, ?, ?, ?, ?)",
-                        (
-                            tag_name,
-                            description,
-                            use_summary,
-                            json.dumps(any_tags) if any_tags else None,
-                            json.dumps(and_tags) if and_tags else None,
-                            json.dumps(not_any_tags) if not_any_tags else None,
-                        ),
-                    )
-                    tag_id = cursor.lastrowid
-                    cursor.execute(
-                        "INSERT INTO tag_hashes (tag_id, property_hash) VALUES (?, ?)",
-                        (tag_id, new_hash),
-                    )
-                    logger.debug(f"Added new tag '{tag_name}'")
-            conn.commit()
-
-    def _initialize_db(self, cursor: sqlite3.Cursor) -> None:
-        """Create indexes to improve performance."""
-        cursor.executescript(
-            """
-            CREATE INDEX IF NOT EXISTS idx_article_summaries_file_name ON article_summaries(file_name);
-            CREATE INDEX IF NOT EXISTS idx_tags_name ON tags(name);
-            CREATE INDEX IF NOT EXISTS idx_article_tags_article_id ON article_tags(article_id);
-            CREATE INDEX IF NOT EXISTS idx_article_tags_tag_id ON article_tags(tag_id);
-        """
-        )
+        db.sync_tags_from_config(config)
 
     def _get_excluded_folders(self) -> Set[str]:
-        return set(getConfig().get("folderTagExclusions", []))
+        """Get list of folders that should be excluded from folder tagging."""
+        config = getConfig()
+        # Use "excludedFolders" (or "folderTagExclusions" if that’s what you prefer)
+        return set(config.get("excludedFolders", []))
 
-    def _fetch_existing_tags(
-        self, cursor: sqlite3.Cursor
-    ) -> Tuple[Dict[str, int], Dict[str, int]]:
-        cursor.execute(
-            "SELECT id, name FROM tags WHERE name LIKE 'folder_%' OR name LIKE 'prev_folder_%'"
-        )
+    def _fetch_existing_tags(self, cursor) -> Dict[str, Dict[str, int]]:
+        """Fetch all existing folder and prev_folder tags from the database."""
         folder_tags = {}
         prev_folder_tags = {}
-        for tag_id, name in cursor.fetchall():
-            if name.startswith("folder_"):
-                folder_tags[name] = tag_id
-            elif name.startswith("prev_folder_"):
-                prev_folder_tags[name] = tag_id
-        return folder_tags, prev_folder_tags
+        for tag_id, tag_name in db.get_folder_tags():
+            if tag_name.startswith("folder_"):
+                # Remove the 'folder_' prefix for matching purposes
+                folder_tags[tag_name[7:]] = tag_id
+            elif tag_name.startswith("prev_folder_"):
+                prev_folder_tags[tag_name[12:]] = tag_id
+        return {"folder_tags": folder_tags, "prev_folder_tags": prev_folder_tags}
 
     def _get_articles(
-        self, cursor: sqlite3.Cursor, max_articles: Optional[int], debug: bool
+        self, cursor, max_articles: Optional[int], debug: bool
     ) -> List[Tuple]:
-        cursor.execute("SELECT id, file_name FROM article_summaries")
-        articles = cursor.fetchall()
-        if max_articles and len(articles) > max_articles:
+        """Get articles from database to process for folder tagging."""
+        all_articles = db.get_all_articles()
+        if max_articles:
             if debug:
-                logger.debug(f"Limiting to {max_articles} articles")
-            articles = articles[:max_articles]
-        if debug:
-            logger.debug(f"Processing {len(articles)} articles for folder tagging")
-        return articles
+                logger.info(f"Limiting folder tagging to {max_articles} articles")
+            all_articles = all_articles[:max_articles]
+        return all_articles
 
-    def _get_current_article_tags(self, cursor: sqlite3.Cursor) -> Dict[int, Dict]:
-        cursor.execute(
-            """SELECT at.article_id, t.name, t.id 
-               FROM article_tags at
-               JOIN tags t ON at.tag_id = t.id 
-               WHERE t.name LIKE 'folder_%'"""
-        )
-        article_tags = {}
-        for article_id, tag_name, tag_id in cursor.fetchall():
-            article_tags.setdefault(article_id, {})[tag_name] = tag_id
-        return article_tags
+    def _get_current_article_tags(self, cursor) -> Dict[int, Dict]:
+        """Get a dictionary mapping article IDs to their current folder tag associations."""
+        article_tags = db.get_current_article_tags()
+        # Transform to a simple format (set of tag IDs for each article)
+        result = {}
+        for article_id, tags_dict in article_tags.items():
+            result[article_id] = {
+                "matching": {tag_id for tag_id, _ in tags_dict.get("matching", [])},
+                "not_matching": {
+                    tag_id for tag_id, _ in tags_dict.get("not_matching", [])
+                },
+            }
+        return result
 
     def _process_articles(
         self,
@@ -265,123 +113,109 @@ class TagManager:
         current_article_tags: Dict,
         folder_tags: Dict[str, int],
         prev_folder_tags: Dict[str, int],
-    ) -> Tuple[Any, Any, Any, Any, Any, Any]:
-        folder_locations = {}
-        tags_to_create = set()
-        prev_tags_to_create = set()
-        article_tag_associations = []
-        article_prev_tag_associations = []
-        article_keep_tags = {}
+    ) -> Tuple[Dict[str, Set[int]], Dict[str, Set[int]]]:
+        """
+        Process articles and collect folder information.
+        Returns two dictionaries:
+          - article_folders: mapping folder (relative path) to set of article IDs
+          - article_prev_folders: mapping parent folder (relative path) to set of article IDs
+        """
+        article_folders = {}
+        article_prev_folders = {}
+
         for article_id, file_name in articles:
-            if not file_name:
-                continue
-            keep_tags = set()
-            article_folders = set()
-            file_path = os.path.join(articles_path, file_name)
-            rel_path = os.path.relpath(file_path, articles_path)
-            folder_path = os.path.dirname(rel_path)
-            if folder_path:
-                current_path = ""
-                for folder in Path(folder_path).parts:
-                    if folder in exclusions or not folder:
-                        continue
-                    current_path = (
-                        f"{current_path}/{folder}" if current_path else folder
-                    )
-                    article_folders.add(current_path)
-                    folder_tag = f"folder_{current_path}"
-                    keep_tags.add(folder_tag)
-                    if folder_tag in folder_tags:
-                        article_tag_associations.append(
-                            (article_id, folder_tags[folder_tag])
+            try:
+                relative_folder = os.path.dirname(file_name)
+                if not relative_folder:
+                    continue
+                # Normalize folder path
+                relative_folder = relative_folder.replace("\\", "/")
+                if any(excl in relative_folder for excl in exclusions):
+                    continue
+
+                # Direct folder: add article_id under this folder key
+                article_folders.setdefault(relative_folder, set()).add(article_id)
+
+                # Also process parent folders (if any)
+                path_parts = relative_folder.split("/")
+                for i in range(1, len(path_parts)):
+                    prev_folder = "/".join(path_parts[:i])
+                    if prev_folder and not any(
+                        excl in prev_folder for excl in exclusions
+                    ):
+                        article_prev_folders.setdefault(prev_folder, set()).add(
+                            article_id
                         )
-                    else:
-                        tags_to_create.add(
-                            (
-                                folder_tag,
-                                f"Articles located in the '{current_path}' folder",
-                            )
-                        )
-                    prev_tag = f"prev_folder_{current_path}"
-                    if prev_tag in prev_folder_tags:
-                        article_prev_tag_associations.append(
-                            (article_id, prev_folder_tags[prev_tag])
-                        )
-                    else:
-                        prev_tags_to_create.add(
-                            (
-                                prev_tag,
-                                f"Articles previously located in the '{current_path}' folder",
-                            )
-                        )
-                folder_locations[article_id] = article_folders
-                article_keep_tags[article_id] = keep_tags
-        tags_to_remove = []
-        for article_id, current_tags in current_article_tags.items():
-            keep = article_keep_tags.get(article_id, set())
-            for tag_name, tag_id in current_tags.items():
-                if tag_name.startswith("folder_") and tag_name not in keep:
-                    tags_to_remove.append((article_id, tag_id))
-        return (
-            folder_locations,
-            tags_to_create,
-            prev_tags_to_create,
-            article_tag_associations,
-            article_prev_tag_associations,
-            tags_to_remove,
-        )
+            except Exception as e:
+                logger.error(f"Error processing article {file_name}: {e}")
+
+        return article_folders, article_prev_folders
 
     def _batch_create_tags(
         self,
-        cursor: sqlite3.Cursor,
+        cursor,
         tags_to_create: set,
         tags_dict: Dict[str, int],
-        folder_locations: Dict[int, set],
+        folder_locations: Dict[str, Set[int]],
         is_prev: bool,
         debug: bool,
-    ) -> List[Tuple[int, int]]:
-        new_associations = []
-        for name, desc in tags_to_create:
-            cursor.execute(
-                "INSERT OR IGNORE INTO tags (name, description, use_summary) VALUES (?, ?, 1)",
-                (name, desc),
-            )
-            cursor.execute("SELECT id FROM tags WHERE name = ?", (name,))
-            tag_id = cursor.fetchone()[0]
-            tags_dict[name] = tag_id
-            folder_key = name[12:] if is_prev else name[7:]
-            for article_id, folders in folder_locations.items():
-                if folder_key in folders:
-                    new_associations.append((article_id, tag_id))
-        tag_type = "prev_folder" if is_prev else "folder"
-        logger.debug(f"Created {len(tags_to_create)} new {tag_type} tags")
-        return new_associations
+    ) -> None:
+        """Create folder tags in batches and update article-tag relationships."""
+        prefix = "prev_folder_" if is_prev else "folder_"
+
+        for folder_name in tags_to_create:
+            tag_name = f"{prefix}{folder_name}"
+            description = f"{'Parent folder' if is_prev else 'Folder'}: {folder_name}"
+
+            tag_id = db.get_tag_id_by_name(tag_name)
+            if not tag_id:
+                # Create the tag if it doesn't exist
+                with db.get_connection() as conn:
+                    cursor = conn.cursor()
+                    cursor.execute(
+                        "INSERT INTO tags (name, description, use_summary) VALUES (?, ?, ?)",
+                        (tag_name, description, False),
+                    )
+                    tag_id = cursor.lastrowid
+                    conn.commit()
+                tags_dict[folder_name] = tag_id
+                if debug:
+                    logger.debug(f"Created tag: {tag_name} with ID {tag_id}")
+
+            # For each article in this folder, assign the tag
+            for article_id in folder_locations.get(folder_name, set()):
+                db.set_article_tag(article_id, tag_id, True)
+                if debug:
+                    logger.debug(f"Tagged article {article_id} with {tag_name}")
 
     def create_folder_tags(
         self,
         articles_path: str,
         max_articles: Optional[int] = None,
         debug: bool = False,
-    ) -> None:
-        start_time = time.time()
-        logger.debug(f"Starting folder tagging at {start_time}")
-        with sqlite3.connect(self.db_path) as conn:
-            conn.execute("PRAGMA synchronous = OFF")
-            conn.execute("PRAGMA journal_mode = MEMORY")
+    ) -> Dict[str, Dict[str, int]]:
+        """Create and update folder tags based on article file locations."""
+        logger.info("Creating folder tags...")
+        exclusions = self._get_excluded_folders()
+        if debug:
+            logger.debug(f"Excluded folders: {exclusions}")
+
+        with db.get_connection() as conn:
             cursor = conn.cursor()
-            self._initialize_db(cursor)
-            exclusions = self._get_excluded_folders()
-            folder_tags, prev_folder_tags = self._fetch_existing_tags(cursor)
+            tag_dict = self._fetch_existing_tags(cursor)
+            folder_tags = tag_dict["folder_tags"]
+            prev_folder_tags = tag_dict["prev_folder_tags"]
+
+            if debug:
+                logger.debug(f"Found {len(folder_tags)} existing folder tags")
+                logger.debug(f"Found {len(prev_folder_tags)} existing prev_folder tags")
+
             articles = self._get_articles(cursor, max_articles, debug)
+            if debug:
+                logger.debug(f"Found {len(articles)} articles to process")
             current_article_tags = self._get_current_article_tags(cursor)
-            (
-                folder_locations,
-                tags_to_create,
-                prev_tags_to_create,
-                article_tag_associations,
-                article_prev_tag_associations,
-                tags_to_remove,
-            ) = self._process_articles(
+
+            article_folders, article_prev_folders = self._process_articles(
                 articles,
                 articles_path,
                 exclusions,
@@ -389,46 +223,36 @@ class TagManager:
                 folder_tags,
                 prev_folder_tags,
             )
-            if tags_to_create:
-                new_assoc = self._batch_create_tags(
-                    cursor, tags_to_create, folder_tags, folder_locations, False, debug
-                )
-                article_tag_associations.extend(new_assoc)
-            if prev_tags_to_create:
-                new_assoc = self._batch_create_tags(
-                    cursor,
-                    prev_tags_to_create,
-                    prev_folder_tags,
-                    folder_locations,
-                    True,
-                    debug,
-                )
-                article_prev_tag_associations.extend(new_assoc)
-            if tags_to_remove:
-                cursor.executemany(
-                    "DELETE FROM article_tags WHERE article_id = ? AND tag_id = ?",
-                    tags_to_remove,
-                )
-                logger.info(f"Removed {len(tags_to_remove)} folder tag associations")
-            if article_tag_associations:
-                cursor.executemany(
-                    "INSERT OR IGNORE INTO article_tags (article_id, tag_id, matches) VALUES (?, ?, 1)",
-                    article_tag_associations,
-                )
-                logger.info(
-                    f"Created {len(article_tag_associations)} new folder tag associations"
-                )
-            if article_prev_tag_associations:
-                cursor.executemany(
-                    "INSERT OR IGNORE INTO article_tags (article_id, tag_id, matches) VALUES (?, ?, 1)",
-                    article_prev_tag_associations,
-                )
-                logger.info(
-                    f"Created {len(article_prev_tag_associations)} new prev_folder tag associations"
-                )
-            conn.commit()
-        elapsed = time.time() - start_time
-        logger.info(f"Folder tagging completed in {elapsed:.2f} seconds")
+            if debug:
+                logger.debug(f"Found {len(article_folders)} unique folders")
+                logger.debug(f"Found {len(article_prev_folders)} unique parent folders")
+
+            folder_tags_to_create = set(article_folders.keys()) - set(
+                folder_tags.keys()
+            )
+            self._batch_create_tags(
+                cursor,
+                folder_tags_to_create,
+                folder_tags,
+                article_folders,
+                False,
+                debug,
+            )
+
+            prev_folder_tags_to_create = set(article_prev_folders.keys()) - set(
+                prev_folder_tags.keys()
+            )
+            self._batch_create_tags(
+                cursor,
+                prev_folder_tags_to_create,
+                prev_folder_tags,
+                article_prev_folders,
+                True,
+                debug,
+            )
+
+        logger.info("Folder tags created successfully")
+        return {"folder_tags": folder_tags, "prev_folder_tags": prev_folder_tags}
 
 
 class TagEvaluator:
@@ -531,16 +355,16 @@ class TagEvaluator:
         article_id: int,
         file_name: str,
         text: str,
-        tags_list: List[Tuple[int, str, str]],
+        tags_to_evaluate: List[Tuple[int, str, str]],
     ) -> Dict[int, bool]:
-        if not tags_list or not text:
+        if not tags_to_evaluate or not text:
             return {}
         tag_batches = [
-            tags_list[i : i + self.batch_size]
-            for i in range(0, len(tags_list), self.batch_size)
+            tags_to_evaluate[i : i + self.batch_size]
+            for i in range(0, len(tags_to_evaluate), self.batch_size)
         ]
         logger.debug(
-            f"Processing {len(tags_list)} tags in {len(tag_batches)} batches (batch size: {self.batch_size})"
+            f"Processing {len(tags_to_evaluate)} tags in {len(tag_batches)} batches (batch size: {self.batch_size})"
         )
         tag_results = {}
         for i, batch in enumerate(tag_batches):
@@ -555,18 +379,6 @@ class TagEvaluator:
             except Exception as e:
                 logger.error(f"Error processing batch {i+1}: {e}")
         return tag_results
-
-    def evaluate_if_article_matches_tag(
-        self, text: str, tag_name: str, tag_description: str
-    ) -> bool:
-        try:
-            results = self.evaluate_tags(text, [(0, tag_name, tag_description)])
-            return results.get(0, False)
-        except Exception as e:
-            logger.error(
-                f"Error evaluating if article matches tag '{tag_name}': {e}\n{traceback.format_exc()}"
-            )
-            return False
 
 
 class ArticleTagger:
@@ -584,192 +396,77 @@ class ArticleTagger:
         self.tag_search_cache = {}
 
     def _get_active_tag_ids(self) -> Set[int]:
-        with sqlite3.connect(self.db_path) as conn:
+        """Get the IDs of all active tags that should be applied to articles."""
+        active_tag_ids = set()
+        with db.get_connection() as conn:
             cursor = conn.cursor()
-            active_tags = {
-                tag_name: tag_data
-                for tag_name, tag_data in self.config.get("article_tags", {}).items()
-                if tag_data.get("enabled", True)
-            }
             cursor.execute("SELECT id, name FROM tags")
-            return {
-                row[0]
-                for row in cursor.fetchall()
-                if row[1] in active_tags or row[1].startswith("folder_")
-            }
+            for tag_id, tag_name in cursor.fetchall():
+                if not tag_name.startswith("folder_") and not tag_name.startswith(
+                    "prev_folder_"
+                ):
+                    active_tag_ids.add(tag_id)
+        return active_tag_ids
 
     def _get_articles_needing_tagging(self) -> List[Tuple[int, str, str, str]]:
-        articles_to_tag = []
-        evaluated_count = 0
-        seen = set()
-        i = 1
-        with sqlite3.connect(self.db_path) as conn:
-            cursor = conn.cursor()
-            while evaluated_count < self.max_articles_per_session:
-                cursor.execute(
-                    """
-                    SELECT a.id, a.file_hash, a.file_name, a.summary 
-                    FROM article_summaries a
-                    WHERE EXISTS (
-                        SELECT 1 FROM tags t
-                        WHERE t.id NOT IN (
-                            SELECT tag_id FROM article_tags WHERE article_id = a.id
-                        )
-                        AND t.name NOT LIKE 'folder_%'
-                        AND t.name NOT LIKE 'prev_folder_%'
-                        AND NOT (t.use_summary = 1 AND (a.summary = 'failed_to_extract' OR a.summary = 'failed_to_summarise'))
-                    )
-                    ORDER BY RANDOM()
-                    LIMIT ?
-                    """,
-                    (self.max_articles_per_session * i,),
-                )
-                i += 1
-                batch = cursor.fetchall()
-                batch = [article for article in batch if article[0] not in seen]
-                if not batch:
-                    break
-                for article in batch:
-                    seen.add(article[0])
-                    work_units = self._prepare_article_work_units(
-                        article, self._get_active_tag_ids()
-                    )
-                    if work_units:
-                        articles_to_tag.append(article)
-                        evaluated_count += 1
-                    if evaluated_count >= self.max_articles_per_session:
-                        logger.info(
-                            f"Reached max articles to tag: {self.max_articles_per_session}"
-                        )
-                        break
-        return articles_to_tag
+        """Get articles that need tagging."""
+        return db.get_articles_needing_tagging(self.max_articles_per_session)
 
     def _get_tags_for_article(
         self, article_id: int, active_tag_ids: Set[int]
-    ) -> List[Tuple[int, str, str, bool, List[str], List[str], List[str]]]:
-        with sqlite3.connect(self.db_path) as conn:
+    ) -> List[Tuple[int, str, str]]:
+        """Get tags that need to be evaluated for an article."""
+        tags_to_evaluate = []
+        with db.get_connection() as conn:
             cursor = conn.cursor()
-            cursor.execute(
-                """
-                SELECT t.id, t.name, t.description, t.use_summary, t.any_tags, t.and_tags, t.not_any_tags
-                FROM tags t
-                WHERE t.id NOT IN (
-                    SELECT tag_id FROM article_tags WHERE article_id = ?
-                )
-                """,
-                (article_id,),
-            )
-            tags = cursor.fetchall()
-        processed = []
-        for (
-            tag_id,
-            tag_name,
-            tag_desc,
-            use_summary,
-            any_tags,
-            and_tags,
-            not_any_tags,
-        ) in tags:
-            if (
-                not tag_name.startswith("folder_")
-                and not tag_name.startswith("prev_")
-                and tag_id in active_tag_ids
-            ):
-                processed.append(
-                    (
-                        tag_id,
-                        tag_name,
-                        tag_desc,
-                        use_summary,
-                        json.loads(any_tags) if any_tags else [],
-                        json.loads(and_tags) if and_tags else [],
-                        json.loads(not_any_tags) if not_any_tags else [],
-                    )
-                )
-        return processed
+            tag_details = db.get_all_tag_details()
+            for tag_id in active_tag_ids:
+                if tag_id in tag_details:
+                    tag = tag_details[tag_id]
+                    # Skip tags with filtering criteria (handled separately)
+                    if (
+                        tag.get("any_tags")
+                        or tag.get("and_tags")
+                        or tag.get("not_any_tags")
+                    ):
+                        continue
+                    tags_to_evaluate.append((tag_id, tag["name"], tag["description"]))
+        return tags_to_evaluate
 
     def _get_tag_criteria_cache_key(self, any_tags, and_tags, not_any_tags) -> str:
-        return f"any:{'|'.join(sorted(any_tags)) if any_tags else ''}|and:{'|'.join(sorted(and_tags)) if and_tags else ''}|not:{'|'.join(sorted(not_any_tags)) if not_any_tags else ''}"
+        """Create a cache key for tag search criteria."""
+        any_tags_str = "|".join(sorted(any_tags)) if any_tags else ""
+        and_tags_str = "|".join(sorted(and_tags)) if and_tags else ""
+        not_any_tags_str = "|".join(sorted(not_any_tags)) if not_any_tags else ""
+        return f"{any_tags_str}#{and_tags_str}#{not_any_tags_str}"
 
     def _prepare_article_work_units(
         self, article: Tuple[int, str, str, str], active_tag_ids: Set[int]
-    ) -> List[Dict[str, Any]]:
+    ) -> List[Dict]:
+        """Prepare work units for an article to be processed for content tagging."""
         article_id, file_hash, file_name, summary = article
         tags_to_evaluate = self._get_tags_for_article(article_id, active_tag_ids)
-        logger.debug(
-            f"Tags to evaluate for article {article_id}: {len(tags_to_evaluate)}"
-        )
-        if not tags_to_evaluate:
-            return []
-        filtered_tags = []
-        article_path = os.path.join(self.articles_path, file_name)
-        for tag in tags_to_evaluate:
-            (
-                tag_id,
-                tag_name,
-                tag_desc,
-                use_summary,
-                any_tags,
-                and_tags,
-                not_any_tags,
-            ) = tag
-            if not any_tags and not and_tags and not not_any_tags:
-                filtered_tags.append((tag_id, tag_name, tag_desc, use_summary))
-            else:
-                cache_key = self._get_tag_criteria_cache_key(
-                    any_tags, and_tags, not_any_tags
-                )
-                if cache_key in self.tag_search_cache:
-                    if article_id in self.tag_search_cache[cache_key]:
-                        filtered_tags.append((tag_id, tag_name, tag_desc, use_summary))
-                    else:
-                        logger.debug(
-                            f"Article {article_id} filtered out for tag {tag_name} (cache hit)"
-                        )
-                else:
-                    logger.debug(
-                        f"No cache entry for {cache_key}, including tag {tag_name} without filtering"
-                    )
-                    filtered_tags.append((tag_id, tag_name, tag_desc, use_summary))
-        if not filtered_tags:
-            logger.debug(
-                f"No tags to evaluate for article {article_id} after filtering"
-            )
-            return []
-        summary_tags = []
-        full_text_tags = []
-        for tag_id, tag_name, tag_desc, use_summary in filtered_tags:
-            if use_summary:
-                if summary and summary not in [
-                    "failed_to_extract",
-                    "failed_to_summarise",
-                ]:
-                    summary_tags.append((tag_id, tag_name, tag_desc))
-            else:
-                full_text_tags.append((tag_id, tag_name, tag_desc))
         work_units = []
-        if summary_tags:
-            work_units.append(
-                {
-                    "article_id": article_id,
-                    "file_hash": file_hash,
-                    "file_name": file_name,
-                    "text": summary,
-                    "tags": summary_tags,
-                    "use_summary": True,
-                }
-            )
-        if full_text_tags:
-            work_units.append(
-                {
-                    "article_id": article_id,
-                    "file_hash": file_hash,
-                    "file_name": file_name,
-                    "text": None,
-                    "tags": full_text_tags,
-                    "use_summary": False,
-                }
-            )
+        if tags_to_evaluate:
+            file_path = os.path.join(self.articles_path, file_name)
+            try:
+                if os.path.exists(file_path):
+                    article_text = summary
+                    if not article_text:
+                        # Extract text if summary is missing
+                        article_text, _, _ = extract_text_from_file(file_path)
+                    work_units.append(
+                        {
+                            "article_id": article_id,
+                            "file_name": file_name,
+                            "text": article_text,
+                            "tags": tags_to_evaluate,
+                        }
+                    )
+                else:
+                    logger.warning(f"File not found: {file_path}")
+            except Exception as e:
+                logger.error(f"Error extracting text from {file_path}: {e}")
         return work_units
 
     def _process_article_tag_batch(
@@ -778,33 +475,26 @@ class ArticleTagger:
         file_name: str,
         text: str,
         tags_batch: List[Tuple[int, str, str]],
-    ) -> Dict:
-        results = {"matches": [], "non_matches": []}
-        if not text:
-            logger.warning(f"Empty text for article {article_id}, file: {file_name}")
-            return results
-        for tag_id, tag_name, tag_desc in tags_batch:
-            try:
-                if self.tag_evaluator.evaluate_if_article_matches_tag(
-                    text, tag_name, tag_desc
-                ):
-                    results["matches"].append((tag_id, tag_name, tag_desc))
-                else:
-                    results["non_matches"].append((tag_id, tag_name, tag_desc))
-            except Exception as e:
-                logger.error(
-                    f"Error evaluating tag {tag_name} for article {article_id}: {e}"
-                )
-                results["non_matches"].append((tag_id, tag_name, tag_desc))
-        return results
+    ) -> Dict[int, bool]:
+        """Process a batch of tags for an article."""
+        logger.info(f"Evaluating article {file_name} with {len(tags_batch)} tags")
+        try:
+            return self.tag_evaluator.batch_evaluate_tags(
+                article_id, file_name, text, tags_batch
+            )
+        except Exception as e:
+            logger.error(f"Error evaluating article {file_name}: {e}")
+            logger.error(traceback.format_exc())
+            return {}
 
     def _process_work_units(self, work_units: List[Dict]) -> Dict[int, Dict]:
+        """Process all work units in parallel using a ThreadPoolExecutor."""
         if not work_units:
             logger.debug("No work units to process")
             return {}
         logger.info(f"Processing {len(work_units)} work units in parallel")
         results_by_article = {}
-        file_names = {}
+        file_names_by_article = {}
         with concurrent.futures.ThreadPoolExecutor(
             max_workers=self.max_tagging_threads
         ) as executor:
@@ -812,19 +502,9 @@ class ArticleTagger:
             for unit in work_units:
                 article_id = unit["article_id"]
                 file_name = unit["file_name"]
-                file_names[article_id] = file_name
+                file_names_by_article[article_id] = file_name
                 text = unit["text"]
-                if not unit["use_summary"] and text is None:
-                    file_path = os.path.join(self.articles_path, file_name)
-                    if os.path.exists(file_path):
-                        try:
-                            text = extract_text_from_file(file_path, self.config)
-                        except Exception as e:
-                            logger.error(f"Error extracting text from {file_name}: {e}")
-                            continue
-                    else:
-                        logger.warning(f"File not found: {file_path}")
-                        continue
+                # Submit the work unit for parallel processing
                 future = executor.submit(
                     self._process_article_tag_batch,
                     article_id,
@@ -839,16 +519,14 @@ class ArticleTagger:
                     batch_results = future.result()
                     if article_id not in results_by_article:
                         results_by_article[article_id] = {
-                            "file_name": file_names[article_id],
-                            "matches": [],
-                            "non_matches": [],
+                            "matches": {},
+                            "non_matches": {},
                         }
-                    results_by_article[article_id]["matches"].extend(
-                        batch_results["matches"]
-                    )
-                    results_by_article[article_id]["non_matches"].extend(
-                        batch_results["non_matches"]
-                    )
+                    for tag_id, matched in batch_results.items():
+                        if matched:
+                            results_by_article[article_id]["matches"][tag_id] = True
+                        else:
+                            results_by_article[article_id]["non_matches"][tag_id] = True
                 except Exception as e:
                     logger.error(
                         f"Error processing article {article_id}: {e}\n{traceback.format_exc()}"
@@ -858,210 +536,180 @@ class ArticleTagger:
     def _apply_tag_results_to_articles(
         self, results_by_article: Dict[int, Dict]
     ) -> None:
-        logger.info(f"Applying results to {len(results_by_article)} articles")
-        with sqlite3.connect(self.db_path) as conn:
+        """Apply tag evaluation results to articles in the database."""
+        with db.get_connection() as conn:
             cursor = conn.cursor()
-            conn.execute("BEGIN TRANSACTION")
-            try:
-                for article_id, result in results_by_article.items():
-                    for tag in result["matches"]:
-                        tag_id, tag_name, tag_desc = tag
-                        cursor.execute(
-                            "SELECT 1 FROM article_tags WHERE article_id = ? AND tag_id = ?",
-                            (article_id, tag_id),
-                        )
-                        if cursor.fetchone():
-                            cursor.execute(
-                                "UPDATE article_tags SET matches = 1 WHERE article_id = ? AND tag_id = ?",
-                                (article_id, tag_id),
-                            )
-                        else:
-                            cursor.execute(
-                                "INSERT INTO article_tags (article_id, tag_id, matches) VALUES (?, ?, 1)",
-                                (article_id, tag_id),
-                            )
-                    for tag in result["non_matches"]:
-                        tag_id, tag_name, tag_desc = tag
-                        cursor.execute(
-                            "SELECT 1 FROM article_tags WHERE article_id = ? AND tag_id = ?",
-                            (article_id, tag_id),
-                        )
-                        if cursor.fetchone():
-                            cursor.execute(
-                                "UPDATE article_tags SET matches = 0 WHERE article_id = ? AND tag_id = ?",
-                                (article_id, tag_id),
-                            )
-                        else:
-                            cursor.execute(
-                                "INSERT INTO article_tags (article_id, tag_id, matches) VALUES (?, ?, 0)",
-                                (article_id, tag_id),
-                            )
-                conn.commit()
-                logger.info(
-                    f"Successfully applied tag results to {len(results_by_article)} articles"
-                )
-            except Exception as e:
-                conn.rollback()
-                logger.error(
-                    f"Error applying tag results to articles: {e}\n{traceback.format_exc()}"
-                )
+            for article_id, results in results_by_article.items():
+                for tag_id in results.get("matches", {}):
+                    db.set_article_tag(article_id, tag_id, True)
+                for tag_id in results.get("non_matches", {}):
+                    db.set_article_tag(article_id, tag_id, False)
+            conn.commit()
 
-    def _cache_tag_search_results(self, cursor: sqlite3.Cursor) -> None:
-        try:
-            cursor.execute(
-                "SELECT id, name, any_tags, and_tags, not_any_tags FROM tags"
-            )
-            all_tags = cursor.fetchall()
-            self.tag_search_cache = {}
-            for (
-                tag_id,
-                tag_name,
-                any_tags_json,
-                and_tags_json,
-                not_any_tags_json,
-            ) in all_tags:
-                any_tags = json.loads(any_tags_json) if any_tags_json else []
-                and_tags = json.loads(and_tags_json) if and_tags_json else []
-                not_any_tags = (
-                    json.loads(not_any_tags_json) if not_any_tags_json else []
-                )
-                if not any_tags and not and_tags and not not_any_tags:
-                    continue
-                cache_key = self._get_tag_criteria_cache_key(
-                    any_tags, and_tags, not_any_tags
-                )
-                if cache_key not in self.tag_search_cache:
-                    matching_articles = searchArticlesByTags(
-                        all_tags=and_tags,
-                        any_tags=any_tags,
-                        not_any_tags=not_any_tags,
-                        cursor=cursor,
-                    )
-                    self.tag_search_cache[cache_key] = set(matching_articles.keys())
-                    logger.debug(
-                        f"Cached {len(matching_articles)} articles for criteria: {cache_key}"
-                    )
-        except Exception as e:
-            logger.error(
-                f"Error caching tag search results: {e}\n{traceback.format_exc()}"
-            )
+    def _cache_tag_search_results(self, cursor) -> None:
+        """Cache tag search criteria for tags that have filtering (any/and/not)."""
+        self.tag_search_cache = {}
+        tag_details = db.get_all_tag_details()
+        for tag_id, tag in tag_details.items():
+            any_tags = tag.get("any_tags", [])
+            and_tags = tag.get("and_tags", [])
+            not_any_tags = tag.get("not_any_tags", [])
+            if any_tags or and_tags or not_any_tags:
+                self.tag_search_cache[tag_id] = {
+                    "name": tag["name"],
+                    "any_tags": any_tags,
+                    "and_tags": and_tags,
+                    "not_any_tags": not_any_tags,
+                }
 
     def apply_tags_to_articles(self) -> None:
-        active_tag_ids = self._get_active_tag_ids()
-        articles_to_tag = self._get_articles_needing_tagging()
-        if len(articles_to_tag) > self.max_articles_per_session:
-            articles_to_tag = articles_to_tag[: self.max_articles_per_session]
-        logger.info(f"Found {len(articles_to_tag)} articles that need tagging")
-        if not articles_to_tag:
-            logger.info("No articles to tag")
+        """Apply content-based tags to articles based on tag definitions."""
+        logger.info("Starting tagging process...")
+        articles = self._get_articles_needing_tagging()
+        if not articles:
+            logger.info("No articles need tagging")
             return
-        with sqlite3.connect(self.db_path) as conn:
+        logger.info(f"Found {len(articles)} articles for tagging")
+        active_tag_ids = self._get_active_tag_ids()
+        logger.info(f"Found {len(active_tag_ids)} active tags")
+
+        with db.get_connection() as conn:
             cursor = conn.cursor()
             self._cache_tag_search_results(cursor)
-            all_work_units = []
-            for article in articles_to_tag:
-                all_work_units.extend(
-                    self._prepare_article_work_units(article, active_tag_ids)
-                )
-            logger.info(
-                f"Created {len(all_work_units)} work units for parallel processing"
-            )
-            results = self._process_work_units(all_work_units)
-            self._apply_tag_results_to_articles(results)
+
+        all_work_units = []
+        for article in articles:
+            work_units = self._prepare_article_work_units(article, active_tag_ids)
+            all_work_units.extend(work_units)
+        logger.info(f"Created {len(all_work_units)} work units")
+
+        if all_work_units:
+            results_by_article = self._process_work_units(all_work_units)
+            self._apply_tag_results_to_articles(results_by_article)
+
+            # Process tags with filtering criteria separately
+            with db.get_connection() as conn:
+                cursor = conn.cursor()
+                for article_id in results_by_article.keys():
+                    article_tags = set(db.get_tags_for_article(article_id))
+                    for tag_id, criteria in self.tag_search_cache.items():
+                        tag_name = criteria["name"]
+                        any_tags = set(criteria.get("any_tags", []))
+                        and_tags = set(criteria.get("and_tags", []))
+                        not_any_tags = set(criteria.get("not_any_tags", []))
+                        any_tag_ids = {
+                            db.get_tag_id_by_name(tag)
+                            for tag in any_tags
+                            if db.get_tag_id_by_name(tag)
+                        }
+                        and_tag_ids = {
+                            db.get_tag_id_by_name(tag)
+                            for tag in and_tags
+                            if db.get_tag_id_by_name(tag)
+                        }
+                        not_any_tag_ids = {
+                            db.get_tag_id_by_name(tag)
+                            for tag in not_any_tags
+                            if db.get_tag_id_by_name(tag)
+                        }
+                        match = True
+                        if any_tag_ids and not any_tag_ids.intersection(article_tags):
+                            match = False
+                        if and_tag_ids and not and_tag_ids.issubset(article_tags):
+                            match = False
+                        if not_any_tag_ids and not_any_tag_ids.intersection(
+                            article_tags
+                        ):
+                            match = False
+                        db.set_article_tag(article_id, tag_id, match)
+                conn.commit()
+
+        logger.info("Tagging process completed")
 
 
 def analyze_tag_results(tag_name: str) -> None:
     """Analyze which articles match or do not match a specific tag and output a markdown report."""
-    logger.info(f"Analyzing results for tag: {tag_name}")
-    db_path = setup_tag_database()
-    with sqlite3.connect(db_path) as conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
-        tag_result = cursor.fetchone()
-        if not tag_result:
-            logger.error(f"Tag '{tag_name}' not found in the database")
-            return
-        tag_id = tag_result[0]
-        cursor.execute(
-            """
-            SELECT a.file_name 
-            FROM article_summaries a
-            JOIN article_tags t ON a.id = t.article_id
-            WHERE t.tag_id = ? AND t.matches = 1
-            ORDER BY a.file_name
-            """,
-            (tag_id,),
-        )
-        matching_articles = [row[0] for row in cursor.fetchall()]
-        cursor.execute(
-            """
-            SELECT a.file_name 
-            FROM article_summaries a
-            JOIN article_tags t ON a.id = t.article_id
-            WHERE t.tag_id = ? AND t.matches = 0
-            ORDER BY a.file_name
-            """,
-            (tag_id,),
-        )
-        non_matching_articles = [row[0] for row in cursor.fetchall()]
-    markdown_content = f"# Tag Analysis: {tag_name}\n\nGenerated on: {time.strftime('%Y-%m-%d %H:%M:%S')}\n\n"
-    markdown_content += f"## Articles Matching Tag ({len(matching_articles)})\n\n"
-    markdown_content += (
-        "\n".join(f"- {a}" for a in matching_articles)
-        if matching_articles
-        else "No articles match this tag.\n"
-    )
-    markdown_content += (
-        f"\n## Articles Not Matching Tag ({len(non_matching_articles)})\n\n"
-    )
-    markdown_content += (
-        "\n".join(f"- {a}" for a in non_matching_articles)
-        if non_matching_articles
-        else "No articles have been explicitly categorized as not matching this tag.\n"
-    )
-    output_path = PROJECT_ROOT / "TAG_ANALYSE.md"
-    with open(output_path, "w") as f:
-        f.write(markdown_content)
-    logger.info(f"Tag analysis saved to {output_path}")
-    print(f"Tag analysis completed. Results saved to {output_path}")
+    db_path = db.get_db_path()
+    tag_id = db.get_tag_id_by_name(tag_name)
+    if not tag_id:
+        logger.error(f"Tag not found: {tag_name}")
+        return
+    matching_articles = db.get_articles_by_tag(tag_name)
+    non_matching_articles = db.get_articles_without_tag(tag_name)
+    report = f"# Tag Analysis: {tag_name}\n\n"
+    report += f"## Matching Articles ({len(matching_articles)})\n\n"
+    for file_name in matching_articles:
+        report += f"- {file_name}\n"
+    report += f"\n## Non-Matching Articles ({len(non_matching_articles)})\n\n"
+    for file_name in non_matching_articles:
+        report += f"- {file_name}\n"
+    report_path = os.path.join(os.path.dirname(db_path), f"tag_analysis_{tag_name}.md")
+    with open(report_path, "w") as f:
+        f.write(report)
+    logger.info(f"Tag analysis saved to: {report_path}")
 
 
-def main():
-    """Main entry point for the tagging process."""
+def main(folder_tags=False, all_tags=True, limit=None, analyze=None, debug=False):
+    """
+    Main entry point for the tagging process.
+
+    Args:
+        folder_tags: Create folder tags only.
+        all_tags: Create both folder tags and content tags.
+        limit: Limit the number of articles to process.
+        analyze: Analyze a specific tag.
+        debug: Enable debug logging.
+    """
     load_environment_variables()
-    parser = argparse.ArgumentParser(description="Apply tags to articles")
-    parser.add_argument(
-        "--folder-tags-only",
-        action="store_true",
-        help="Only create folder tags without applying other tags",
-    )
-    parser.add_argument(
-        "--analyze-tag",
-        type=str,
-        help="Analyze a specific tag and save results to TAG_ANALYSE.md",
-    )
-    args = parser.parse_args()
-    try:
-        db_path = setup_tag_database()
-        config = getConfig()
-        articles_path = config.get("articleFileFolder", "")
-        if not articles_path:
-            logger.error("Error: articleFileFolder not specified in config.json")
-            return
+    if __name__ == "__main__":
+        parser = argparse.ArgumentParser(description="Manage article tags.")
+        parser.add_argument(
+            "--folder-tags", action="store_true", help="Create folder tags only"
+        )
+        parser.add_argument(
+            "--all",
+            action="store_true",
+            help="Create both folder tags and content tags",
+        )
+        parser.add_argument(
+            "--limit", type=int, help="Limit the number of articles to process"
+        )
+        parser.add_argument("--analyze", type=str, help="Analyze a specific tag")
+        parser.add_argument("--debug", action="store_true", help="Enable debug logging")
+        args = parser.parse_args()
+        folder_tags = args.folder_tags
+        all_tags = args.all
+        limit = args.limit
+        analyze = args.analyze
+        debug = args.debug
+
+    if debug:
+        logger.remove()
+        logger.add(sys.stdout, level="DEBUG")
+
+    db_path = db.get_db_path()
+
+    if analyze:
+        analyze_tag_results(analyze)
+        return
+
+    tag_manager = TagManager(db_path)
+    tag_manager.sync_tags_from_config()
+    logger.info("Tags synced from config")
+
+    if folder_tags or all_tags:
         logger.info("Creating folder tags...")
-        tag_manager = TagManager(db_path)
-        tag_manager.sync_tags_from_config()
-        tag_manager.create_folder_tags(articles_path)
-        if not args.folder_tags_only:
-            logger.info("Applying tags to articles...")
-            ArticleTagger(db_path).apply_tags_to_articles()
-        else:
-            logger.info("Skipping AI-based tagging (folder-tags-only mode)")
-        if args.analyze_tag:
-            analyze_tag_results(args.analyze_tag)
-        logger.info("Tagging process completed successfully")
-    except Exception as e:
-        logger.error(f"An error occurred: {e}\n{traceback.format_exc()}")
+        article_folder = getConfig().get("articleFileFolder", "")
+        if not os.path.exists(article_folder):
+            logger.error(f"Article folder not found: {article_folder}")
+            return
+        tag_manager.create_folder_tags(article_folder, limit, debug)
+
+    if all_tags:
+        logger.info("Applying content-based tags...")
+        article_tagger = ArticleTagger(db_path)
+        article_tagger.apply_tags_to_articles()
+        logger.info("Content tagging completed")
 
 
 if __name__ == "__main__":

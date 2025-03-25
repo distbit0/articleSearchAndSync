@@ -11,6 +11,7 @@ from openai import OpenAI
 import os
 from .utils import calculate_normal_hash, getConfig, getArticlePathsForQuery
 from .textExtraction import extract_text_from_file, TextExtractionError
+from . import db
 
 # Configure loguru logger
 log_file_path = os.path.join(
@@ -55,33 +56,8 @@ def setup_database() -> str:
     Returns:
         str: Path to the database file
     """
-    storage_dir = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "storage"
-    )
-    os.makedirs(storage_dir, exist_ok=True)
-    db_path = os.path.join(storage_dir, "article_summaries.db")
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    # Create table if it doesn't exist
-    cursor.execute(
-        """
-    CREATE TABLE IF NOT EXISTS article_summaries (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        file_hash TEXT UNIQUE,
-        file_name TEXT,
-        file_format TEXT,
-        summary TEXT,
-        extraction_method TEXT,
-        word_count INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )
-    """
-    )
-
-    conn.commit()
-    conn.close()
-    return db_path
+    # Use the centralized setup_database function from db module
+    return db.setup_database()
 
 
 def summarize_with_openrouter(text: str) -> Tuple[str, bool]:
@@ -200,19 +176,11 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
     if file_format.startswith("."):
         file_format = file_format[1:]  # Remove leading dot
 
-    # Setup database
-    db_path = setup_database()
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    # Check if summary exists
-    cursor.execute(
-        "SELECT summary FROM article_summaries WHERE file_hash = ?", (file_hash,)
-    )
-    result = cursor.fetchone()
-
-    if result:
-        summary = result[0]
+    # Check if summary exists in the database
+    article = db.get_article_by_hash(file_hash)
+    
+    if article:
+        summary = article["summary"]
 
         # If summary is NULL, it means the file was added to the database but not yet summarized
         if summary is None or summary == "":
@@ -236,7 +204,6 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
                 # We'll try again since this might be a temporary issue
             else:
                 return summary, True
-    conn.close()
 
     # Extract text from the file
     try:
@@ -250,16 +217,6 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
         # Generate a summary and check if text was sufficient
         summary, is_sufficient = summarize_with_openrouter(text)
 
-        # Reconnect to the database
-        conn = sqlite3.connect(db_path)
-        cursor = conn.cursor()
-
-        # Check if the article is already in the database (could have been added by add_files_to_database)
-        cursor.execute(
-            "SELECT id FROM article_summaries WHERE file_hash = ?", (file_hash,)
-        )
-        existing_article = cursor.fetchone()
-
         # ONLY set failed_to_summarise when the model specifically reports insufficient text
         # All other errors should be considered temporary
         if not is_sufficient and "[INSUFFICIENT_TEXT]" in summary:
@@ -271,38 +228,15 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
             db_summary = summary
             logger.debug(f"Successfully created summary for file: {file_path}")
 
-        if existing_article:
-            # Update existing record
-            cursor.execute(
-                """
-                UPDATE article_summaries
-                SET summary = ?, extraction_method = ?, word_count = ?
-                WHERE file_hash = ?
-                """,
-                (db_summary, extraction_method, word_count, file_hash),
-            )
-            logger.debug(f"Updated existing database entry for file: {file_path}")
-        else:
-            # Insert new record
-            cursor.execute(
-                """
-                INSERT INTO article_summaries 
-                (file_hash, file_name, file_format, summary, extraction_method, word_count)
-                VALUES (?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    file_hash,
-                    file_name,
-                    file_format,
-                    db_summary,
-                    extraction_method,
-                    word_count,
-                ),
-            )
-            logger.debug(f"Created new database entry for file: {file_path}")
-
-        conn.commit()
-        conn.close()
+        # Update the database with the summary
+        db.update_article_summary(
+            file_hash,
+            file_name,
+            file_format,
+            db_summary,
+            extraction_method,
+            word_count
+        )
 
         return summary, is_sufficient
     except TextExtractionError as te:
@@ -311,52 +245,16 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
             error_message = f"Error extracting text from article: {str(te)}"
             logger.error(error_message)
 
-        # DO NOT mark as permanently failed in the database
-        # This might be a temporary issue that could be resolved later
-        try:
-            conn = sqlite3.connect(db_path)
-            cursor = conn.cursor()
-
-            # Check if the article is already in the database with a valid summary
-            cursor.execute(
-                "SELECT id, summary FROM article_summaries WHERE file_hash = ?",
-                (file_hash,),
-            )
-            existing_article = cursor.fetchone()
-
-            # Only update if there's no existing article or if the existing summary isn't set
-            # This prevents overwriting a good summary with an error
-            if not existing_article:
-                # Insert new record with a NULL summary so it will be attempted again later
-                cursor.execute(
-                    """
-                    INSERT INTO article_summaries 
-                    (file_hash, file_name, file_format, summary, extraction_method, word_count)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                    """,
-                    (
-                        file_hash,
-                        file_name,
-                        file_format,
-                        None,  # Set to NULL instead of "failed_to_extract"
-                        "none",
-                        0,
-                    ),
-                )
-            elif existing_article[1] is None or existing_article[1] == "":
-                # Keep it as NULL so it will be retried later
-                pass
-
-            conn.commit()
-            conn.close()
-        except Exception as db_error:
-            logger.error(
-                f"Error updating database after extraction attempt: {str(db_error)}"
-            )
-            try:
-                conn.close()
-            except:
-                pass
+        # Add file to database if it doesn't exist, with NULL summary
+        # to be retried later
+        db.add_file_to_database(
+            file_hash,
+            file_name,
+            file_format,
+            None,  # NULL summary
+            "none",
+            0
+        )
 
         return "Temporary text extraction error", False
     except Exception as e:
@@ -365,12 +263,6 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
 
         if os.environ.get("DEBUG", "false").lower() == "true":
             logger.debug(traceback.format_exc())
-
-        # Ensure the database connection is closed in case of error
-        try:
-            conn.close()
-        except:
-            pass
 
         # Return a temporary error message, but don't permanently mark in the database
         return f"Temporary error: {error_message}", False
@@ -399,20 +291,10 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
         )
 
     # Set up the database
-    db_path = setup_database()
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
+    db.setup_database()
+    
     # Get list of articles that need summarization (NULL or empty summary)
-    cursor.execute(
-        """
-        SELECT file_hash, file_name
-        FROM article_summaries
-        WHERE summary IS NULL OR summary = ''
-    """
-    )
-    articles_needing_summary = cursor.fetchall()
-    conn.close()
+    articles_needing_summary = db.get_articles_needing_summary()
 
     logger.info(
         f"Found {len(articles_needing_summary)} articles in database that need summarization"
@@ -585,17 +467,14 @@ def add_files_to_database(articles_path: Optional[str] = None) -> int:
     logger.debug(f"Adding files to database from: {articles_path}")
 
     # Setup database
-    db_path = setup_database()
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
+    db.setup_database()
+    
     # Get list of supported file formats from config
     config = getConfig()
     file_names_to_skip = config.get("fileNamesToSkip", [])
 
     # Get all existing file hashes to avoid duplicates
-    cursor.execute("SELECT file_hash FROM article_summaries")
-    existing_hashes = set(row[0] for row in cursor.fetchall())
+    existing_hashes = set(db.get_all_file_hashes())
 
     # Add all files to database with NULL summary
     added_count = 0
@@ -623,30 +502,16 @@ def add_files_to_database(articles_path: Optional[str] = None) -> int:
             file_ext = os.path.splitext(file_name)[1].lstrip(".")
 
             # Add to database with NULL summary
-            # We use NULL (not empty string) to indicate it needs to be summarized
-            # This is different from an empty string ("") which indicates a failed summarization
-            cursor.execute(
-                """
-                INSERT INTO article_summaries 
-                (file_hash, file_name, file_format, summary, extraction_method, word_count)
-                VALUES (?, ?, ?, NULL, NULL, 0)
-                """,
-                (file_hash, file_name, file_ext),
-            )
+            db.add_file_to_database(file_hash, file_name, file_ext)
             existing_hashes.add(file_hash)
             added_count += 1
 
             if added_count % 100 == 0:
                 logger.debug(f"Added {added_count} new files to database")
-                conn.commit()  # Commit in batches
 
         except Exception as e:
             logger.error(f"Error adding file to database: {file_path}: {str(e)}")
             traceback.print_exc()
-
-    # Final commit
-    conn.commit()
-    conn.close()
 
     logger.info(f"Added a total of {added_count} new files to database")
     return added_count
@@ -674,52 +539,19 @@ def remove_nonexistent_files_from_database(articles_path: Optional[str] = None) 
 
     logger.debug(f"Checking for nonexistent files in database from: {articles_path}")
 
-    # Setup database
-    db_path = setup_database()
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    # Get all file entries from the database
-    cursor.execute("SELECT id, file_name FROM article_summaries")
-    db_files = cursor.fetchall()
-
     # Get all actual files in the articles directory
     existing_files = set(
         os.path.basename(path) for path in getArticlePathsForQuery("*")
     )
-
-    # Find files in database that don't exist on filesystem
-    removed_count = 0
-    files_to_remove = []
-
-    for file_id, file_name in db_files:
-        if file_name not in existing_files:
-            files_to_remove.append(file_id)
-
-    # Remove files in batches
-    if files_to_remove:
-        # First, remove entries from article_tags
-        for file_id in files_to_remove:
-            cursor.execute("DELETE FROM article_tags WHERE article_id = ?", (file_id,))
-
-        # Then remove from article_summaries
-        placeholder = ",".join(["?"] * len(files_to_remove))
-        cursor.execute(
-            f"DELETE FROM article_summaries WHERE id IN ({placeholder})",
-            files_to_remove,
-        )
-        removed_count = len(files_to_remove)
-
-        logger.info(
-            f"Removed {removed_count} entries for nonexistent files from database"
-        )
+    
+    # Use the centralized function to remove nonexistent files
+    removed_count = db.remove_nonexistent_files(existing_files)
+    
+    if removed_count > 0:
+        logger.info(f"Removed {removed_count} entries for nonexistent files from database")
     else:
         logger.info("No nonexistent files found in database")
-
-    # Commit changes and close connection
-    conn.commit()
-    conn.close()
-
+    
     return removed_count
 
 
@@ -733,41 +565,13 @@ def remove_orphaned_tags_from_database() -> int:
         int: Number of orphaned tags removed from the database
     """
     logger.debug("Checking for orphaned tags in database")
-
-    # Setup database
-    db_path = setup_database()
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    # Find tags that don't have any entries in article_tags
-    cursor.execute(
-        """
-        SELECT id, name FROM tags 
-        WHERE id NOT IN (
-            SELECT DISTINCT tag_id FROM article_tags
-        )
-    """
-    )
-
-    orphaned_tags = cursor.fetchall()
-
-    # Remove orphaned tags
-    removed_count = 0
-    if orphaned_tags:
-        tag_ids = [tag[0] for tag in orphaned_tags]
-        tag_names = [tag[1] for tag in orphaned_tags]
-
-        # Delete orphaned tags
-        placeholder = ",".join(["?"] * len(tag_ids))
-        cursor.execute(f"DELETE FROM tags WHERE id IN ({placeholder})", tag_ids)
-        removed_count = len(tag_ids)
-
-        logger.info(f"Removed {removed_count} orphaned tags: {', '.join(tag_names)}")
+    
+    # Use the centralized function to remove orphaned tags
+    removed_count = db.remove_orphaned_tags()
+    
+    if removed_count > 0:
+        logger.info(f"Removed {removed_count} orphaned tags from database")
     else:
         logger.info("No orphaned tags found in database")
-
-    # Commit changes and close connection
-    conn.commit()
-    conn.close()
-
+    
     return removed_count

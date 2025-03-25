@@ -10,6 +10,7 @@ import sys
 from . import utils
 import ebooklib
 from ebooklib import epub
+import PyPDF2
 
 # Configure loguru logger
 log_file_path = os.path.join(

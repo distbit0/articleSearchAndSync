@@ -16,7 +16,6 @@ import sqlite3
 # import snscrape
 import pysnooper
 import shutil
-import PyPDF2
 import traceback
 
 

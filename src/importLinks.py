@@ -14,6 +14,7 @@ import cProfile
 import pstats
 import shutil
 from typing import Iterable
+from . import db
 from .articleSummary import (
     summarize_articles,
     add_files_to_database,
@@ -172,18 +173,10 @@ def updatePerTagFiles(root_folder):
         root_folder: Path to the root folder where articles are stored
     """
 
-    # Get the database path
-    db_path = os.path.join(
-        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-        "storage",
-        "article_summaries.db",
-    )
+    # Ensure database is set up
+    db.setup_database()
 
-    if not os.path.exists(db_path):
-        logger.info(f"Tag database not found at {db_path}")
-        return
-
-    # Create tag_files directory if it doesn't exist
+    # Get the tag files directory from config
     tag_files_dir = getConfig()["backupFolderPath"]
     os.makedirs(tag_files_dir, exist_ok=True)
 
@@ -201,20 +194,8 @@ def updatePerTagFiles(root_folder):
                 # If file is corrupted, skip it
                 pass
 
-    # Connect to the database
-    conn = sqlite3.connect(db_path)
-    cursor = conn.cursor()
-
-    # Get all tags, including the number of articles with each tag
-    cursor.execute(
-        """
-        SELECT t.id, t.name, COUNT(at.article_id) as article_count
-        FROM tags t
-        LEFT JOIN article_tags at ON t.id = at.tag_id AND at.matches = 1
-        GROUP BY t.id, t.name
-        """
-    )
-    tags = cursor.fetchall()
+    # Get all tags with article counts
+    tags = db.get_all_tags_with_article_count()
 
     # Total number of tags processed
     total_tags = len(tags)
@@ -233,24 +214,15 @@ def updatePerTagFiles(root_folder):
             f"Processing tag {tags_processed}/{total_tags}: {tag_name} ({article_count} articles)"
         )
 
-        # For each tag, get the articles that have this tag
-        cursor.execute(
-            """
-            SELECT a.file_name
-            FROM article_summaries a
-            JOIN article_tags at ON a.id = at.article_id
-            WHERE at.tag_id = ? AND at.matches = 1
-            """,
-            (tag_id,),
-        )
-        tagged_articles = cursor.fetchall()
+        # Get all articles with this tag
+        tagged_articles = db.get_articles_for_tag(tag_id)
 
         # Lists to store URLs and file data
         urls_with_titles = []
         file_data = {}
 
         # Process each article
-        for (file_name,) in tagged_articles:
+        for article_id, file_name in tagged_articles:
             try:
                 # Find the full path of the article
                 article_path = os.path.join(root_folder, file_name)
@@ -304,21 +276,13 @@ def updatePerTagFiles(root_folder):
                 f"  - Created file hash data with {len(file_data)} files: {os.path.basename(tag_file_path)}"
             )
 
-    # Clean up empty tags in the database
-    cursor.execute(
-        """
-        DELETE FROM tags 
-        WHERE id NOT IN (
-            SELECT DISTINCT tag_id FROM article_tags
-        )
-        """
-    )
-    deleted_tags = cursor.rowcount
-    if deleted_tags > 0:
-        logger.info(f"Removed {deleted_tags} tags with no associated articles")
+    # Clean up the database by removing orphaned items
+    orphaned_tags, orphaned_hashes = db.clean_orphaned_database_items()
+    if orphaned_tags > 0:
+        logger.info(f"Removed {orphaned_tags} tags with no associated articles")
+    if orphaned_hashes > 0:
+        logger.info(f"Removed {orphaned_hashes} orphaned tag hash entries")
 
-    conn.commit()
-    conn.close()
     logger.info(
         f"Finished processing {tags_processed} tags ({skipped_tags} tags with 0 articles skipped)"
     )
@@ -485,6 +449,7 @@ def deleteDuplicateFiles(directory_path):
 def main():
     logger.info("remove nonexistent files from database")
     remove_nonexistent_files_from_database()
+
     logger.info("remove orphaned tags from database")
     remove_orphaned_tags_from_database()
 
