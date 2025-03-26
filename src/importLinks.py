@@ -449,10 +449,8 @@ def deleteDuplicateFiles(directory_path):
 def main():
     logger.info("remove nonexistent files from database")
     remove_nonexistent_files_from_database()
-
     logger.info("remove orphaned tags from database")
     remove_orphaned_tags_from_database()
-
     logger.info("download new articles")
     urlsToAdd = calcUrlsToAdd()
     urlsToAdd = urlsToAdd["AlreadyRead"] + urlsToAdd["UnRead"]
@@ -461,8 +459,8 @@ def main():
     reTitlePDFs.retitleAllPDFs()
     logger.info("add files to database")
     add_files_to_database()
-    # logger.info("summarize articles") <-------------------------------------------------------------------------------
-    # summarize_articles()
+    logger.info("summarize articles")
+    summarize_articles()
     logger.info("tag articles")
     tag_articles()
     logger.info("move docs to target folder")

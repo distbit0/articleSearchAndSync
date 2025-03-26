@@ -178,7 +178,7 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
 
     # Check if summary exists in the database
     article = db.get_article_by_hash(file_hash)
-    
+
     if article:
         summary = article["summary"]
 
@@ -230,12 +230,7 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
 
         # Update the database with the summary
         db.update_article_summary(
-            file_hash,
-            file_name,
-            file_format,
-            db_summary,
-            extraction_method,
-            word_count
+            file_hash, file_name, file_format, db_summary, extraction_method, word_count
         )
 
         return summary, is_sufficient
@@ -248,12 +243,7 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
         # Add file to database if it doesn't exist, with NULL summary
         # to be retried later
         db.add_file_to_database(
-            file_hash,
-            file_name,
-            file_format,
-            None,  # NULL summary
-            "none",
-            0
+            file_hash, file_name, file_format, None, "none", 0  # NULL summary
         )
 
         return "Temporary text extraction error", False
@@ -292,7 +282,7 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
 
     # Set up the database
     db.setup_database()
-    
+
     # Get list of articles that need summarization (NULL or empty summary)
     articles_needing_summary = db.get_articles_needing_summary()
 
@@ -447,8 +437,7 @@ def add_files_to_database(articles_path: Optional[str] = None) -> int:
     """Add all supported files to the database without summarizing.
 
     This function finds all article files in the given path and adds them to the database
-    with NULL summaries, indicating they need to be summarized later. This ensures that
-    folder tagging can work with all files regardless of summarization status.
+    with NULL summaries, indicating they need to be summarized later.
 
     Args:
         articles_path: Path to the articles directory
@@ -468,7 +457,7 @@ def add_files_to_database(articles_path: Optional[str] = None) -> int:
 
     # Setup database
     db.setup_database()
-    
+
     # Get list of supported file formats from config
     config = getConfig()
     file_names_to_skip = config.get("fileNamesToSkip", [])
@@ -543,15 +532,17 @@ def remove_nonexistent_files_from_database(articles_path: Optional[str] = None) 
     existing_files = set(
         os.path.basename(path) for path in getArticlePathsForQuery("*")
     )
-    
+
     # Use the centralized function to remove nonexistent files
     removed_count = db.remove_nonexistent_files(existing_files)
-    
+
     if removed_count > 0:
-        logger.info(f"Removed {removed_count} entries for nonexistent files from database")
+        logger.info(
+            f"Removed {removed_count} entries for nonexistent files from database"
+        )
     else:
         logger.info("No nonexistent files found in database")
-    
+
     return removed_count
 
 
@@ -565,13 +556,13 @@ def remove_orphaned_tags_from_database() -> int:
         int: Number of orphaned tags removed from the database
     """
     logger.debug("Checking for orphaned tags in database")
-    
+
     # Use the centralized function to remove orphaned tags
     removed_count = db.remove_orphaned_tags()
-    
+
     if removed_count > 0:
         logger.info(f"Removed {removed_count} orphaned tags from database")
     else:
         logger.info("No orphaned tags found in database")
-    
+
     return removed_count

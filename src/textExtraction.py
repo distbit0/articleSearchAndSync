@@ -127,7 +127,7 @@ def run_command(cmd: List[str], timeout: int = 60) -> Tuple[bool, str]:
 
 
 def extract_text_from_pdf(
-    file_path: str, max_words: int = None
+    file_path: str, max_words: Optional[int] = None
 ) -> Tuple[str, str, int]:
     """Extract text from a PDF file using multiple methods.
 
@@ -175,7 +175,7 @@ def extract_text_from_pdf(
     # Only log errors if all methods failed
     error_details = "\n".join([f"  - {err}" for err in errors])
     log_error = f"All PDF extraction methods failed for file: {file_path}\nDetailed errors:\n{error_details}"
-    logger.error(log_error)
+    logger.debug(log_error)
     raise TextExtractionError(log_error, already_logged=True)
 
 
@@ -323,7 +323,7 @@ def extract_text_from_html(
     # Only log errors if all methods failed
     error_details = "\n".join([f"  - {err}" for err in errors])
     log_error = f"All HTML extraction methods failed for file: {file_path}\nDetailed errors:\n{error_details}"
-    logger.error(log_error)
+    logger.debug(log_error)
     raise TextExtractionError(log_error, already_logged=True)
 
 
@@ -696,7 +696,7 @@ def extract_text_from_epub(
     # Only log errors if all methods failed
     error_details = "\n".join([f"  - {err}" for err in errors])
     log_error = f"All EPUB extraction methods failed for file: {file_path}\nDetailed errors:\n{error_details}"
-    logger.error(log_error)
+    logger.debug(log_error)
     raise TextExtractionError(log_error, already_logged=True)
 
 
@@ -727,7 +727,7 @@ def extract_epub_with_ebooklib(file_path: str) -> str:
 
         try:
             # Explicitly set ignore_ncx=True to address the future change warning
-            book = epub.read_epub(file_path, ignore_ncx=True)
+            book = epub.read_epub(file_path)
 
             # Extract text from all HTML items
             all_text = []
@@ -860,7 +860,7 @@ def extract_text_from_mobi(
         if not errors:
             error_details = f"  - general_mobi_error: {str(e)}"
         log_error = f"All MOBI extraction methods failed for file: {file_path}\nDetailed errors:\n{error_details}"
-        logger.error(log_error)
+        logger.debug(log_error)
         raise TextExtractionError(log_error, already_logged=True)
 
 
@@ -891,7 +891,7 @@ def convert_mobi_and_extract(file_path: str) -> str:
 
 
 def extract_text_from_file(
-    file_path: str, max_words: int = None
+    file_path: str, max_words: Optional[int] = None
 ) -> Tuple[str, str, int]:
     """Extract text from a file based on its format.
 

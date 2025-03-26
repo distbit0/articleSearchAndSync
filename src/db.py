@@ -242,7 +242,7 @@ def add_file_to_database(
     summary: Optional[str] = None,
     extraction_method: Optional[str] = None,
     word_count: int = 0,
-) -> int:
+) -> int | None:
     """Add a file to the database with optional summary information.
 
     Args:
@@ -435,9 +435,9 @@ def remove_nonexistent_files(existing_files: Set[str]) -> int:
 def get_tag_property_hash(
     description: str,
     use_summary: bool,
-    any_tags: List[str] = None,
-    and_tags: List[str] = None,
-    not_any_tags: List[str] = None,
+    any_tags: List[str] = [],
+    and_tags: List[str] = [],
+    not_any_tags: List[str] = [],
 ) -> str:
     """Compute an MD5 hash from tag properties.
 
@@ -501,6 +501,13 @@ def sync_tags_from_config(config: Dict[str, Any]) -> None:
         # Load property hashes for existing tags
         cursor.execute("SELECT tag_id, property_hash FROM tag_hashes")
         property_hashes = {row[0]: row[1] for row in cursor.fetchall()}
+
+        # Get set of tag names from config, excluding list-type entries
+        config_tag_names = {
+            tag_name
+            for tag_name, tag_data in tag_config.items()
+            if not isinstance(tag_data, list)
+        }
 
         # Process each tag from config
         for tag_name, tag_data in tag_config.items():
@@ -569,6 +576,24 @@ def sync_tags_from_config(config: Dict[str, Any]) -> None:
                     "INSERT INTO tag_hashes (tag_id, property_hash) VALUES (?, ?)",
                     (tag_id, new_hash),
                 )
+                logger.debug(f"Added new tag '{tag_name}'")
+
+        # Delete tags that are no longer in the config
+        tags_to_delete = set(existing_tags.keys()) - config_tag_names
+
+        for tag_name in tags_to_delete:
+            tag_id = existing_tags[tag_name]["id"]
+
+            # First delete from article_tags to maintain referential integrity
+            cursor.execute("DELETE FROM article_tags WHERE tag_id = ?", (tag_id,))
+
+            # Then delete from tag_hashes
+            cursor.execute("DELETE FROM tag_hashes WHERE tag_id = ?", (tag_id,))
+
+            # Finally delete the tag itself
+            cursor.execute("DELETE FROM tags WHERE id = ?", (tag_id,))
+
+            logger.debug(f"Deleted tag '{tag_name}' as it no longer exists in config")
 
         conn.commit()
 
@@ -676,24 +701,6 @@ def get_all_tag_details() -> Dict[int, Dict[str, Any]]:
             }
             for row in results
         }
-
-
-def get_folder_tags() -> List[Tuple[int, str]]:
-    """Get all folder tags (tags that start with 'folder_' or 'prev_folder_').
-
-    Returns:
-        List[Tuple[int, str]]: List of tuples containing tag ID and name
-    """
-    with get_connection() as conn:
-        cursor = conn.cursor()
-        cursor.execute(
-            """SELECT id, name FROM tags 
-               WHERE name LIKE 'folder_%' OR name LIKE 'prev_folder_%'"""
-        )
-        return cursor.fetchall()
-
-
-# Article-Tag Operations
 
 
 def set_article_tag(article_id: int, tag_id: int, matches: bool) -> None:
@@ -993,7 +1000,7 @@ def get_articles_needing_tagging(
                 )
             )
             AND a.summary IS NOT NULL
-            ORDER BY a.id DESC
+            ORDER BY RANDOM()
         """
 
         if max_articles:

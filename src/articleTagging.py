@@ -1,20 +1,17 @@
 import os
 import sys
 import json
-import hashlib
 import traceback
-import time
 import argparse
 import concurrent.futures
 from pathlib import Path
-from typing import Dict, List, Tuple, Any, Set, Optional
+from typing import Dict, List, Tuple, Set, Optional
 from loguru import logger
 from dotenv import load_dotenv
 from openai import OpenAI
-from .utils import getConfig, searchArticlesByTags
+from .utils import getConfig
 from .textExtraction import extract_text_from_file
 from . import db
-import re
 
 # Constants
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -61,198 +58,6 @@ class TagManager:
         """Synchronize tag definitions from config.json into the database."""
         config = getConfig()
         db.sync_tags_from_config(config)
-
-    def _get_excluded_folders(self) -> Set[str]:
-        """Get list of folders that should be excluded from folder tagging."""
-        config = getConfig()
-        # Use "excludedFolders" (or "folderTagExclusions" if that’s what you prefer)
-        return set(config.get("excludedFolders", []))
-
-    def _fetch_existing_tags(self, cursor) -> Dict[str, Dict[str, int]]:
-        """Fetch all existing folder and prev_folder tags from the database."""
-        folder_tags = {}
-        prev_folder_tags = {}
-        for tag_id, tag_name in db.get_folder_tags():
-            if tag_name.startswith("folder_"):
-                # Remove the 'folder_' prefix for matching purposes
-                folder_tags[tag_name[7:]] = tag_id
-            elif tag_name.startswith("prev_folder_"):
-                prev_folder_tags[tag_name[12:]] = tag_id
-        return {"folder_tags": folder_tags, "prev_folder_tags": prev_folder_tags}
-
-    def _get_articles(
-        self, cursor, max_articles: Optional[int], debug: bool
-    ) -> List[Tuple]:
-        """Get articles from database to process for folder tagging."""
-        all_articles = db.get_all_articles()
-        if max_articles:
-            if debug:
-                logger.info(f"Limiting folder tagging to {max_articles} articles")
-            all_articles = all_articles[:max_articles]
-        return all_articles
-
-    def _get_current_article_tags(self, cursor) -> Dict[int, Dict]:
-        """Get a dictionary mapping article IDs to their current folder tag associations."""
-        article_tags = db.get_current_article_tags()
-        # Transform to a simple format (set of tag IDs for each article)
-        result = {}
-        for article_id, tags_dict in article_tags.items():
-            result[article_id] = {
-                "matching": {tag_id for tag_id, _ in tags_dict.get("matching", [])},
-                "not_matching": {
-                    tag_id for tag_id, _ in tags_dict.get("not_matching", [])
-                },
-            }
-        return result
-
-    def _process_articles(
-        self,
-        articles: List[Tuple],
-        articles_path: str,
-        exclusions: Set[str],
-        current_article_tags: Dict,
-        folder_tags: Dict[str, int],
-        prev_folder_tags: Dict[str, int],
-    ) -> Tuple[Dict[str, Set[int]], Dict[str, Set[int]]]:
-        """
-        Process articles and collect folder information.
-        Returns two dictionaries:
-          - article_folders: mapping folder (relative path) to set of article IDs
-          - article_prev_folders: mapping parent folder (relative path) to set of article IDs
-        """
-        article_folders = {}
-        article_prev_folders = {}
-
-        for article_id, file_name in articles:
-            try:
-                relative_folder = os.path.dirname(file_name)
-                if not relative_folder:
-                    continue
-                # Normalize folder path
-                relative_folder = relative_folder.replace("\\", "/")
-                if any(excl in relative_folder for excl in exclusions):
-                    continue
-
-                # Direct folder: add article_id under this folder key
-                article_folders.setdefault(relative_folder, set()).add(article_id)
-
-                # Also process parent folders (if any)
-                path_parts = relative_folder.split("/")
-                for i in range(1, len(path_parts)):
-                    prev_folder = "/".join(path_parts[:i])
-                    if prev_folder and not any(
-                        excl in prev_folder for excl in exclusions
-                    ):
-                        article_prev_folders.setdefault(prev_folder, set()).add(
-                            article_id
-                        )
-            except Exception as e:
-                logger.error(f"Error processing article {file_name}: {e}")
-
-        return article_folders, article_prev_folders
-
-    def _batch_create_tags(
-        self,
-        cursor,
-        tags_to_create: set,
-        tags_dict: Dict[str, int],
-        folder_locations: Dict[str, Set[int]],
-        is_prev: bool,
-        debug: bool,
-    ) -> None:
-        """Create folder tags in batches and update article-tag relationships."""
-        prefix = "prev_folder_" if is_prev else "folder_"
-
-        for folder_name in tags_to_create:
-            tag_name = f"{prefix}{folder_name}"
-            description = f"{'Parent folder' if is_prev else 'Folder'}: {folder_name}"
-
-            tag_id = db.get_tag_id_by_name(tag_name)
-            if not tag_id:
-                # Create the tag if it doesn't exist
-                with db.get_connection() as conn:
-                    cursor = conn.cursor()
-                    cursor.execute(
-                        "INSERT INTO tags (name, description, use_summary) VALUES (?, ?, ?)",
-                        (tag_name, description, False),
-                    )
-                    tag_id = cursor.lastrowid
-                    conn.commit()
-                tags_dict[folder_name] = tag_id
-                if debug:
-                    logger.debug(f"Created tag: {tag_name} with ID {tag_id}")
-
-            # For each article in this folder, assign the tag
-            for article_id in folder_locations.get(folder_name, set()):
-                db.set_article_tag(article_id, tag_id, True)
-                if debug:
-                    logger.debug(f"Tagged article {article_id} with {tag_name}")
-
-    def create_folder_tags(
-        self,
-        articles_path: str,
-        max_articles: Optional[int] = None,
-        debug: bool = False,
-    ) -> Dict[str, Dict[str, int]]:
-        """Create and update folder tags based on article file locations."""
-        logger.info("Creating folder tags...")
-        exclusions = self._get_excluded_folders()
-        if debug:
-            logger.debug(f"Excluded folders: {exclusions}")
-
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            tag_dict = self._fetch_existing_tags(cursor)
-            folder_tags = tag_dict["folder_tags"]
-            prev_folder_tags = tag_dict["prev_folder_tags"]
-
-            if debug:
-                logger.debug(f"Found {len(folder_tags)} existing folder tags")
-                logger.debug(f"Found {len(prev_folder_tags)} existing prev_folder tags")
-
-            articles = self._get_articles(cursor, max_articles, debug)
-            if debug:
-                logger.debug(f"Found {len(articles)} articles to process")
-            current_article_tags = self._get_current_article_tags(cursor)
-
-            article_folders, article_prev_folders = self._process_articles(
-                articles,
-                articles_path,
-                exclusions,
-                current_article_tags,
-                folder_tags,
-                prev_folder_tags,
-            )
-            if debug:
-                logger.debug(f"Found {len(article_folders)} unique folders")
-                logger.debug(f"Found {len(article_prev_folders)} unique parent folders")
-
-            folder_tags_to_create = set(article_folders.keys()) - set(
-                folder_tags.keys()
-            )
-            self._batch_create_tags(
-                cursor,
-                folder_tags_to_create,
-                folder_tags,
-                article_folders,
-                False,
-                debug,
-            )
-
-            prev_folder_tags_to_create = set(article_prev_folders.keys()) - set(
-                prev_folder_tags.keys()
-            )
-            self._batch_create_tags(
-                cursor,
-                prev_folder_tags_to_create,
-                prev_folder_tags,
-                article_prev_folders,
-                True,
-                debug,
-            )
-
-        logger.info("Folder tags created successfully")
-        return {"folder_tags": folder_tags, "prev_folder_tags": prev_folder_tags}
 
 
 class TagEvaluator:
@@ -402,10 +207,7 @@ class ArticleTagger:
             cursor = conn.cursor()
             cursor.execute("SELECT id, name FROM tags")
             for tag_id, tag_name in cursor.fetchall():
-                if not tag_name.startswith("folder_") and not tag_name.startswith(
-                    "prev_folder_"
-                ):
-                    active_tag_ids.add(tag_id)
+                active_tag_ids.add(tag_id)
         return active_tag_ids
 
     def _get_articles_needing_tagging(self) -> List[Tuple[int, str, str, str]]:
@@ -649,13 +451,12 @@ def analyze_tag_results(tag_name: str) -> None:
     logger.info(f"Tag analysis saved to: {report_path}")
 
 
-def main(folder_tags=False, all_tags=True, limit=None, analyze=None, debug=False):
+def main(all_tags=True, limit=None, analyze=None, debug=False):
     """
     Main entry point for the tagging process.
 
     Args:
-        folder_tags: Create folder tags only.
-        all_tags: Create both folder tags and content tags.
+        all_tags: Create content tags.
         limit: Limit the number of articles to process.
         analyze: Analyze a specific tag.
         debug: Enable debug logging.
@@ -664,12 +465,9 @@ def main(folder_tags=False, all_tags=True, limit=None, analyze=None, debug=False
     if __name__ == "__main__":
         parser = argparse.ArgumentParser(description="Manage article tags.")
         parser.add_argument(
-            "--folder-tags", action="store_true", help="Create folder tags only"
-        )
-        parser.add_argument(
             "--all",
             action="store_true",
-            help="Create both folder tags and content tags",
+            help="Create content tags",
         )
         parser.add_argument(
             "--limit", type=int, help="Limit the number of articles to process"
@@ -677,7 +475,6 @@ def main(folder_tags=False, all_tags=True, limit=None, analyze=None, debug=False
         parser.add_argument("--analyze", type=str, help="Analyze a specific tag")
         parser.add_argument("--debug", action="store_true", help="Enable debug logging")
         args = parser.parse_args()
-        folder_tags = args.folder_tags
         all_tags = args.all
         limit = args.limit
         analyze = args.analyze
@@ -696,14 +493,6 @@ def main(folder_tags=False, all_tags=True, limit=None, analyze=None, debug=False
     tag_manager = TagManager(db_path)
     tag_manager.sync_tags_from_config()
     logger.info("Tags synced from config")
-
-    if folder_tags or all_tags:
-        logger.info("Creating folder tags...")
-        article_folder = getConfig().get("articleFileFolder", "")
-        if not os.path.exists(article_folder):
-            logger.error(f"Article folder not found: {article_folder}")
-            return
-        tag_manager.create_folder_tags(article_folder, limit, debug)
 
     if all_tags:
         logger.info("Applying content-based tags...")
