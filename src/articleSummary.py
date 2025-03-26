@@ -1,14 +1,14 @@
-import sqlite3
 import random
 import traceback
+import sys
+import os
 from pathlib import Path
 from typing import Optional, Tuple
 import concurrent.futures
-import sys
 from loguru import logger
 from dotenv import load_dotenv
 from openai import OpenAI
-import os
+
 from .utils import calculate_normal_hash, getConfig, getArticlePathsForQuery
 from .textExtraction import extract_text_from_file, TextExtractionError
 from . import db
@@ -21,11 +21,8 @@ log_file_path = os.path.join(
 )
 os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
 
-# Remove default handler and add custom handlers
 logger.remove()
-# Add stdout handler
 logger.add(sys.stdout, level="INFO")
-# Add rotating file handler - 5MB max size, keep 3 backup files
 logger.add(
     log_file_path,
     rotation="5 MB",
@@ -34,8 +31,7 @@ logger.add(
     format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} - {message}",
 )
 
-# Load environment variables from the correct path
-# Try multiple potential locations for the .env file
+# Load environment variables from one of multiple potential .env locations
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 potential_env_paths = [
     os.path.join(project_root, ".env"),
@@ -56,20 +52,19 @@ def setup_database() -> str:
     Returns:
         str: Path to the database file
     """
-    # Use the centralized setup_database function from db module
     return db.setup_database()
 
 
 def summarize_with_openrouter(text: str) -> Tuple[str, bool]:
-    """Generate a summary of the text using OpenRouter API.
+    """Generate a summary of the text using the OpenRouter API.
 
     Args:
         text: Text to summarize
 
     Returns:
-        Tuple[str, bool]: Generated summary and flag indicating if text was sufficient (True) or insufficient (False)
+        Tuple[str, bool]: Generated summary and flag indicating if the text was sufficient.
     """
-    if not text or len(text.strip()) == 0:
+    if not text or not text.strip():
         logger.warning("No text to summarize")
         return "No text to summarize", False
 
@@ -78,11 +73,8 @@ def summarize_with_openrouter(text: str) -> Tuple[str, bool]:
         logger.error("OPENROUTER_API_KEY not found in environment variables")
         raise ValueError("OPENROUTER_API_KEY not found in environment variables")
 
-    # Get configuration from config.json
     config = getConfig()
     model = config.get("ai_model")
-
-    # Get optional referer info from environment variables
     referer = os.getenv("OPENROUTER_REFERER", "articleSearchAndSync")
     title = os.getenv("OPENROUTER_TITLE", "Article Search and Sync")
 
@@ -95,27 +87,28 @@ def summarize_with_openrouter(text: str) -> Tuple[str, bool]:
                 "X-Title": title,
             },
         )
-
         logger.debug(f"Sending summary request to OpenRouter with model: {model}")
 
-        system_prompt = """You are a helpful system that generates concise summaries of academic or educational content. 
-You must first assess if the provided text contains sufficient content to generate a meaningful summary. 
-If the text is too short, fragmented, or lacks substantive content, respond with "<summary>[INSUFFICIENT_TEXT]</summary>" at the beginning of your response.
-DO NOT respond with [INSUFFICIENT_TEXT] if there is substantive content but the text merely ends abruptly/not at the end of a sentence.
-ALWAYS return your summary enclosed within <summary></summary> tags.
-ONLY put the summary itself inside these tags, not any other part of your response."""
+        system_prompt = (
+            "You are a helpful system that generates concise summaries of academic or educational content. "
+            "You must first assess if the provided text contains sufficient content to generate a meaningful summary. "
+            "If the text is too short, fragmented, or lacks substantive content, respond with "
+            '"<summary>[INSUFFICIENT_TEXT]</summary>" at the beginning of your response. '
+            "DO NOT respond with [INSUFFICIENT_TEXT] if there is substantive content but the text merely ends abruptly/not at the end of a sentence. "
+            "ALWAYS return your summary enclosed within <summary></summary> tags. "
+            "ONLY put the summary itself inside these tags, not any other part of your response."
+        )
 
-        user_prompt = f"""Please analyze the following text:
-
-{text}
-
-First, determine if the text provides enough substantial content to write a meaningful summary. 
-If the text is too short, fragmented, or clearly not the full article (e.g., just metadata, table of contents, or a small snippet), 
-respond with "<summary>[INSUFFICIENT_TEXT]</summary>" followed by a brief explanation of why the text is insufficient.
-
-If the text IS sufficient, please summarize it in a concise but informative way that captures the main arguments, principles, concepts, cruxes, intuitions, explanations and conclusions. Do not say things like "the author argues that..." or "the text explains how...".  
-
-IMPORTANT: Return ONLY your summary enclosed within <summary></summary> tags. Do not include any other text outside these tags."""
+        user_prompt = (
+            f"Please analyze the following text:\n\n{text}\n\n"
+            "First, determine if the text provides enough substantial content to write a meaningful summary. "
+            "If the text is too short, fragmented, or clearly not the full article (e.g., just metadata, table of contents, or a small snippet), "
+            'respond with "<summary>[INSUFFICIENT_TEXT]</summary>" followed by a brief explanation of why the text is insufficient.\n\n'
+            "If the text IS sufficient, please summarize it in a concise but informative way that captures the main arguments, principles, "
+            'concepts, cruxes, intuitions, explanations and conclusions. Do not say things like "the author argues that..." or '
+            '"the text explains how...".\n\n'
+            "IMPORTANT: Return ONLY your summary enclosed within <summary></summary> tags. Do not include any other text outside these tags."
+        )
 
         response = client.chat.completions.create(
             extra_headers={
@@ -129,33 +122,26 @@ IMPORTANT: Return ONLY your summary enclosed within <summary></summary> tags. Do
             ],
         )
 
-        # Extract the summary from the response
         full_response = response.choices[0].message.content
-
-        # Extract content between <summary> and </summary> tags
         import re
 
         summary_match = re.search(r"<summary>(.*?)</summary>", full_response, re.DOTALL)
-
         if summary_match:
             summary = summary_match.group(1).strip()
         else:
-            # If tags aren't found, log error and skip this article
             error_message = "Summary tags not found in model response"
             logger.error(f"{error_message}. Response: {full_response}")
             return f"Failed to generate summary: {error_message}", False
 
-        # Check if the summary indicates insufficient text
-        if summary.strip().startswith("[INSUFFICIENT_TEXT]"):
-            logger.warning(f"Insufficient text detected: {summary.strip()}")
-            return summary.strip(), False
+        if summary.startswith("[INSUFFICIENT_TEXT]"):
+            logger.debug(f"Insufficient text detected: {summary}")
+            return summary, False
 
-        return summary.strip(), True
+        return summary, True
 
     except Exception as e:
         error_message = f"Error generating summary: {str(e)}"
-        error_traceback = traceback.format_exc()
-        logger.error(f"{error_message}\n{error_traceback}")
+        logger.error(f"{error_message}\n{traceback.format_exc()}")
         traceback.print_exc()
         return f"Failed to generate summary: {error_message}", False
 
@@ -167,231 +153,155 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
         file_path: Path to the article file
 
     Returns:
-        Tuple[str, bool]: Article summary and a flag indicating if text was sufficient
+        Tuple[str, bool]: Article summary and a flag indicating if text was sufficient.
     """
-    # Calculate file hash
     file_hash = calculate_normal_hash(file_path)
     file_name = os.path.basename(file_path)
-    file_format = os.path.splitext(file_path)[1].lower()
-    if file_format.startswith("."):
-        file_format = file_format[1:]  # Remove leading dot
+    file_format = os.path.splitext(file_path)[1].lower().lstrip(".")
 
-    # Check if summary exists in the database
     article = db.get_article_by_hash(file_hash)
-
     if article:
         summary = article["summary"]
-
-        # If summary is NULL, it means the file was added to the database but not yet summarized
-        if summary is None or summary == "":
-            logger.debug(
-                f"File {file_name} is in the database but has not been summarized yet"
-            )
-            # Proceed with summarization (same logic as below)
-        else:
-            # Check if summary indicates a previous insufficient text failure
+        if summary is not None and summary != "":
             if summary == "failed_to_summarise":
                 logger.debug(
-                    f"Skipping file {file_name} due to insufficient text previously detected"
+                    f"Skipping file {file_name} due to previous insufficient text"
                 )
-                # Return the failure message and mark as insufficient
                 return summary, False
-            # Check if summary indicates a text extraction failure
             elif summary == "failed_to_extract":
                 logger.debug(
-                    f"File {file_name} previously had extraction issues, attempting to summarize again"
+                    f"File {file_name} had extraction issues; attempting to summarize again"
                 )
-                # We'll try again since this might be a temporary issue
             else:
                 return summary, True
+        else:
+            logger.debug(
+                f"File {file_name} exists in DB but has not been summarized yet"
+            )
 
-    # Extract text from the file
     try:
         config = getConfig()
         max_words = int(config.get("summary_in_max_words", 3000))
-
         text, extraction_method, word_count = extract_text_from_file(
             file_path, max_words
         )
-
-        # Generate a summary and check if text was sufficient
         summary, is_sufficient = summarize_with_openrouter(text)
 
-        # ONLY set failed_to_summarise when the model specifically reports insufficient text
-        # All other errors should be considered temporary
         if not is_sufficient and "[INSUFFICIENT_TEXT]" in summary:
             db_summary = "failed_to_summarise"
             logger.warning(
-                f"Insufficient text for summary in file: {file_path}, marking as failed_to_summarise"
+                f"Insufficient text for file: {file_path}, marking as failed_to_summarise: {summary}"
             )
         else:
             db_summary = summary
             logger.debug(f"Successfully created summary for file: {file_path}")
 
-        # Update the database with the summary
         db.update_article_summary(
             file_hash, file_name, file_format, db_summary, extraction_method, word_count
         )
-
         return summary, is_sufficient
+
     except TextExtractionError as te:
-        # Check if this error has already been logged to avoid duplication
-        if not hasattr(te, "already_logged") or not te.already_logged:
-            error_message = f"Error extracting text from article: {str(te)}"
-            logger.error(error_message)
-
-        # Add file to database if it doesn't exist, with NULL summary
-        # to be retried later
-        db.add_file_to_database(
-            file_hash, file_name, file_format, None, "none", 0  # NULL summary
-        )
-
+        if not getattr(te, "already_logged", False):
+            logger.error(f"Error extracting text from article: {str(te)}")
+        db.add_file_to_database(file_hash, file_name, file_format)
         return "Temporary text extraction error", False
+
     except Exception as e:
         error_message = f"Error summarizing article: {str(e)}"
-        logger.error(f"{error_message}")
-
+        logger.error(error_message)
         if os.environ.get("DEBUG", "false").lower() == "true":
             logger.debug(traceback.format_exc())
-
-        # Return a temporary error message, but don't permanently mark in the database
         return f"Temporary error: {error_message}", False
 
 
 def summarize_articles(articles_path: Optional[str] = None, query: str = "*") -> None:
-    """Summarize all supported articles in the given path that don't have summaries yet.
+    """Summarize all articles in the given path that don't have summaries yet.
+
     Uses parallel processing to summarize multiple articles simultaneously.
 
     Args:
-        articles_path: Path to the articles directory
-        query: Query string to filter articles (default: "*" for all articles)
+        articles_path: Path to the articles directory.
+        query: Query string to filter articles (default: "*" for all articles).
     """
     if not articles_path:
-        # Get the default articles directory from config
         config = getConfig()
         articles_path = config.get("articleFileFolder", "")
         if not articles_path:
-            logger.error("No articles directory specified in config or as argument")
+            logger.error("No articles directory specified in config or argument")
             return
 
-    # Make path absolute if it's not already
     if not os.path.isabs(articles_path):
         articles_path = os.path.join(
             os.path.dirname(os.path.dirname(os.path.abspath(__file__))), articles_path
         )
 
-    # Set up the database
     db.setup_database()
-
-    # Get list of articles that need summarization (NULL or empty summary)
     articles_needing_summary = db.get_articles_needing_summary()
-
-    logger.info(
-        f"Found {len(articles_needing_summary)} articles in database that need summarization"
-    )
+    logger.info(f"Found {len(articles_needing_summary)} articles needing summarization")
 
     if not articles_needing_summary:
         logger.info("No articles need summarization")
         return
 
-    # Articles to summarize, with their paths
     articles_to_summarize = []
-
-    # Get max summaries per session from config before the loop
     config = getConfig()
     max_summaries_per_session = int(config.get("maxSummariesPerSession", 150))
-
-    # Process each article that needs summarization
     random.shuffle(articles_needing_summary)
 
     for file_hash, file_name in articles_needing_summary:
-        # Stop if we've reached the maximum number of articles to summarize
         if len(articles_to_summarize) >= max_summaries_per_session:
             logger.info(
-                f"Reached limit of {max_summaries_per_session} articles, stopping search"
+                f"Reached limit of {max_summaries_per_session} articles, stopping"
             )
             break
-
-        # Find the article path using the helper function
         file_path = os.path.join(articles_path, file_name)
-
         if file_path:
-            # Use the first matching file path
             articles_to_summarize.append(file_path)
         else:
-            logger.warning(
-                f"Could not find file path for {file_name} in {articles_path}"
-            )
+            logger.warning(f"Could not find path for {file_name} in {articles_path}")
 
     logger.info(f"{len(articles_to_summarize)} articles need summarization")
-
     if not articles_to_summarize:
         logger.info("No articles to summarize")
         return
 
-    # Get max workers from config
-    config = getConfig()
     max_workers = int(config.get("llm_api_batch_size", 4))
-
-    # Track statistics
     total_articles = len(articles_to_summarize)
     successful = 0
     failed = 0
     insufficient = 0
-    # List to track word counts for calculating average
     summary_word_counts = []
 
-    # Use ThreadPoolExecutor to process multiple articles in parallel
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Submit all articles for processing
         future_to_article = {
-            executor.submit(process_single_article, article_path): article_path
-            for article_path in articles_to_summarize
+            executor.submit(process_single_article, path): path
+            for path in articles_to_summarize
         }
-
-        # Process results as they complete
-        for i, future in enumerate(concurrent.futures.as_completed(future_to_article)):
+        for future in concurrent.futures.as_completed(future_to_article):
             article_path = future_to_article[future]
             try:
                 success, message, is_sufficient, summary = future.result()
-                file_name = os.path.basename(article_path)
-
                 if success:
                     if is_sufficient:
                         logger.debug(
                             f"Successfully summarized: {article_path} - {message}"
                         )
                         successful += 1
-
-                        # Calculate average word count directly from the summary
-                        words = summary.split()
-                        if words:
-                            word_count = len(words)
+                        word_count = len(summary.split())
+                        if word_count:
                             summary_word_counts.append(word_count)
                     else:
-                        # Don't log warning here as it's already logged in get_article_summary()
                         insufficient += 1
                 else:
                     logger.debug(f"Failed to summarize: {article_path} - {message}")
                     failed += 1
             except Exception as e:
-                file_name = os.path.basename(article_path)
-                # Check if this is a TextExtractionError that's already been logged
-                if (
-                    isinstance(e, TextExtractionError)
-                    and hasattr(e, "already_logged")
-                    and e.already_logged
-                ):
-                    # Just count the failure without duplicating the error log
-                    failed += 1
-                else:
-                    # Log new errors that haven't been logged yet
-                    logger.error(f"Failed to summarize: {article_path} - {str(e)}")
-                    if os.environ.get("DEBUG", "false").lower() == "true":
-                        logger.debug(f"Detailed error: {traceback.format_exc()}")
-                    failed += 1
+                logger.error(
+                    f"Failed to summarize: {article_path} - {str(e)}\n{traceback.format_exc()}"
+                )
+                failed += 1
 
-    # Calculate and print the average word count if any successful summaries
     if summary_word_counts:
         avg_word_count = sum(summary_word_counts) / len(summary_word_counts)
         print(f"Average word count in generated summaries: {avg_word_count:.2f} words")
@@ -408,16 +318,15 @@ def process_single_article(article_path: str) -> Tuple[bool, str, bool, str]:
     """Process a single article for summarization.
 
     Args:
-        article_path: Path to the article file
+        article_path: Path to the article file.
 
     Returns:
-        Tuple[bool, str, bool, str]: Success status, result message, flag indicating if text was sufficient, and the summary
+        Tuple[bool, str, bool, str]: Success status, message, sufficiency flag, and summary.
     """
     try:
         summary, is_sufficient = get_article_summary(article_path)
         if summary.startswith("Failed to summarize article:"):
             return False, summary, False, ""
-
         if not is_sufficient:
             return (
                 True,
@@ -425,7 +334,6 @@ def process_single_article(article_path: str) -> Tuple[bool, str, bool, str]:
                 False,
                 summary,
             )
-
         return True, f"Summary generated ({len(summary)} chars)", True, summary
     except Exception as e:
         error_message = f"Error processing article: {str(e)}"
@@ -436,16 +344,12 @@ def process_single_article(article_path: str) -> Tuple[bool, str, bool, str]:
 def add_files_to_database(articles_path: Optional[str] = None) -> int:
     """Add all supported files to the database without summarizing.
 
-    This function finds all article files in the given path and adds them to the database
-    with NULL summaries, indicating they need to be summarized later.
-
     Args:
-        articles_path: Path to the articles directory
+        articles_path: Path to the articles directory.
 
     Returns:
-        int: Number of new files added to the database
+        int: Number of new files added to the database.
     """
-    # Get articles path from config if not provided
     if not articles_path:
         config = getConfig()
         articles_path = config.get("articleFileFolder", "")
@@ -454,50 +358,28 @@ def add_files_to_database(articles_path: Optional[str] = None) -> int:
             return 0
 
     logger.debug(f"Adding files to database from: {articles_path}")
-
-    # Setup database
     db.setup_database()
-
-    # Get list of supported file formats from config
     config = getConfig()
     file_names_to_skip = config.get("fileNamesToSkip", [])
-
-    # Get all existing file hashes to avoid duplicates
     existing_hashes = set(db.get_all_file_hashes())
-
-    # Add all files to database with NULL summary
     added_count = 0
-
     all_article_paths = getArticlePathsForQuery("*")
     logger.info(f"Found {len(all_article_paths)} files in {articles_path}.")
 
-    # Process each file found
     for file_path in all_article_paths:
         file_name = os.path.basename(file_path)
-
-        # Skip files in the exclusion list
         if file_name in file_names_to_skip:
             continue
-
         try:
-            # Calculate file hash to check if already in DB
             file_hash = calculate_normal_hash(file_path)
-
-            # Skip if already in database
             if file_hash in existing_hashes:
                 continue
-
-            # Determine the file format from the extension
             file_ext = os.path.splitext(file_name)[1].lstrip(".")
-
-            # Add to database with NULL summary
             db.add_file_to_database(file_hash, file_name, file_ext)
             existing_hashes.add(file_hash)
             added_count += 1
-
             if added_count % 100 == 0:
                 logger.debug(f"Added {added_count} new files to database")
-
         except Exception as e:
             logger.error(f"Error adding file to database: {file_path}: {str(e)}")
             traceback.print_exc()
@@ -509,16 +391,12 @@ def add_files_to_database(articles_path: Optional[str] = None) -> int:
 def remove_nonexistent_files_from_database(articles_path: Optional[str] = None) -> int:
     """Remove database entries for files that no longer exist on the filesystem.
 
-    This function checks all file entries in the database and removes those
-    where the corresponding file no longer exists in the articles directory.
-
     Args:
-        articles_path: Path to the articles directory
+        articles_path: Path to the articles directory.
 
     Returns:
-        int: Number of files removed from the database
+        int: Number of files removed from the database.
     """
-    # Get articles path from config if not provided
     if not articles_path:
         config = getConfig()
         articles_path = config.get("articleFileFolder", "")
@@ -527,42 +405,27 @@ def remove_nonexistent_files_from_database(articles_path: Optional[str] = None) 
             return 0
 
     logger.debug(f"Checking for nonexistent files in database from: {articles_path}")
-
-    # Get all actual files in the articles directory
-    existing_files = set(
-        os.path.basename(path) for path in getArticlePathsForQuery("*")
-    )
-
-    # Use the centralized function to remove nonexistent files
+    existing_files = {os.path.basename(path) for path in getArticlePathsForQuery("*")}
     removed_count = db.remove_nonexistent_files(existing_files)
-
     if removed_count > 0:
         logger.info(
             f"Removed {removed_count} entries for nonexistent files from database"
         )
     else:
         logger.info("No nonexistent files found in database")
-
     return removed_count
 
 
 def remove_orphaned_tags_from_database() -> int:
     """Remove tags from the database that don't have any associated articles.
 
-    This function identifies and removes tags that no longer have any
-    associated articles in the article_tags table.
-
     Returns:
-        int: Number of orphaned tags removed from the database
+        int: Number of orphaned tags removed from the database.
     """
     logger.debug("Checking for orphaned tags in database")
-
-    # Use the centralized function to remove orphaned tags
     removed_count = db.remove_orphaned_tags()
-
     if removed_count > 0:
         logger.info(f"Removed {removed_count} orphaned tags from database")
     else:
         logger.info("No orphaned tags found in database")
-
     return removed_count

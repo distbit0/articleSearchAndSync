@@ -10,7 +10,6 @@ from loguru import logger
 from dotenv import load_dotenv
 from openai import OpenAI
 from .utils import getConfig
-from .textExtraction import extract_text_from_file
 from . import db
 
 # Constants
@@ -204,8 +203,7 @@ class ArticleTagger:
         """Get the IDs of all active tags that should be applied to articles."""
         active_tag_ids = set()
         with db.get_connection() as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT id, name FROM tags")
+            cursor = conn.execute("SELECT id, name FROM tags")
             for tag_id, tag_name in cursor.fetchall():
                 active_tag_ids.add(tag_id)
         return active_tag_ids
@@ -219,20 +217,18 @@ class ArticleTagger:
     ) -> List[Tuple[int, str, str]]:
         """Get tags that need to be evaluated for an article."""
         tags_to_evaluate = []
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            tag_details = db.get_all_tag_details()
-            for tag_id in active_tag_ids:
-                if tag_id in tag_details:
-                    tag = tag_details[tag_id]
-                    # Skip tags with filtering criteria (handled separately)
-                    if (
-                        tag.get("any_tags")
-                        or tag.get("and_tags")
-                        or tag.get("not_any_tags")
-                    ):
-                        continue
-                    tags_to_evaluate.append((tag_id, tag["name"], tag["description"]))
+        tag_details = db.get_all_tag_details()
+        for tag_id in active_tag_ids:
+            if tag_id in tag_details:
+                tag = tag_details[tag_id]
+                # Skip tags with filtering criteria (handled separately)
+                if (
+                    tag.get("any_tags")
+                    or tag.get("and_tags")
+                    or tag.get("not_any_tags")
+                ):
+                    continue
+                tags_to_evaluate.append((tag_id, tag["name"], tag["description"]))
         return tags_to_evaluate
 
     def _get_tag_criteria_cache_key(self, any_tags, and_tags, not_any_tags) -> str:
@@ -241,6 +237,22 @@ class ArticleTagger:
         and_tags_str = "|".join(sorted(and_tags)) if and_tags else ""
         not_any_tags_str = "|".join(sorted(not_any_tags)) if not_any_tags else ""
         return f"{any_tags_str}#{and_tags_str}#{not_any_tags_str}"
+
+    def _cache_tag_search_results(self) -> None:
+        """Cache tag search criteria for tags that have filtering (any/and/not)."""
+        self.tag_search_cache = {}
+        tag_details = db.get_all_tag_details()
+        for tag_id, tag in tag_details.items():
+            any_tags = tag.get("any_tags", [])
+            and_tags = tag.get("and_tags", [])
+            not_any_tags = tag.get("not_any_tags", [])
+            if any_tags or and_tags or not_any_tags:
+                self.tag_search_cache[tag_id] = {
+                    "name": tag["name"],
+                    "any_tags": any_tags,
+                    "and_tags": and_tags,
+                    "not_any_tags": not_any_tags,
+                }
 
     def _prepare_article_work_units(
         self, article: Tuple[int, str, str, str], active_tag_ids: Set[int]
@@ -253,22 +265,19 @@ class ArticleTagger:
             file_path = os.path.join(self.articles_path, file_name)
             try:
                 if os.path.exists(file_path):
-                    article_text = summary
-                    if not article_text:
-                        # Extract text if summary is missing
-                        article_text, _, _ = extract_text_from_file(file_path)
-                    work_units.append(
-                        {
-                            "article_id": article_id,
-                            "file_name": file_name,
-                            "text": article_text,
-                            "tags": tags_to_evaluate,
-                        }
-                    )
+                    if summary:
+                        work_units.append(
+                            {
+                                "article_id": article_id,
+                                "file_name": file_name,
+                                "text": summary,
+                                "tags": tags_to_evaluate,
+                            }
+                        )
                 else:
                     logger.warning(f"File not found: {file_path}")
             except Exception as e:
-                logger.error(f"Error extracting text from {file_path}: {e}")
+                logger.error(f"Error processing article {file_path}: {e}")
         return work_units
 
     def _process_article_tag_batch(
@@ -279,7 +288,7 @@ class ArticleTagger:
         tags_batch: List[Tuple[int, str, str]],
     ) -> Dict[int, bool]:
         """Process a batch of tags for an article."""
-        logger.info(f"Evaluating article {file_name} with {len(tags_batch)} tags")
+        logger.debug(f"Evaluating article {file_name} with {len(tags_batch)} tags")
         try:
             return self.tag_evaluator.batch_evaluate_tags(
                 article_id, file_name, text, tags_batch
@@ -306,7 +315,6 @@ class ArticleTagger:
                 file_name = unit["file_name"]
                 file_names_by_article[article_id] = file_name
                 text = unit["text"]
-                # Submit the work unit for parallel processing
                 future = executor.submit(
                     self._process_article_tag_batch,
                     article_id,
@@ -339,30 +347,11 @@ class ArticleTagger:
         self, results_by_article: Dict[int, Dict]
     ) -> None:
         """Apply tag evaluation results to articles in the database."""
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            for article_id, results in results_by_article.items():
-                for tag_id in results.get("matches", {}):
-                    db.set_article_tag(article_id, tag_id, True)
-                for tag_id in results.get("non_matches", {}):
-                    db.set_article_tag(article_id, tag_id, False)
-            conn.commit()
-
-    def _cache_tag_search_results(self, cursor) -> None:
-        """Cache tag search criteria for tags that have filtering (any/and/not)."""
-        self.tag_search_cache = {}
-        tag_details = db.get_all_tag_details()
-        for tag_id, tag in tag_details.items():
-            any_tags = tag.get("any_tags", [])
-            and_tags = tag.get("and_tags", [])
-            not_any_tags = tag.get("not_any_tags", [])
-            if any_tags or and_tags or not_any_tags:
-                self.tag_search_cache[tag_id] = {
-                    "name": tag["name"],
-                    "any_tags": any_tags,
-                    "and_tags": and_tags,
-                    "not_any_tags": not_any_tags,
-                }
+        for article_id, results in results_by_article.items():
+            for tag_id in results.get("matches", {}):
+                db.set_article_tag(article_id, tag_id, True)
+            for tag_id in results.get("non_matches", {}):
+                db.set_article_tag(article_id, tag_id, False)
 
     def apply_tags_to_articles(self) -> None:
         """Apply content-based tags to articles based on tag definitions."""
@@ -375,9 +364,7 @@ class ArticleTagger:
         active_tag_ids = self._get_active_tag_ids()
         logger.info(f"Found {len(active_tag_ids)} active tags")
 
-        with db.get_connection() as conn:
-            cursor = conn.cursor()
-            self._cache_tag_search_results(cursor)
+        self._cache_tag_search_results()
 
         all_work_units = []
         for article in articles:
@@ -388,44 +375,42 @@ class ArticleTagger:
         if all_work_units:
             results_by_article = self._process_work_units(all_work_units)
             self._apply_tag_results_to_articles(results_by_article)
-
+            tagStats = {}
             # Process tags with filtering criteria separately
-            with db.get_connection() as conn:
-                cursor = conn.cursor()
-                for article_id in results_by_article.keys():
-                    article_tags = set(db.get_tags_for_article(article_id))
-                    for tag_id, criteria in self.tag_search_cache.items():
-                        tag_name = criteria["name"]
-                        any_tags = set(criteria.get("any_tags", []))
-                        and_tags = set(criteria.get("and_tags", []))
-                        not_any_tags = set(criteria.get("not_any_tags", []))
-                        any_tag_ids = {
-                            db.get_tag_id_by_name(tag)
-                            for tag in any_tags
-                            if db.get_tag_id_by_name(tag)
-                        }
-                        and_tag_ids = {
-                            db.get_tag_id_by_name(tag)
-                            for tag in and_tags
-                            if db.get_tag_id_by_name(tag)
-                        }
-                        not_any_tag_ids = {
-                            db.get_tag_id_by_name(tag)
-                            for tag in not_any_tags
-                            if db.get_tag_id_by_name(tag)
-                        }
-                        match = True
-                        if any_tag_ids and not any_tag_ids.intersection(article_tags):
-                            match = False
-                        if and_tag_ids and not and_tag_ids.issubset(article_tags):
-                            match = False
-                        if not_any_tag_ids and not_any_tag_ids.intersection(
-                            article_tags
-                        ):
-                            match = False
-                        db.set_article_tag(article_id, tag_id, match)
-                conn.commit()
+            for article_id in results_by_article.keys():
+                article_tags = set(db.get_tags_for_article(article_id))
+                for tag_id, criteria in self.tag_search_cache.items():
+                    any_tags = set(criteria.get("any_tags", []))
+                    and_tags = set(criteria.get("and_tags", []))
+                    not_any_tags = set(criteria.get("not_any_tags", []))
+                    # Retrieve corresponding tag IDs for each filtering criteria
+                    any_tag_ids = {
+                        db.get_tag_id_by_name(tag)
+                        for tag in any_tags
+                        if db.get_tag_id_by_name(tag)
+                    }
+                    and_tag_ids = {
+                        db.get_tag_id_by_name(tag)
+                        for tag in and_tags
+                        if db.get_tag_id_by_name(tag)
+                    }
+                    not_any_tag_ids = {
+                        db.get_tag_id_by_name(tag)
+                        for tag in not_any_tags
+                        if db.get_tag_id_by_name(tag)
+                    }
+                    match = True
+                    if any_tag_ids and not any_tag_ids.intersection(article_tags):
+                        match = False
+                    if and_tag_ids and not and_tag_ids.issubset(article_tags):
+                        match = False
+                    if not_any_tag_ids and not_any_tag_ids.intersection(article_tags):
+                        match = False
+                    db.set_article_tag(article_id, tag_id, match)
+                    tagStats[tag_id] = tagStats.get(tag_id, 0) + 1
 
+        for tag_id, count in tagStats.items():
+            logger.info(f"Tag {db.get_tag_name_by_id(tag_id)}: {count} articles")
         logger.info("Tagging process completed")
 
 
@@ -437,7 +422,7 @@ def analyze_tag_results(tag_name: str) -> None:
         logger.error(f"Tag not found: {tag_name}")
         return
     matching_articles = db.get_articles_by_tag(tag_name)
-    non_matching_articles = db.get_articles_without_tag(tag_name)
+    non_matching_articles = db.get_articles_not_matching_tag(tag_name)
     report = f"# Tag Analysis: {tag_name}\n\n"
     report += f"## Matching Articles ({len(matching_articles)})\n\n"
     for file_name in matching_articles:
@@ -464,11 +449,7 @@ def main(all_tags=True, limit=None, analyze=None, debug=False):
     load_environment_variables()
     if __name__ == "__main__":
         parser = argparse.ArgumentParser(description="Manage article tags.")
-        parser.add_argument(
-            "--all",
-            action="store_true",
-            help="Create content tags",
-        )
+        parser.add_argument("--all", action="store_true", help="Create content tags")
         parser.add_argument(
             "--limit", type=int, help="Limit the number of articles to process"
         )

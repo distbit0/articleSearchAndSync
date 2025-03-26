@@ -5,7 +5,7 @@
     "backupFolderPath": "/home/pimania/miscSyncs/ebooksBackup/",
     "convertLinksDir": "/home/pimania/dev/convertLinks",
     "maxSummariesPerSession": 300,
-    "maxArticlesToTagPerSession": 300,
+    "maxArticlesToTagPerSession": 600,
     "droidEbooksFolderPath": "/storage/emulated/0/ebooks/",
     "summary_in_max_words": 8000,
     "enable_article_summarization": true,
@@ -70,8 +70,7 @@
     "article_tags": {
         "infofi": {
             "description": "Articles about prediction markets or decision markets or futarchy or which mention info-finance or which are about constructing incentive mechanisms to elicit information or using prediction markets for governance or combining prediction markets/prediction competitions and ai/ml/ai agents",
-            "use_summary": true,
-            "not_any_tags": []
+            "use_summary": true
         }
     },
     "listToTagMappings": {

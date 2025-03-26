@@ -31,7 +31,7 @@ def updateLists():
         articlePathsForList = [
             x[0] for x in sorted(articlePathsForList.items(), key=lambda x: x[1])
         ]
-
+        # print(articlePathsForList)
         utils.addArticlesToList(listName, articlePathsForList)
 
 
