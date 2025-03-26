@@ -402,31 +402,33 @@ def getArticlePathsForQuery(
     search_targets = [glob.escape(fileName)] if fileName else formats
     # Create glob patterns for both root and recursive searches
 
-    # Determine file prefix pattern based on read state
-    file_prefix = ""
-    if readState == "read":
-        file_prefix = "."  # For read files (dot files)
-    elif readState == "unread":
-        file_prefix = "[^.]"  # For unread files (non-dot files)
-    # Default is empty string - no additional prefix needed
-
-    # Create the glob patterns using the determined prefix
+    # Create the glob patterns
     glob_patterns = [
         *(
             (
-                os.path.join(folderPath, globWildcard, f"{file_prefix}*{target}")
+                os.path.join(folderPath, globWildcard, f"{target}")
                 if recursive
-                else os.path.join(folderPath, f"{file_prefix}*{target}")
+                else os.path.join(folderPath, f"{globWildcard}{target}")
             )
             for target in search_targets
         ),  # Recursively
     ]
+    final_patterns = []
+    for pattern in glob_patterns:
+        lastSegment = path.split(pattern)[-1]
+        if readState == "read":
+            lastSegment = f".{lastSegment}"
+        firstSegments = path.split(pattern)[:-1]
+        pattern = os.path.join(*firstSegments, lastSegment)
+        final_patterns.append(pattern)
 
+    glob_patterns = final_patterns
+    include_hidden = False if readState == "unread" else True
     allArticlesPaths = []
     for pattern in glob_patterns:
         try:
             matching_paths = glob.glob(
-                pattern, recursive=recursive, include_hidden=True
+                pattern, recursive=recursive, include_hidden=include_hidden
             )
             matching_paths = [
                 path for path in matching_paths if not doesPathContainDotFolders(path)
@@ -434,6 +436,7 @@ def getArticlePathsForQuery(
             allArticlesPaths.extend(matching_paths)
         except Exception as e:
             print(f"Error in glob pattern {pattern}: {e}")
+
     allArticlesPaths = [
         path
         for path in allArticlesPaths
@@ -451,7 +454,9 @@ def searchArticlesForQuery(query, subjects=[], readState="", formats=[], path=""
         "pdf" in formats and query != "*" and path == ""
     ):  # i.e. if we want to search in the text of the pdf files
         formats.remove("pdf")
-    allArticlesPaths.extend(getArticlePathsForQuery(query, formats, path))
+    allArticlesPaths.extend(
+        getArticlePathsForQuery(query, formats, path, readState=readState)
+    )
 
     for articlePath in allArticlesPaths:
         skipBecauseReadState = False

@@ -562,7 +562,7 @@ def get_articles_needing_tagging(
         SELECT a.id, a.file_hash, a.file_name, a.summary 
         FROM article_summaries a
         WHERE NOT EXISTS (SELECT 1 FROM article_tags WHERE article_id = a.id)
-        AND a.summary IS NOT NULL
+        AND a.summary IS NOT NULL AND a.summary != ''
         ORDER BY RANDOM()
     """
     if max_articles:

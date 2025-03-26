@@ -375,42 +375,18 @@ class ArticleTagger:
         if all_work_units:
             results_by_article = self._process_work_units(all_work_units)
             self._apply_tag_results_to_articles(results_by_article)
+
+            # Initialize tagStats before processing any tags
             tagStats = {}
-            # Process tags with filtering criteria separately
-            for article_id in results_by_article.keys():
-                article_tags = set(db.get_tags_for_article(article_id))
-                for tag_id, criteria in self.tag_search_cache.items():
-                    any_tags = set(criteria.get("any_tags", []))
-                    and_tags = set(criteria.get("and_tags", []))
-                    not_any_tags = set(criteria.get("not_any_tags", []))
-                    # Retrieve corresponding tag IDs for each filtering criteria
-                    any_tag_ids = {
-                        db.get_tag_id_by_name(tag)
-                        for tag in any_tags
-                        if db.get_tag_id_by_name(tag)
-                    }
-                    and_tag_ids = {
-                        db.get_tag_id_by_name(tag)
-                        for tag in and_tags
-                        if db.get_tag_id_by_name(tag)
-                    }
-                    not_any_tag_ids = {
-                        db.get_tag_id_by_name(tag)
-                        for tag in not_any_tags
-                        if db.get_tag_id_by_name(tag)
-                    }
-                    match = True
-                    if any_tag_ids and not any_tag_ids.intersection(article_tags):
-                        match = False
-                    if and_tag_ids and not and_tag_ids.issubset(article_tags):
-                        match = False
-                    if not_any_tag_ids and not_any_tag_ids.intersection(article_tags):
-                        match = False
-                    db.set_article_tag(article_id, tag_id, match)
+            # First, count all direct tag matches from content-based tagging
+            for _, results in results_by_article.items():
+                for tag_id in results.get("matches", {}):
                     tagStats[tag_id] = tagStats.get(tag_id, 0) + 1
 
-        for tag_id, count in tagStats.items():
-            logger.info(f"Tag {db.get_tag_name_by_id(tag_id)}: {count} articles")
+            for tag_id, count in tagStats.items():
+                tag_details = db.get_tag_details(tag_id)
+                logger.info(f"Tag {tag_details['name']}: {count} articles")
+
         logger.info("Tagging process completed")
 
 
