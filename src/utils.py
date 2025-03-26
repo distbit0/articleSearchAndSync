@@ -547,7 +547,7 @@ def addArticlesToList(listName, articlePathsForList, overwrite=False):
     combinedListText = (
         headers + newListText + ("" if overwrite else existingArticleListText)
     )
-    if len(linesToAppend) > 0 or overwrite:
+    if len(linesToAppend) > 0 and not overwrite:
         print(
             "\n\n\n\nAdding the following articles to list: " + listName,
             "\n",
