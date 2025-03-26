@@ -501,7 +501,7 @@ def deleteListIfExists(listName):
         os.remove(listPath)
 
 
-def addArticlesToList(listName, articlePathsForList):
+def addArticlesToList(listName, articlePathsForList, overwrite=False):
     listPath = os.path.join(
         getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"
     )
@@ -515,7 +515,7 @@ def addArticlesToList(listName, articlePathsForList):
         articleName = articlePath.split("/")[-1]
         relativeArticlePath = os.path.relpath(articlePath, articleFileFolder)
         droidArticlePath = os.path.join(droidEbooksFolderPath, relativeArticlePath)
-        if articleName not in articleNamesInList:
+        if overwrite or articleName not in articleNamesInList:
             displayName = articleName.split(".")[0]
             linesToAppend.append(droidArticlePath + "\t" + displayName)
     newListText = "\n".join(linesToAppend) + "\n" if linesToAppend else ""
@@ -543,15 +543,18 @@ def addArticlesToList(listName, articlePathsForList):
             # Simple format with no headers
             existingArticleListText = currentListText
 
-    combinedListText = headers + newListText + existingArticleListText
-
-    print(
-        "\n\n\n\nAdding the following articles to list: " + listName,
-        "\n",
-        newListText,
+    # If overwrite is True, discard existing articles
+    combinedListText = (
+        headers + newListText + ("" if overwrite else existingArticleListText)
     )
+    if len(linesToAppend) > 0 or overwrite:
+        print(
+            "\n\n\n\nAdding the following articles to list: " + listName,
+            "\n",
+            newListText,
+        )
 
-    if len(linesToAppend) > 0:
+    if len(linesToAppend) > 0 or overwrite:
         with open(listPath, "w") as f:
             f.write(combinedListText)
 

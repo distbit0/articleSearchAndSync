@@ -89,6 +89,27 @@ def get_article_by_hash(file_hash: str) -> Optional[Dict[str, Any]]:
     }
 
 
+def get_article_by_file_name(file_name: str) -> Optional[Dict[str, Any]]:
+    with get_connection() as conn:
+        cursor = conn.execute(
+            "SELECT id, file_hash, file_name, file_format, summary, extraction_method, word_count, created_at FROM article_summaries WHERE file_name = ?",
+            (file_name,),
+        )
+        row = cursor.fetchone()
+    if not row:
+        return None
+    return {
+        "id": row[0],
+        "file_hash": row[1],
+        "file_name": row[2],
+        "file_format": row[3],
+        "summary": row[4],
+        "extraction_method": row[5],
+        "word_count": row[6],
+        "created_at": row[7],
+    }
+
+
 def update_article_summary(
     file_hash: str,
     file_name: str,

@@ -507,7 +507,7 @@ if __name__ == "__main__":
     # summarize_articles()
     # deleteFilesMarkedToDelete()
     # hideArticlesMarkedAsRead()
-    tag_articles()
+    # tag_articles()
     updateLists()
 
     # profiler.disable()

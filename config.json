@@ -78,7 +78,8 @@
             "all_tags": [],
             "any_tags": [
                 "infofi"
-            ]
+            ],
+            "prefixSummary": true
         }
     }
 }
