@@ -501,14 +501,14 @@ if __name__ == "__main__":
     # profiler = cProfile.Profile()
     # profiler.enable()
 
-    # main()
+    main()
     # moveDocsToTargetFolder()
     # remove_nonexistent_files_from_database()
     # summarize_articles()
     # deleteFilesMarkedToDelete()
     # hideArticlesMarkedAsRead()
     # tag_articles()
-    updateLists()
+    # updateLists()
 
     # profiler.disable()
     # stats = pstats.Stats(profiler)

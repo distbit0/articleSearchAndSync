@@ -170,8 +170,9 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
                 return summary, False
             elif summary == "failed_to_extract":
                 logger.debug(
-                    f"File {file_name} had extraction issues; attempting to summarize again"
+                    f"Skipping file {file_name} due to previous extraction issues"
                 )
+                return summary, False
             else:
                 return summary, True
         else:
@@ -204,8 +205,15 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
     except TextExtractionError as te:
         if not getattr(te, "already_logged", False):
             logger.error(f"Error extracting text from article: {str(te)}")
-        db.add_file_to_database(file_hash, file_name, file_format)
-        return "Temporary text extraction error", False
+        db.update_article_summary(
+            file_hash,
+            file_name,
+            file_format,
+            "failed_to_extract",
+            "no method worked",
+            0,
+        )
+        return "failed_to_extract", False
 
     except Exception as e:
         error_message = f"Error summarizing article: {str(e)}"

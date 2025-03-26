@@ -165,9 +165,9 @@ def add_file_to_database(
     word_count: int = 0,
 ) -> int:
     with get_connection() as conn:
-        existing_id = get_article_by_hash(file_hash)["id"]
-        if existing_id:
-            return existing_id
+        existing_article = get_article_by_hash(file_hash)
+        if existing_article:
+            return existing_article["id"]
         cursor = conn.execute(
             """
             INSERT INTO article_summaries (file_hash, file_name, file_format, summary, extraction_method, word_count)
