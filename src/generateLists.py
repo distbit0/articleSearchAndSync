@@ -1,5 +1,7 @@
+import pysnooper
 from .utils import getConfig
 from . import utils, db
+from bs4 import BeautifulSoup
 import os
 
 
@@ -16,31 +18,55 @@ def create_prefixed_html(original_path, prefixed_path, summary):
         bool: True if successful, False otherwise
     """
     try:
+
         # Read the original file
         with open(original_path, "r", encoding="utf-8", errors="ignore") as file:
             content = file.read()
 
-        # Add the summary as a <p> element at the beginning of the content
-        summary_html = f"<p>{summary}</p>"
+        # Create the summary paragraph element
+        summary_html = f"<p>{summary}</p><br>"
 
-        # Handle different document structures for HTML files
-        if "<body" in content:
-            # Insert after the body tag
-            body_start = content.find("<body")
-            # Find the end of the body tag
-            body_tag_end = content.find(">", body_start) + 1
-            modified_content = (
-                content[:body_tag_end] + summary_html + content[body_tag_end:]
-            )
+        # Parse HTML with BeautifulSoup
+        soup = BeautifulSoup(content, "html.parser")
+
+        # Find the body tag
+        body = soup.find("body")
+
+        if body:
+            # Find the first text element in body that contains an actual sentence
+            first_text_element = None
+            for element in body.find_all(
+                [
+                    "p",
+                    "article",
+                    "section",
+                ]
+            ):
+                text = element.get_text().strip()
+                # Check if text appears to be a sentence or meaningful content
+                if (
+                    text
+                    and len(text) > 15  # Minimum length for a likely sentence
+                    and any(
+                        char.isalpha() for char in text
+                    )  # Contains at least one letter
+                    and sum(1 for char in text if char.isalpha())
+                    > 5  # Has reasonable number of letters
+                    and not text.startswith(("•", "-", "–", "—", "*", ">", "×"))
+                ):  # Not just a list item or button
+                    first_text_element = element
+                    break
+
+            # If found a text element, insert the summary before it
+            if first_text_element:
+                summary_soup = BeautifulSoup(summary_html, "html.parser")
+                summary_elements = list(summary_soup.children)
+                for element in reversed(summary_elements):
+                    first_text_element.insert_before(element)
+
+            modified_content = str(soup)
         else:
-            # No body tag, try to insert after <html> or just prepend
-            if "<html" in content:
-                html_start = content.find("<html")
-                html_tag_end = content.find(">", html_start) + 1
-                modified_content = (
-                    content[:html_tag_end] + summary_html + content[html_tag_end:]
-                )
-
+            raise TextExtractionError("No text tag found in HTML file")
         # Write the modified content to the new file
         with open(prefixed_path, "w", encoding="utf-8") as file:
             file.write(modified_content)
@@ -91,6 +117,7 @@ def process_article_for_prefixing(path, prefixed_folder):
         return prefixed_path
 
 
+# @pysnooper.snoop()
 def updateLists():
     listToTagMappings = getConfig()["listToTagMappings"]
 
@@ -133,7 +160,9 @@ def updateLists():
         utils.addArticlesToList(listName, articlePathsForList)
 
         # Process prefixing if required
-        if prefixSummary:
+        if (
+            prefixSummary
+        ):  # this doesn't work for the time being unfortunately. so do not use it
             prefixed_folder = os.path.join(
                 getConfig()["articleFileFolder"], "prefixedArticles"
             )
