@@ -1,6 +1,4 @@
-import sqlite3
 import re
-from pathlib import Path
 import json
 from . import utils
 from .utils import getConfig, calculate_normal_hash, calculate_ipfs_hash
@@ -503,14 +501,14 @@ if __name__ == "__main__":
     # profiler = cProfile.Profile()
     # profiler.enable()
 
-    main()
+    # main()
     # moveDocsToTargetFolder()
     # remove_nonexistent_files_from_database()
     # summarize_articles()
     # deleteFilesMarkedToDelete()
     # hideArticlesMarkedAsRead()
-    # tag_articles()
-    # updateLists()
+    tag_articles()
+    updateLists()
 
     # profiler.disable()
     # stats = pstats.Stats(profiler)

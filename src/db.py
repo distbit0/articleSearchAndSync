@@ -1,9 +1,11 @@
 import sqlite3
+import os
 import json
 import hashlib
 from pathlib import Path
 from typing import Dict, List, Tuple, Any, Set, Optional
 from loguru import logger
+from . import utils
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 STORAGE_DIR = PROJECT_ROOT / "storage"
@@ -66,24 +68,6 @@ def setup_database() -> str:
 # Article Summary Operations
 
 
-def get_article_summary_by_hash(file_hash: str) -> Optional[str]:
-    with get_connection() as conn:
-        cursor = conn.execute(
-            "SELECT summary FROM article_summaries WHERE file_hash = ?", (file_hash,)
-        )
-        row = cursor.fetchone()
-    return row[0] if row else None
-
-
-def get_article_id_by_hash(file_hash: str) -> Optional[int]:
-    with get_connection() as conn:
-        cursor = conn.execute(
-            "SELECT id FROM article_summaries WHERE file_hash = ?", (file_hash,)
-        )
-        row = cursor.fetchone()
-    return row[0] if row else None
-
-
 def get_article_by_hash(file_hash: str) -> Optional[Dict[str, Any]]:
     with get_connection() as conn:
         cursor = conn.execute(
@@ -114,7 +98,7 @@ def update_article_summary(
     word_count: int,
 ) -> int:
     with get_connection() as conn:
-        article_id = get_article_id_by_hash(file_hash)
+        article_id = get_article_by_hash(file_hash)["id"]
         if article_id:
             conn.execute(
                 """
@@ -160,7 +144,7 @@ def add_file_to_database(
     word_count: int = 0,
 ) -> int:
     with get_connection() as conn:
-        existing_id = get_article_id_by_hash(file_hash)
+        existing_id = get_article_by_hash(file_hash)["id"]
         if existing_id:
             return existing_id
         cursor = conn.execute(
@@ -181,45 +165,12 @@ def get_all_file_hashes() -> List[str]:
         return [row[0] for row in cursor.fetchall()]
 
 
-def get_all_articles() -> List[Tuple[int, str]]:
-    with get_connection() as conn:
-        cursor = conn.execute("SELECT id, file_name FROM article_summaries")
-        return cursor.fetchall()
-
-
 def get_articles_needing_summary() -> List[Tuple[str, str]]:
     with get_connection() as conn:
         cursor = conn.execute(
             "SELECT file_hash, file_name FROM article_summaries WHERE summary IS NULL OR summary = ''"
         )
         return cursor.fetchall()
-
-
-def remove_article_by_id(article_id: int) -> None:
-    with get_connection() as conn:
-        conn.execute("DELETE FROM article_tags WHERE article_id = ?", (article_id,))
-        conn.execute("DELETE FROM article_summaries WHERE id = ?", (article_id,))
-        conn.commit()
-
-
-def remove_article_by_hash(file_hash: str) -> bool:
-    article_id = get_article_id_by_hash(file_hash)
-    if article_id:
-        remove_article_by_id(article_id)
-        return True
-    return False
-
-
-def get_articles_by_filename(filenames: List[str]) -> Dict[str, int]:
-    if not filenames:
-        return {}
-    placeholders = ",".join("?" for _ in filenames)
-    with get_connection() as conn:
-        cursor = conn.execute(
-            f"SELECT file_name, id FROM article_summaries WHERE file_name IN ({placeholders})",
-            filenames,
-        )
-        return {row[0]: row[1] for row in cursor.fetchall()}
 
 
 def remove_nonexistent_files(existing_files: Set[str]) -> int:
@@ -396,26 +347,6 @@ def get_tags_for_article(article_id: int) -> List[int]:
         return [row[0] for row in cursor.fetchall()]
 
 
-def get_tag_details(tag_id: int) -> Optional[Dict[str, Any]]:
-    with get_connection() as conn:
-        cursor = conn.execute(
-            "SELECT id, name, description, use_summary, any_tags, and_tags, not_any_tags FROM tags WHERE id = ?",
-            (tag_id,),
-        )
-        row = cursor.fetchone()
-    if not row:
-        return None
-    return {
-        "id": row[0],
-        "name": row[1],
-        "description": row[2],
-        "use_summary": bool(row[3]),
-        "any_tags": json.loads(row[4]) if row[4] else [],
-        "and_tags": json.loads(row[5]) if row[5] else [],
-        "not_any_tags": json.loads(row[6]) if row[6] else [],
-    }
-
-
 def get_all_tag_details() -> Dict[int, Dict[str, Any]]:
     with get_connection() as conn:
         cursor = conn.execute(
@@ -444,30 +375,6 @@ def set_article_tag(article_id: int, tag_id: int, matches: bool) -> None:
         conn.commit()
 
 
-def remove_article_tag(article_id: int, tag_id: int) -> None:
-    with get_connection() as conn:
-        conn.execute(
-            "DELETE FROM article_tags WHERE article_id = ? AND tag_id = ?",
-            (article_id, tag_id),
-        )
-        conn.commit()
-
-
-def get_current_article_tags() -> Dict[int, Dict[str, List[Tuple[int, str]]]]:
-    result = {}
-    with get_connection() as conn:
-        cursor = conn.execute(
-            "SELECT at.article_id, t.name, t.id, at.matches FROM article_tags at JOIN tags t ON at.tag_id = t.id"
-        )
-        for article_id, tag_name, tag_id, matches in cursor.fetchall():
-            result.setdefault(article_id, {"matching": [], "not_matching": []})
-            if matches:
-                result[article_id]["matching"].append((tag_id, tag_name))
-            else:
-                result[article_id]["not_matching"].append((tag_id, tag_name))
-    return result
-
-
 def remove_orphaned_tags() -> int:
     with get_connection() as conn:
         cursor = conn.execute(
@@ -478,57 +385,6 @@ def remove_orphaned_tags() -> int:
 
 
 # Search Operations
-
-
-def search_articles_by_tags(
-    all_tags: List[str] = None,
-    any_tags: List[str] = None,
-    not_any_tags: List[str] = None,
-    filenames: List[str] = None,
-) -> List[Tuple[str, int]]:
-    all_tags = all_tags or []
-    any_tags = any_tags or []
-    not_any_tags = not_any_tags or []
-    if not (all_tags or any_tags or not_any_tags):
-        return []
-    query_params = []
-    sql = "SELECT a.file_name, a.id FROM article_summaries a "
-    if filenames:
-        placeholders = ",".join("?" for _ in filenames)
-        sql += f"WHERE a.file_name IN ({placeholders}) "
-        query_params.extend(filenames)
-    for i, tag in enumerate(all_tags):
-        sql += f"""
-        INNER JOIN article_tags at_all{i} ON a.id = at_all{i}.article_id AND at_all{i}.matches = 1
-        INNER JOIN tags t_all{i} ON at_all{i}.tag_id = t_all{i}.id AND t_all{i}.name = ? 
-        """
-        query_params.append(tag)
-    conditions = []
-    if any_tags:
-        any_conditions = []
-        for tag in any_tags:
-            any_conditions.append(
-                "EXISTS (SELECT 1 FROM article_tags at_any JOIN tags t_any ON at_any.tag_id = t_any.id WHERE at_any.article_id = a.id AND t_any.name = ? AND at_any.matches = 1)"
-            )
-            query_params.append(tag)
-        conditions.append("(" + " OR ".join(any_conditions) + ")")
-    if not_any_tags:
-        not_conditions = []
-        for tag in not_any_tags:
-            not_conditions.append(
-                "NOT EXISTS (SELECT 1 FROM article_tags at_not JOIN tags t_not ON at_not.tag_id = t_not.id WHERE at_not.article_id = a.id AND t_not.name = ? AND at_not.matches = 1)"
-            )
-            query_params.append(tag)
-        conditions.append("(" + " AND ".join(not_conditions) + ")")
-    if conditions:
-        sql += (
-            "WHERE " + " AND ".join(conditions)
-            if "WHERE" not in sql
-            else " AND " + " AND ".join(conditions)
-        )
-    with get_connection() as conn:
-        cursor = conn.execute(sql, query_params)
-        return cursor.fetchall()
 
 
 def get_articles_by_tag(tag_name: str) -> List[str]:
@@ -572,15 +428,6 @@ def get_articles_needing_tagging(
         return cursor.fetchall()
 
 
-def get_article_count_by_tag(tag_id: int) -> int:
-    with get_connection() as conn:
-        cursor = conn.execute(
-            "SELECT COUNT(article_id) FROM article_tags WHERE tag_id = ? AND matches = 1",
-            (tag_id,),
-        )
-        return cursor.fetchone()[0]
-
-
 def get_all_tags_with_article_count() -> List[Tuple[int, str, int]]:
     with get_connection() as conn:
         cursor = conn.execute(
@@ -611,3 +458,144 @@ def clean_orphaned_database_items() -> Tuple[int, int]:
         conn.commit()
     orphaned_hashes = cursor.rowcount
     return orphaned_tags, orphaned_hashes
+
+
+def searchArticlesByTags(
+    all_tags=[], any_tags=[], not_any_tags=[], readState="", formats=[]
+):
+    """
+    Search for articles that match specified tags.
+
+    Args:
+        all_tags: List of tags where all must match (AND logic)
+        any_tags: List of tags where any must match (OR logic)
+        not_any_tags: List of tags where none should match (NOT ANY logic)
+        readState: Filter by read state ('read', 'unread', or '') - empty string means no filtering
+        formats: List of file formats to include
+        path: Base path to search in
+
+    Returns:
+        Dict of article paths with their URLs
+    """
+    # Early return conditions
+    is_format_specific = (
+        formats
+        and len(formats) > 0
+        and formats != utils.getConfig()["docFormatsToMove"]
+    )
+    if not all_tags and not any_tags and not not_any_tags and not is_format_specific:
+        return {}
+
+    # Get database path
+    db_path = os.path.join(
+        os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
+        "storage",
+        "article_summaries.db",
+    )
+    if not os.path.exists(db_path):
+        print(f"Tag database not found at {db_path}")
+        return {}
+
+    # Get all article paths that match the format criteria
+    article_paths = utils.getArticlePathsForQuery("*", formats, readState=readState)
+
+    # If no tags specified and only filtering by format, just apply read state filter and return
+    if not all_tags and not any_tags and not not_any_tags:
+        matchingArticles = {
+            articlePath: utils.getUrlOfArticle(articlePath)
+            for articlePath in article_paths
+        }
+        return matchingArticles
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    try:
+        # Extract filenames from paths for efficient filtering
+        filenames = {os.path.basename(path): path for path in article_paths}
+
+        # Build SQL query for tag filtering
+        query_params = []
+
+        # Base SQL query to get article summaries
+        sql = """
+        SELECT as1.file_name, as1.id 
+        FROM article_summaries as1
+        WHERE as1.file_name IN ({})
+        """.format(
+            ",".join(["?"] * len(filenames))
+        )
+
+        query_params.extend(filenames.keys())
+
+        # Filter by all_tags (AND logic)
+        if all_tags:
+            # For each required tag, join to article_tags and check for match
+            for i, tag in enumerate(all_tags):
+                tag_alias = f"at{i}"
+                tag_join = f"""
+                JOIN article_tags {tag_alias} ON as1.id = {tag_alias}.article_id
+                JOIN tags t{i} ON {tag_alias}.tag_id = t{i}.id AND t{i}.name = ? AND {tag_alias}.matches = 1
+                """
+                sql = sql.replace(
+                    "FROM article_summaries as1",
+                    f"FROM article_summaries as1 {tag_join}",
+                )
+                query_params.append(tag)
+
+        # Filter by any_tags (OR logic)
+        if any_tags:
+            or_conditions = []
+            for tag in any_tags:
+                or_conditions.append("(t_any.name = ? AND at_any.matches = 1)")
+                query_params.append(tag)
+
+            if or_conditions:
+                any_tag_join = """
+                JOIN article_tags at_any ON as1.id = at_any.article_id
+                JOIN tags t_any ON at_any.tag_id = t_any.id
+                """
+                any_tag_where = " AND (" + " OR ".join(or_conditions) + ")"
+
+                # Add the join to the FROM clause
+                sql = sql.replace(
+                    "FROM article_summaries as1",
+                    f"FROM article_summaries as1 {any_tag_join}",
+                )
+                # Add the OR conditions to the WHERE clause
+                sql += any_tag_where
+
+        # Filter by not_any_tags (NOT ANY logic)
+        if not_any_tags:
+            # Create a subquery to exclude articles that have any of the excluded tags
+            not_any_subquery = """
+            NOT EXISTS (
+                SELECT 1 
+                FROM article_tags at_not 
+                JOIN tags t_not ON at_not.tag_id = t_not.id 
+                WHERE as1.id = at_not.article_id 
+                AND at_not.matches = 1 
+                AND t_not.name IN ({})
+            )
+            """.format(
+                ",".join(["?"] * len(not_any_tags))
+            )
+
+            query_params.extend(not_any_tags)
+            sql += " AND " + not_any_subquery
+
+        # Execute query
+        cursor.execute(sql, query_params)
+        matching_files = cursor.fetchall()
+
+        # Build result dictionary
+        matchingArticles = {
+            filenames[filename]: utils.getUrlOfArticle(filenames[filename])
+            for filename, _ in matching_files
+            if filename in filenames
+        }
+        return matchingArticles
+
+    finally:
+        if cursor:
+            cursor.connection.close()

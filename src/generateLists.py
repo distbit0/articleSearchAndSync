@@ -1,5 +1,5 @@
 from .utils import getConfig
-from . import utils
+from . import utils, db
 import os
 
 
@@ -20,7 +20,7 @@ def updateLists():
             continue
 
         print(listName, listInfo)
-        articlePathsForList = utils.searchArticlesByTags(
+        articlePathsForList = db.searchArticlesByTags(
             all_tags=all_tags,
             any_tags=any_tags,
             not_any_tags=not_any_tags,
