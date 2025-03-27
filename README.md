@@ -10,7 +10,7 @@ Infolio is a tool for managing ebooks and articles. It uses AI to assign article
 - **Article Management**: Store and organize articles in various formats (PDF, HTML, MHTML, EPUB, etc.).
 - **Automatic Summarization**: Generate AI-powered summaries of articles using OpenAI/OpenRouter.
 - **Smart Tagging**: Automatically tag articles based on their content to improve organization and searchability.
-- **Powerful Search**: Search articles by content, tags, or custom Boolean queries with ease.
+- **Powerful Search**: Search articles by content, tags, or custom Boolean queries.
 - **Format Conversion**: Convert PDFs to EPUB format using the Mineru API.
 - **Synchronization**: Sync articles to mobile devices, including integration with the @Voice reader on Android.
 - **Browser Integration**: Import and process articles directly from your browser bookmarks.

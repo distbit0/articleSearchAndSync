@@ -46,7 +46,7 @@ def get_upload_url(file_path):
         "language": "en",
         "layout_model": "doclayout_yolo",
         "enable_table": True,
-        "files": [{"name": filename, "is_ocr": True, "data_id": filename}],
+        "files": [{"name": filename, "is_ocr": False, "data_id": filename}],
     }
     url = "https://mineru.net/api/v4/file-urls/batch"
     response = requests.post(url, headers=HEADERS, json=payload, timeout=10)
