@@ -75,7 +75,7 @@ Run the main module to process bookmarks, download new articles, extract text fo
 uv run -m src.main
 ```
 
-The automatically generated reading lists allow you to easily import article paths into @Voice or other reader apps
+The automatically generated reading lists allow you to easily import article paths into [@Voice](https://play.google.com/store/apps/details?id=com.hyperionics.avar&hl=en_US) or other reader apps
 
 
 ### Tag-Based Management
@@ -97,7 +97,7 @@ articles = searchArticlesByTags(
 
 ## Reading Lists
 
-One of the core functions of this project is the automatic generation of reading lists. These lists comprise paths to articles that match a set of specified tags and can be imported into various reading tools, including but not limited to @Voice on Android, allowing you to organize your reading based on topics of interest and seamlessly integrate with your preferred reading applications.
+One of the core functions of this project is the automatic generation of reading lists. These lists comprise paths to articles that match a set of specified tags and can be imported into various reading tools, including but not limited to [@Voice](https://play.google.com/store/apps/details?id=com.hyperionics.avar&hl=en_US) on Android, allowing you to organize your reading based on topics of interest and seamlessly integrate with your preferred reading applications.
 
 Each tag in the configuration is not only a label but comes with a natural language description (configured in `config.json` under the `article_tags` section). This description is used by the language model (LLM) to determine whether a given article should be associated with a particular tag, making tag assignment both dynamic and context-aware.
 

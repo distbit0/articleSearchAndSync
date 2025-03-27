@@ -77,7 +77,7 @@ def upload_file(upload_url, file_path):
     return True
 
 
-def poll_batch_task_result(batch_id, max_retries=8, retry_interval=10):
+def poll_batch_task_result(batch_id, max_retries=10, retry_interval=10):
     """
     Poll the Mineru batch results endpoint until the parsing task is done.
     """
