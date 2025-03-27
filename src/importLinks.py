@@ -24,7 +24,7 @@ from loguru import logger
 
 # Configure loguru logger
 logger.remove()
-logger.add(sys.stdout, level="DEBUG")
+logger.add(sys.stdout, level="INFO")
 
 sys.path.append(getConfig()["convertLinksDir"])
 from convertLinks import main as convertLinks
