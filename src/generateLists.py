@@ -49,7 +49,7 @@ def get_upload_url(file_path):
         "files": [{"name": filename, "is_ocr": True, "data_id": filename}],
     }
     url = "https://mineru.net/api/v4/file-urls/batch"
-    response = requests.post(url, headers=HEADERS, json=payload, timeout=5)
+    response = requests.post(url, headers=HEADERS, json=payload, timeout=10)
     if response.status_code != 200:
         raise Exception(
             f"Failed to get upload URL. Status code: {response.status_code}\nResponse: {response.text}"
@@ -84,7 +84,7 @@ def poll_batch_task_result(batch_id, max_retries=8, retry_interval=10):
     result_url = f"https://mineru.net/api/v4/extract-results/batch/{batch_id}"
     for attempt in range(1, max_retries + 1):
         logger.debug(f"Polling batch task status (attempt {attempt}/{max_retries})...")
-        res = requests.get(result_url, headers=HEADERS, timeout=5)
+        res = requests.get(result_url, headers=HEADERS, timeout=10)
         if res.status_code != 200:
             logger.debug(
                 f"Failed to get batch task result (status: {res.status_code}). Retrying..."
@@ -193,6 +193,7 @@ def generate_epub_from_extracted(extract_path, output_epub_path):
         "--resource-path",
         extract_path,
         "--split-level=1",  # With no h1 headings, the document won't split into chapters.
+        "--epub-title-page=false",  # otherwise it creates blank title chapter
     ]
 
     logger.debug(f"Running pandoc command: {' '.join(pandoc_cmd)}")
@@ -219,6 +220,7 @@ def convert_pdf_to_epub(input_pdf_path, output_epub_path):
       4. Downloading and extracting the result ZIP.
       5. Generating the EPUB.
     """
+    logger.info(f"Converting PDF to EPUB: {input_pdf_path}")
     batch_id, file_urls = get_upload_url(input_pdf_path)
     if not file_urls or not isinstance(file_urls, list):
         raise Exception("No file upload URLs received.")
@@ -252,6 +254,37 @@ def process_pdf_for_conversion(pdf_path, epub_folder):
     except Exception as e:
         logger.error(f"Error converting PDF {pdf_path} to EPUB: {e}")
         return pdf_path
+
+
+def process_epub_file(filename, article_folder, epub_folder):
+    """
+    Process an EPUB file in the epubArticles subdirectory.
+    If the EPUB doesn't exist, tries to generate it from the corresponding PDF.
+
+    Args:
+        filename: The EPUB filename in the epubArticles subdirectory
+        article_folder: The main article folder path
+        epub_folder: The path to the epubArticles folder
+
+    Returns:
+        The path to the EPUB file if it exists or was generated, otherwise the original filename
+    """
+    epub_path = os.path.join(article_folder, filename)
+
+    # If the epub doesn't exist, try to generate it from the original PDF
+    if not os.path.exists(epub_path):
+        # Get the corresponding PDF filename (same name but with .pdf extension)
+        pdf_filename = os.path.splitext(os.path.basename(filename))[0] + ".pdf"
+        pdf_path = os.path.join(article_folder, pdf_filename)
+
+        # Check if the PDF exists
+        if os.path.exists(pdf_path):
+            # Use the existing function to convert the PDF to EPUB
+            return process_pdf_for_conversion(pdf_path, epub_folder)
+        else:
+            logger.error(f"Original PDF not found for EPUB: {filename}")
+            return filename
+    return epub_path
 
 
 # -------------------------------------------------------------------
@@ -304,6 +337,7 @@ def process_article_for_prefixing(path, prefixed_folder):
     """
     For HTML/MHTML files, create a version with the summary prefixed.
     """
+    logger.info(f"Processing article for prefixing: {path}")
     file_ext = os.path.splitext(path)[1].lower()
     if file_ext not in [".html", ".mhtml"]:
         return path
@@ -392,7 +426,10 @@ def modifyListFiles():
         def process_single_article(filename):
             path = os.path.join(article_folder, filename)
             ext = os.path.splitext(path)[1].lower()
-            if ext == ".pdf":
+            if ext == ".epub":
+                # Check if this is an epub file in the epubArticles subdirectory
+                return process_epub_file(filename, article_folder, epub_folder)
+            elif ext == ".pdf":
                 logger.debug(f"Converting PDF to EPUB: {filename}")
                 new_path = process_pdf_for_conversion(path, epub_folder)
                 return new_path
@@ -402,7 +439,7 @@ def modifyListFiles():
             else:
                 return path
 
-        max_workers = 10
+        max_workers = 5  # pandoc uses a LOT of ram for conversion
         # Prepare a results list that preserves the order of list_articles
         updated_results = [None] * len(list_articles)
         logger.info(

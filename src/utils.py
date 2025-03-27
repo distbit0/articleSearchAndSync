@@ -507,6 +507,7 @@ def addArticlesToList(listName, articlePathsForList, overwrite=False):
     )
     createListIfNotExists(listPath)
     articleNamesInList = getArticlesFromList(listName)
+    articleNamesNoExtInList = [name.split(".")[0] for name in articleNamesInList]
     # print("articleNamesInList", articleNamesInList, "\n\n\n")
     droidEbooksFolderPath = getConfig()["droidEbooksFolderPath"]
     articleFileFolder = getConfig()["articleFileFolder"]
@@ -515,7 +516,9 @@ def addArticlesToList(listName, articlePathsForList, overwrite=False):
         articleName = articlePath.split("/")[-1]
         relativeArticlePath = os.path.relpath(articlePath, articleFileFolder)
         droidArticlePath = os.path.join(droidEbooksFolderPath, relativeArticlePath)
-        if overwrite or articleName not in articleNamesInList:
+        if (
+            overwrite or articleName.split(".")[0] not in articleNamesNoExtInList
+        ):  # since some articles might have been converted
             displayName = articleName.split(".")[0]
             linesToAppend.append(droidArticlePath + "\t" + displayName)
     newListText = "\n".join(linesToAppend) + "\n" if linesToAppend else ""
