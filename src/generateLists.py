@@ -1,4 +1,5 @@
 import pysnooper
+import re
 from .utils import getConfig
 import sys
 from . import utils, db
@@ -10,9 +11,9 @@ import json
 import zipfile
 import tempfile
 import markdown
-from ebooklib import epub
 from dotenv import load_dotenv
 import concurrent.futures
+import subprocess
 
 from loguru import logger
 
@@ -68,14 +69,15 @@ def upload_file(upload_url, file_path):
     """
     Upload the file to the provided URL.
     """
+    logger.debug(f"Uploading file ({file_path}) to: {upload_url}")
     with open(file_path, "rb") as f:
-        response = requests.put(upload_url, data=f, timeout=30)
+        response = requests.put(upload_url, data=f, timeout=60)
     if response.status_code != 200:
         raise Exception(f"Failed to upload file. Status code: {response.status_code}")
     return True
 
 
-def poll_batch_task_result(batch_id, max_retries=8, retry_interval=5):
+def poll_batch_task_result(batch_id, max_retries=8, retry_interval=10):
     """
     Poll the Mineru batch results endpoint until the parsing task is done.
     """
@@ -150,50 +152,62 @@ def extract_title_from_markdown(md_content):
     return None
 
 
-# @pysnooper.snoop()
+def demote_headers(md_text):
+    # Convert h1 headings (# ) to h2 (## )
+    return re.sub(r"^# (?!#)", "## ", md_text, flags=re.MULTILINE)
+
+
 def generate_epub_from_extracted(extract_path, output_epub_path):
     """
-    Generate an EPUB file from the extracted contents.
+    Generate an EPUB file from the extracted contents using pandoc.
     """
-    logger.debug(f"contents of extracted folder: {os.listdir(extract_path)}")
+    logger.debug(f"Contents of extracted folder: {os.listdir(extract_path)}")
     md_path = os.path.join(extract_path, "full.md")
     if not os.path.exists(md_path):
         raise Exception("full.md not found in the extracted contents!")
 
+    # Read and demote headers if necessary
     with open(md_path, "r", encoding="utf-8") as f:
-        md_content = f.read()
+        md_text = f.read()
+    # Demote h1 headings to h2 to avoid chapter splits when using --epub-chapter-level=1
+    md_text = demote_headers(md_text)
 
-    title = extract_title_from_markdown(md_content) or "Mineru Parsed Document"
-    html_content = markdown.markdown(md_content)
+    # Write the modified markdown to a temporary file
+    with tempfile.NamedTemporaryFile(
+        "w+", suffix=".md", delete=False, encoding="utf-8"
+    ) as tmp:
+        tmp.write(md_text)
+        tmp_md_path = tmp.name
 
-    book = epub.EpubBook()
-    book.set_language("en")
-    chapter = epub.EpubHtml(title=title, file_name="full.xhtml", content=html_content)
-    book.add_item(chapter)
+    # Set up pandoc command with enhanced options
+    pandoc_cmd = [
+        "pandoc",
+        tmp_md_path,
+        "-o",
+        output_epub_path,
+        "--webtex=https://latex.codecogs.com/svg.latex?",
+        "-f",
+        "markdown_github+tex_math_single_backslash+tex_math_dollars",
+        "--embed-resources",
+        "--standalone",
+        "--resource-path",
+        extract_path,
+        "--epub-chapter-level=1",  # With no h1 headings, the document won't split into chapters.
+    ]
 
-    images_dir = os.path.join(extract_path, "images")
-    if os.path.exists(images_dir):
-        for img_file in os.listdir(images_dir):
-            img_path = os.path.join(images_dir, img_file)
-            if os.path.isfile(img_path):
-                with open(img_path, "rb") as img_f:
-                    img_content = img_f.read()
-                media_type = "image/jpeg"
-                if img_file.lower().endswith(".png"):
-                    media_type = "image/png"
-                img_item = epub.EpubItem(
-                    uid=img_file,
-                    file_name=os.path.join("images", img_file),
-                    media_type=media_type,
-                    content=img_content,
-                )
-                book.add_item(img_item)
-    else:
-        logger.debug(f"No images folder found in the extracted content.")
+    logger.debug(f"Running pandoc command: {' '.join(pandoc_cmd)}")
+    result = subprocess.run(pandoc_cmd, capture_output=True, text=True)
+    logger.debug(f"Pandoc output for {output_epub_path}: {result.stdout}")
+    logger.debug(f"Pandoc error for {output_epub_path}: {result.stderr}")
 
-    book.spine = ["nav", chapter]
-    epub.write_epub(output_epub_path, book, {})
+    if result.returncode != 0:
+        error_msg = f"Pandoc failed with error: {result.stderr}"
+        logger.error(error_msg)
+        raise Exception(error_msg)
+
     logger.debug(f"EPUB file generated at: {output_epub_path}")
+    # Optionally, remove the temporary markdown file
+    os.remove(tmp_md_path)
 
 
 def convert_pdf_to_epub(input_pdf_path, output_epub_path):
@@ -209,7 +223,6 @@ def convert_pdf_to_epub(input_pdf_path, output_epub_path):
     if not file_urls or not isinstance(file_urls, list):
         raise Exception("No file upload URLs received.")
     upload_url = file_urls[0]
-    logger.debug(f"Uploading file ({input_pdf_path}) to: {upload_url}")
 
     upload_file(upload_url, input_pdf_path)
     logger.debug(f"File uploaded successfully.")
@@ -237,7 +250,7 @@ def process_pdf_for_conversion(pdf_path, epub_folder):
         convert_pdf_to_epub(pdf_path, epub_path)
         return epub_path
     except Exception as e:
-        logger.debug(f"Error converting PDF {pdf_path} to EPUB: {e}")
+        logger.error(f"Error converting PDF {pdf_path} to EPUB: {e}")
         return pdf_path
 
 
@@ -281,7 +294,7 @@ def create_prefixed_html(original_path, prefixed_path, summary):
             file.write(modified_content)
         return True
     except Exception as e:
-        logger.debug(
+        logger.error(
             f"Error prefixing article {os.path.basename(original_path)}: {str(e)}"
         )
         return False
@@ -313,7 +326,7 @@ def process_article_for_prefixing(path, prefixed_folder):
 # -------------------------------------------------------------------
 
 
-def updateLists():
+def appendToLists():
     config = getConfig()
     listToTagMappings = config["listToTagMappings"]
 
@@ -339,7 +352,7 @@ def updateLists():
             utils.deleteListIfExists(listName)
             continue
 
-        logger.debug(listName, listInfo)
+        logger.debug(f"Processing list {listName} with tags {listInfo}")
         articlePathsForList = db.searchArticlesByTags(
             all_tags=all_tags,
             any_tags=any_tags,
@@ -354,6 +367,13 @@ def updateLists():
         # Initially add articles to the list
         utils.addArticlesToList(listName, articlePathsForList)
 
+
+def modifyListFiles():
+    config = getConfig()
+    listToTagMappings = config["listToTagMappings"]
+
+    for listName, listInfo in listToTagMappings.items():
+        prefixSummary = listInfo.get("prefixSummary", False)
         # Retrieve the current list of article filenames
         list_articles = utils.getArticlesFromList(listName)
         # Ensure the EPUB subfolder exists
@@ -373,7 +393,7 @@ def updateLists():
             path = os.path.join(article_folder, filename)
             ext = os.path.splitext(path)[1].lower()
             if ext == ".pdf":
-                logger.info(f"Converting PDF to EPUB: {filename}")
+                logger.debug(f"Converting PDF to EPUB: {filename}")
                 new_path = process_pdf_for_conversion(path, epub_folder)
                 return new_path
             elif ext in [".html", ".mhtml"] and prefixSummary:
@@ -385,6 +405,9 @@ def updateLists():
         max_workers = 10
         # Prepare a results list that preserves the order of list_articles
         updated_results = [None] * len(list_articles)
+        logger.info(
+            f"Processing {len(list_articles)} articles to add to list {listName}..."
+        )
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_index = {
                 executor.submit(process_single_article, filename): i
@@ -395,7 +418,7 @@ def updateLists():
                 try:
                     updated_results[i] = future.result()
                 except Exception as exc:
-                    logger.debug(f"Error processing {list_articles[i]}: {exc}")
+                    logger.error(f"Error processing {list_articles[i]}: {exc}")
                     updated_results[i] = list_articles[i]
 
         updated_article_paths = updated_results
@@ -405,4 +428,4 @@ def updateLists():
 
 
 if __name__ == "__main__":
-    updateLists()
+    pass

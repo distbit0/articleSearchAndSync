@@ -5,7 +5,7 @@ from .utils import getConfig, calculate_normal_hash, calculate_ipfs_hash
 import os
 from collections import defaultdict
 from . import reTitlePDFs
-from .generateLists import updateLists
+from .generateLists import modifyListFiles, appendToLists
 from .downloadNewArticles import downloadNewArticles
 import sys
 import cProfile
@@ -489,7 +489,8 @@ def main():
         utils.getAbsPath("../storage/alreadyAddedArticles.txt"),
     )
     logger.info("update @voice lists")
-    updateLists()
+    appendToLists()
+    modifyListFiles()
 
     # profiler.disable()
     # stats = pstats.Stats(profiler)
@@ -508,7 +509,8 @@ if __name__ == "__main__":
     deleteFilesMarkedToDelete()
     hideArticlesMarkedAsRead()
     # tag_articles()
-    updateLists()
+    appendToLists()
+    modifyListFiles()
 
     # profiler.disable()
     # stats = pstats.Stats(profiler)
