@@ -3,7 +3,7 @@
 
 Infolio is a tool for managing ebooks and articles. It uses AI to assign articles to tags based on natural language tag descriptions, then combines these tags to automatically generate reading lists. Additional features include automatic summarization, format conversion, and mobile synchronization.
 
-## ALPHA 
+## BETA 
 
 ## Features
 
