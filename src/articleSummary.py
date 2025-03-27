@@ -75,8 +75,6 @@ def summarize_with_openrouter(text: str) -> Tuple[str, bool]:
 
     config = getConfig()
     model = config.get("ai_model")
-    referer = os.getenv("OPENROUTER_REFERER", "articleSearchAndSync")
-    title = os.getenv("OPENROUTER_TITLE", "Article Search and Sync")
 
     try:
         client = OpenAI(

@@ -72,8 +72,6 @@ class TagEvaluator:
         if not self.api_key:
             logger.error("OPENROUTER_API_KEY not found in environment variables")
             raise ValueError("OPENROUTER_API_KEY not found in environment variables")
-        self.referer = os.getenv("OPENROUTER_REFERER", "articleSearchAndSync")
-        self.title = os.getenv("OPENROUTER_TITLE", "Article Search and Sync")
 
     def _create_openai_client(self) -> OpenAI:
         return OpenAI(
