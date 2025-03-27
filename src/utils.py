@@ -624,7 +624,7 @@ def deleteAllArticlesInList(listName):
 
     textWithArticlesRemoved = ""
     if "\n:m" not in currentListText:
-        print(f":m not found in list {listName}")
+        # print(f":m not found in list {listName}")
         textWithArticlesRemoved = ""
     else:
         textWithArticlesRemoved = (

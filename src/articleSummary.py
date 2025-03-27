@@ -111,7 +111,7 @@ def summarize_with_openrouter(text: str) -> Tuple[str, bool]:
                 {"role": "user", "content": user_prompt},
             ],
         )
-
+        print(response)
         full_response = response.choices[0].message.content
         import re
 
