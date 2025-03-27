@@ -24,7 +24,7 @@ from loguru import logger
 
 # Configure loguru logger
 logger.remove()
-logger.add(sys.stdout, level="INFO")
+logger.add(sys.stdout, level="DEBUG")
 
 sys.path.append(getConfig()["convertLinksDir"])
 from convertLinks import main as convertLinks
@@ -501,14 +501,14 @@ if __name__ == "__main__":
     # profiler = cProfile.Profile()
     # profiler.enable()
 
-    main()
+    # main()
     # moveDocsToTargetFolder()
-    # remove_nonexistent_files_from_database()
+    remove_nonexistent_files_from_database()
     # summarize_articles()
-    # deleteFilesMarkedToDelete()
-    # hideArticlesMarkedAsRead()
+    deleteFilesMarkedToDelete()
+    hideArticlesMarkedAsRead()
     # tag_articles()
-    # updateLists()
+    updateLists()
 
     # profiler.disable()
     # stats = pstats.Stats(profiler)

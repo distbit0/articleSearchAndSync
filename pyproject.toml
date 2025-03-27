@@ -24,6 +24,7 @@ dependencies = [
     "pyperclip>=1.9.0",
     "pysnooper>=1.2.1",
     "python-dotenv>=1.0.1",
+    "requests>=2.32.3",
     "secretstorage>=3.3.3",
     "selenium>=4.28.0",
     "soundcloud-lib>=0.6.1",
