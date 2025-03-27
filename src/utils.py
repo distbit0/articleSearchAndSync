@@ -50,6 +50,8 @@ def delete_files_with_name(folder, file_name):
     # Delete all found files
     notFound = True
     possibleExts = ["pdf", "epub"]
+    currentExt = file_name.split(".")[1]
+    possibleExts.append(currentExt)
     for ext in possibleExts:
         try:
             fileName = file_name.split(".")[0] + "." + ext
@@ -70,6 +72,8 @@ def delete_files_with_name(folder, file_name):
 
 def hideFile(f):
     possibleExts = ["pdf", "epub"]
+    currentExt = f.split(".")[1]
+    possibleExts.append(currentExt)
     folder = os.path.dirname(f)
     notFound = True
     orgFileName = os.path.basename(f)
@@ -297,88 +301,124 @@ def getConfig():
 
 
 def getArticlesFromList(listName):
-    listPath = os.path.join(
-        getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"
-    )
+    """
+    Returns a list of article filenames from the .rlst file named `listName`.
+    If listName starts with '_', then any Syncthing conflict files are merged in
+    (only their article lines) and subsequently removed.
+    """
 
-    # Check if file exists
+    config_path = getConfig()["atVoiceFolderPath"]
+    listPath = os.path.join(config_path, ".config", listName + ".rlst")
+
     if not os.path.exists(listPath):
         return []
 
-    # Read the main list file content
-    listText = open(listPath).read().strip()
+    def parse_article_lines(text):
+        """
+        Given the full text of a .rlst file, return (header_text, article_list).
 
-    # Only process conflict files if the list name starts with an underscore
-    has_conflicts = False
+        - header_text is the lines up to the last occurrence of a "\n:" marker
+          (i.e., the "header" region). If no header is detected, returns None.
+        - article_list is the list of extracted article filenames.
+        """
+        text = text.strip()
+        if not text:
+            return None, []
+
+        lines = text.split("\n")
+
+        # Detect a header if there's a second line that starts with ":"
+        if len(lines) > 1 and lines[1].startswith(":"):
+            # Everything up to the last "\n:" is considered the header
+            parts = text.split("\n:")
+            # All parts except the last are the header
+            header_text = "\n:".join(parts[:-1]).rstrip("\n")
+            # The last part is what comes after the final header marker
+            tail = parts[-1].split("\n")
+            # tail[0] is the ":" line, so skip it
+            article_lines = tail[1:]
+        else:
+            # No header found
+            header_text = None
+            article_lines = lines
+
+        # Extract article filenames from article_lines
+        articles = []
+        for line in article_lines:
+            line = line.strip()
+            if not line:
+                continue
+            # The first token (split by tab) holds the path
+            parts = line.split("\t")
+            if parts:
+                path_parts = parts[0].split("/")
+                if path_parts:
+                    filename = path_parts[-1]
+                    if filename not in articles:
+                        articles.append(filename)
+
+        return header_text, articles
+
+    # -------------------------------------------------------
+    # 1. Read and parse main file
+    # -------------------------------------------------------
+    with open(listPath, "r", encoding="utf-8") as f:
+        mainText = f.read()
+
+    mainHeader, mainArticles = parse_article_lines(mainText)
+
+    # -------------------------------------------------------
+    # 2. Check for conflict files only if listName starts with '_'
+    # -------------------------------------------------------
+    conflict_files = []
     if listName.startswith("_"):
-        # Find and process Syncthing conflict files
         baseName = os.path.basename(listPath)
         dirName = os.path.dirname(listPath)
-        conflict_pattern = f"{baseName}.sync-conflict-*"
-        conflict_files = glob.glob(os.path.join(dirName, conflict_pattern))
+        pattern = baseName + ".sync-conflict-*"
+        conflict_files = glob.glob(os.path.join(dirName, pattern))
 
-        if conflict_files:
-            print(f"Found {len(conflict_files)} conflict files for {listName}")
-            has_conflicts = True
-            # Read all conflict files content
-            for conflict_file in conflict_files:
-                try:
-                    conflict_text = open(conflict_file).read().strip()
-                    if conflict_text:
-                        # Append conflict content to main content
-                        if listText:
-                            listText += "\n" + conflict_text
-                        else:
-                            listText = conflict_text
-                except Exception as e:
-                    print(f"Error reading conflict file {conflict_file}: {e}")
+    # -------------------------------------------------------
+    # 3. Merge conflict articles (excluding their headers)
+    # -------------------------------------------------------
+    if conflict_files:
+        print(f"Found {len(conflict_files)} conflict files for {listName}")
+        for cfile in conflict_files:
+            try:
+                with open(cfile, "r", encoding="utf-8") as cf:
+                    ctext = cf.read()
+                # We only take the articles, ignoring conflict headers
+                _, conflictArticles = parse_article_lines(ctext)
+                for article in conflictArticles:
+                    if article not in mainArticles:
+                        mainArticles.append(article)
+            except Exception as e:
+                print(f"Error reading conflict file {cfile}: {e}")
 
-    # If list text is still empty after adding conflict files, return empty list
-    if not listText:
-        return []
+        # -------------------------------------------------------
+        # 4. Rewrite the main file with the merged articles
+        # -------------------------------------------------------
+        if mainHeader is not None:
+            newText = f"{mainHeader}\n:\n" + "\n".join(mainArticles)
+        else:
+            newText = "\n".join(mainArticles)
 
-    # Split the text into lines
-    lines = listText.split("\n")
-
-    # Make sure we have at least 2 lines before checking index 1
-    if len(lines) > 1 and lines[1].startswith(":"):
-        listArticles = listText.split("\n:")[-1].split("\n")[1:]
-    else:
-        # Simple format with no headers
-        listArticles = lines
-
-    # Process article file names, removing duplicates
-    articleFileNames = []
-    for articleLine in listArticles:
-        if not articleLine.strip():  # Skip empty lines
-            continue
-
-        parts = articleLine.split("\t")
-        if parts:
-            path_parts = parts[0].split("/")
-            if path_parts:
-                articleFileName = path_parts[-1]
-                if articleFileName not in articleFileNames:
-                    articleFileNames.append(articleFileName)
-
-    # If we found conflict files, save the merged content back to the main file
-    # and delete the conflict files
-    if has_conflicts:
         try:
-            # Save the merged content
-            with open(listPath, "w") as f:
-                f.write(listText)
+            with open(listPath, "w", encoding="utf-8") as f:
+                f.write(newText)
 
-            # Delete the conflict files
-            for conflict_file in conflict_files:
+            # Delete the conflicts
+            for cfile in conflict_files:
                 try:
-                    os.remove(conflict_file)
+                    os.remove(cfile)
                 except Exception as e:
-                    print(f"Error deleting conflict file {conflict_file}: {e}")
+                    print(f"Error deleting conflict file {cfile}: {e}")
         except Exception as e:
             print(f"Error saving merged content to {listPath}: {e}")
 
-    return articleFileNames
+    # -------------------------------------------------------
+    # 5. Return final article list
+    # -------------------------------------------------------
+    return mainArticles
 
 
 def doesPathContainDotFolders(path):
