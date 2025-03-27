@@ -1,7 +1,9 @@
-#Infolio
+# Infolio
 
 
-A comprehensive tool for managing, searching, tagging, and synchronizing your digital article collection. This application helps you organize articles from various sources, automatically extract summaries, and make them accessible through powerful search and tag-based filtering.
+Infolio is a tool for managing ebooks and articles. It uses AI to assign articles to tags based on natural language tag descriptions, then combines these tags to automatically generate reading lists. Additional features include automatic summarization, format conversion, and mobile synchronization.
+
+
 
 ## Features
 
@@ -39,8 +41,8 @@ A comprehensive tool for managing, searching, tagging, and synchronizing your di
 
 1. **Clone the repository**:
    ```bash
-   git clone https://github.com/yourusername/articleSearchAndSync.git
-   cd articleSearchAndSync
+   git clone https://github.com/yourusername/infolio.git
+   cd infolio
    ```
 
 2. **Install dependencies**:
