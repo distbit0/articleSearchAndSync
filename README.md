@@ -1,17 +1,18 @@
 # Infolio (beta)
 
 
-Infolio is a tool for managing ebooks and articles. It uses AI to assign articles to tags based on natural language tag descriptions, then combines these tags to automatically generate reading lists. Additional features include automatic summarization, format conversion, and mobile synchronization.
+Infolio uses AI to generate high-quality reading lists on specific topics from large collections of documents. It achieves this by tagging articles according to each tag's description, then constructing reading which are defined by specifying a set of tags.
+
 
 
 ## Features
 
-- **Article Management**: Store and organize articles in various formats (PDF, HTML, MHTML, EPUB, etc.).
-- **Automatic Summarization**: Generate AI-powered summaries of articles using OpenAI/OpenRouter.
-- **Browser Integration**: Import and process articles directly from your browser bookmarks and Downloads folder.
-- **Smart Tagging**: Automatically tag articles based on their content to improve organization and searchability.
-- **Powerful Search**: Search articles by content, tags, or custom Boolean queries.
 - **Reading Lists**: Automatically generate reading lists based on tags and their natural language descriptions.
+- **Automatic Summarization**: Generate AI-powered summaries of articles using OpenAI/OpenRouter.
+- **Smart Tagging**: Automatically tag articles based on their content to improve organization and searchability.
+- **Browser Integration**: Import and process articles directly from your browser bookmarks and Downloads folder.
+- **Powerful Search**: Search articles by content, tags, or custom Boolean queries.
+- **Article Management**: Store and organize articles in various formats (PDF, HTML, MHTML, EPUB, etc.).
 
 ### Python Dependencies
 - Python 3.13+
