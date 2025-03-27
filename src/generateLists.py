@@ -456,7 +456,7 @@ def modifyListFiles():
                 try:
                     updated_results[i] = future.result()
                     remainingToComplete -= 1
-                    logger.info(f"{remainingToComplete} articles remaining to process")
+                    logger.debug(f"{remainingToComplete} articles remaining to process")
                 except Exception as exc:
                     logger.error(f"Error processing {list_articles[i]}: {exc}")
                     updated_results[i] = list_articles[i]
