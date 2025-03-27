@@ -47,39 +47,47 @@ def handle_cache(file_name, key, value=None):
 
 def delete_files_with_name(folder, file_name):
     # Find all files with the file name in the folder using our enhanced function
-    matching_file = os.path.join(folder, file_name)
-
     # Delete all found files
-    try:
-        homeDir = os.path.expanduser("~")
-        dest = os.path.join(homeDir, ".local/share/Trash/files/", file_name)
-        shutil.move(matching_file, dest)
-        print(f"Deleted {matching_file}")
-    except OSError as e:
-        print(f"Error deleting {matching_file}: {e}")
-
-
-def hideFilesWithName(folder, file_name):
-    # Find all files with the file name in the folder using our enhanced function
-    matching_file = os.path.join(folder, file_name)
-
-    # Hide all found files
-    hideFile(matching_file)
+    notFound = True
+    possibleExts = ["pdf", "epub"]
+    for ext in possibleExts:
+        try:
+            fileName = file_name.split(".")[0] + "." + ext
+            matching_file = os.path.join(folder, fileName)
+            homeDir = os.path.expanduser("~")
+            dest = os.path.join(homeDir, ".local/share/Trash/files/", file_name)
+            if os.path.exists(matching_file):
+                shutil.move(matching_file, dest)
+                print(f"Deleted {matching_file}")
+                notFound = False
+        except OSError:
+            pass
+    if notFound:
+        print(
+            f"File {file_name} not found in folder {folder}, with extensions {possibleExts}"
+        )
 
 
 def hideFile(f):
-    fileName = f.split("/")[-1]
-    hiddenFileName = "." + fileName
-    if hiddenFileName == "." or fileName[0] == ".":
-        return
-    hiddenFilePath = f.split("/")[:-1]
-    hiddenFilePath.append(hiddenFileName)
-    hiddenFilePath = "/".join(hiddenFilePath)
-    print("HIDING", f, "  >>  ", hiddenFilePath)
-    try:
-        shutil.move(f, hiddenFilePath)
-    except OSError as e:
-        print(f"Error hiding {f}: {e}")
+    possibleExts = ["pdf", "epub"]
+    folder = os.path.dirname(f)
+    notFound = True
+    for ext in possibleExts:
+        try:
+            fileName = f.split(".")[0] + "." + ext
+            matching_file = os.path.join(folder, fileName)
+            if os.path.exists(matching_file):
+                hiddenFileName = "." + fileName
+                if hiddenFileName == "." or fileName[0] == ".":
+                    continue
+                hiddenFilePath = os.path.join(folder, hiddenFileName)
+                print("HIDING", f, "  >>  ", hiddenFilePath)
+                shutil.move(f, hiddenFilePath)
+                notFound = False
+        except OSError:
+            pass
+    if notFound:
+        print(f"File {f} not found in folder {folder}, with extensions {possibleExts}")
 
 
 def formatUrl(url):
@@ -123,7 +131,10 @@ def markArticlesWithUrlsAsRead(readUrls, articleFolder):
     articleUrls = {v: k for k, v in articleUrls.items()}
     for url in readUrls:
         if url in articleUrls:
-            hideFile(articleUrls[url])
+            try:
+                hideFile(articleUrls[url])
+            except OSError:
+                print(f"Error hiding {articleUrls[url]}")
         addUrlToUrlFile(url, getAbsPath("./../storage/markedAsReadArticles.txt"))
 
 
