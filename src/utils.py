@@ -72,9 +72,10 @@ def hideFile(f):
     possibleExts = ["pdf", "epub"]
     folder = os.path.dirname(f)
     notFound = True
+    orgFileName = os.path.basename(f)
     for ext in possibleExts:
         try:
-            fileName = f.split(".")[0] + "." + ext
+            fileName = orgFileName.split(".")[0] + "." + ext
             matching_file = os.path.join(folder, fileName)
             if os.path.exists(matching_file):
                 hiddenFileName = "." + fileName
@@ -82,7 +83,7 @@ def hideFile(f):
                     continue
                 hiddenFilePath = os.path.join(folder, hiddenFileName)
                 print("HIDING", f, "  >>  ", hiddenFilePath)
-                shutil.move(f, hiddenFilePath)
+                shutil.move(matching_file, hiddenFilePath)
                 notFound = False
         except OSError:
             pass
@@ -317,6 +318,7 @@ def getArticlesFromList(listName):
         conflict_files = glob.glob(os.path.join(dirName, conflict_pattern))
 
         if conflict_files:
+            print(f"Found {len(conflict_files)} conflict files for {listName}")
             has_conflicts = True
             # Read all conflict files content
             for conflict_file in conflict_files:
@@ -581,14 +583,16 @@ def deleteAllArticlesInList(listName):
     currentListText = open(listPath).read().strip()
 
     textWithArticlesRemoved = ""
-    if ":m" not in currentListText:
+    if "\n:m" not in currentListText:
+        print(f":m not found in list {listName}")
         textWithArticlesRemoved = ""
     else:
         textWithArticlesRemoved = (
-            "\n".join(currentListText.split(":m")[:-1])
+            "\n:m".join(currentListText.split("\n:m")[:-1])
+            + "\n:m"
+            + currentListText.split("\n:m")[-1].split("\n")[0]
             + "\n"
-            + currentListText.split(":m")[-1].split("\n")[0]
-        )
+        )  # i.e. currentListText.split("\n:m")[-1].split("\n")[0] refers to the last line in the doc which starts with :m
 
     with open(listPath, "w") as f:
         f.write(textWithArticlesRemoved)

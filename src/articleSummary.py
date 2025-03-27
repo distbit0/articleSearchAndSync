@@ -80,10 +80,6 @@ def summarize_with_openrouter(text: str) -> Tuple[str, bool]:
         client = OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=api_key,
-            default_headers={
-                "HTTP-Referer": referer,
-                "X-Title": title,
-            },
         )
         logger.debug(f"Sending summary request to OpenRouter with model: {model}")
 
@@ -109,10 +105,6 @@ def summarize_with_openrouter(text: str) -> Tuple[str, bool]:
         )
 
         response = client.chat.completions.create(
-            extra_headers={
-                "HTTP-Referer": referer,
-                "X-Title": title,
-            },
             model=model,
             messages=[
                 {"role": "system", "content": system_prompt},

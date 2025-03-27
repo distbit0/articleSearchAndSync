@@ -77,7 +77,6 @@ class TagEvaluator:
         return OpenAI(
             base_url="https://openrouter.ai/api/v1",
             api_key=self.api_key,
-            default_headers={"HTTP-Referer": self.referer, "X-Title": self.title},
         )
 
     def evaluate_tags(self, text: str, tags_to_evaluate: List) -> Dict[int, bool]:
@@ -119,7 +118,6 @@ class TagEvaluator:
         while retry_count < max_retries:
             try:
                 response = client.chat.completions.create(
-                    extra_headers={"HTTP-Referer": self.referer, "X-Title": self.title},
                     model=self.model,
                     messages=[
                         {"role": "system", "content": system_prompt},
