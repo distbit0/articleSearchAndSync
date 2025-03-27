@@ -445,6 +445,7 @@ def modifyListFiles():
         logger.info(
             f"Processing {len(list_articles)} articles to add to list {listName}..."
         )
+        remainingToComplete = len(list_articles)
         with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
             future_to_index = {
                 executor.submit(process_single_article, filename): i
@@ -454,6 +455,8 @@ def modifyListFiles():
                 i = future_to_index[future]
                 try:
                     updated_results[i] = future.result()
+                    remainingToComplete -= 1
+                    logger.info(f"{remainingToComplete} articles remaining to process")
                 except Exception as exc:
                     logger.error(f"Error processing {list_articles[i]}: {exc}")
                     updated_results[i] = list_articles[i]
