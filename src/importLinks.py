@@ -496,7 +496,7 @@ if __name__ == "__main__":
     # profiler = cProfile.Profile()
     # profiler.enable()
 
-    # main()
+    main()
     # moveDocsToTargetFolder()
     # remove_nonexistent_files_from_database()
     # summarize_articles()
@@ -504,7 +504,7 @@ if __name__ == "__main__":
     # hideArticlesMarkedAsRead()
     # tag_articles()
     # appendToLists()
-    modifyListFiles()
+    # modifyListFiles()
 
     # profiler.disable()
     # stats = pstats.Stats(profiler)
