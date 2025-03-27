@@ -491,25 +491,20 @@ def main():
     appendToLists()
     modifyListFiles()
 
-    # profiler.disable()
-    # stats = pstats.Stats(profiler)
-    # stats.sort_stats(pstats.SortKey.CUMULATIVE)
-    # stats.print_stats("src")
-
 
 if __name__ == "__main__":
     # profiler = cProfile.Profile()
     # profiler.enable()
 
-    # main()
+    main()
     # moveDocsToTargetFolder()
-    remove_nonexistent_files_from_database()
+    # remove_nonexistent_files_from_database()
     # summarize_articles()
-    deleteFilesMarkedToDelete()
-    hideArticlesMarkedAsRead()
+    # deleteFilesMarkedToDelete()
+    # hideArticlesMarkedAsRead()
     # tag_articles()
-    appendToLists()
-    modifyListFiles()
+    # appendToLists()
+    # modifyListFiles()
 
     # profiler.disable()
     # stats = pstats.Stats(profiler)
