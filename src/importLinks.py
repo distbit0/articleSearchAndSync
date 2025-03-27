@@ -38,7 +38,6 @@ def getBookmarks():
 
 
 def addFileHashesToAlreadyAdded():
-    articleFolder = getConfig()["articleFileFolder"]
     nonHtmlFormats = getConfig()["docFormatsToMove"]
     nonHtmlFormats = [fmt for fmt in nonHtmlFormats if fmt not in ["html", "mhtml"]]
     listFile = utils.getAbsPath("../storage/alreadyAddedArticles.txt")

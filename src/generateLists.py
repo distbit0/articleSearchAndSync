@@ -169,7 +169,7 @@ def generate_epub_from_extracted(extract_path, output_epub_path):
     # Read and demote headers if necessary
     with open(md_path, "r", encoding="utf-8") as f:
         md_text = f.read()
-    # Demote h1 headings to h2 to avoid chapter splits when using --epub-chapter-level=1
+    # Demote h1 headings to h2 to avoid chapter splits when using --split-level=1
     md_text = demote_headers(md_text)
 
     # Write the modified markdown to a temporary file
@@ -192,13 +192,13 @@ def generate_epub_from_extracted(extract_path, output_epub_path):
         "--standalone",
         "--resource-path",
         extract_path,
-        "--epub-chapter-level=1",  # With no h1 headings, the document won't split into chapters.
+        "--split-level=1",  # With no h1 headings, the document won't split into chapters.
     ]
 
     logger.debug(f"Running pandoc command: {' '.join(pandoc_cmd)}")
     result = subprocess.run(pandoc_cmd, capture_output=True, text=True)
-    logger.debug(f"Pandoc output for {output_epub_path}: {result.stdout}")
-    logger.debug(f"Pandoc error for {output_epub_path}: {result.stderr}")
+    logger.debug(f"Pandoc stdout for {output_epub_path}: {result.stdout}")
+    logger.debug(f"Pandoc stderr for {output_epub_path}: {result.stderr}")
 
     if result.returncode != 0:
         error_msg = f"Pandoc failed with error: {result.stderr}"
