@@ -9,21 +9,16 @@ Infolio is a tool for managing ebooks and articles. It uses AI to assign article
 
 - **Article Management**: Store and organize articles in various formats (PDF, HTML, MHTML, EPUB, etc.).
 - **Automatic Summarization**: Generate AI-powered summaries of articles using OpenAI/OpenRouter.
+- **Browser Integration**: Import and process articles directly from your browser bookmarks and Downloads folder.
 - **Smart Tagging**: Automatically tag articles based on their content to improve organization and searchability.
 - **Powerful Search**: Search articles by content, tags, or custom Boolean queries.
-- **Format Conversion**: Convert PDFs to EPUB format using the Mineru API.
-- **Synchronization**: Sync articles to mobile devices, including integration with the @Voice reader on Android.
-- **Browser Integration**: Import and process articles directly from your browser bookmarks.
-- **Database Tracking**: Efficiently store metadata and maintain an organized database of articles.
 - **Reading Lists**: Automatically generate reading lists based on tags and their natural language descriptions.
-
-## System Requirements
 
 ### Python Dependencies
 - Python 3.13+
 - `uv` 
 
-### External Command-Line Tools
+### Command-Line Tool Dependencies
 - **Pandoc**: Used for converting markdown to EPUB format
 - **pdftotext** (from poppler-utils): Used for extracting text from PDF files
 - **html2text**: Used for converting HTML to plain text
@@ -32,7 +27,7 @@ Infolio is a tool for managing ebooks and articles. It uses AI to assign article
 - **pdftitle**: Used for extracting titles from PDF files
 - **xclip**: Used for clipboard operations (Linux only)
 
-### External Services
+### API Dependencies
 - **Mineru API**: Used for PDF processing and conversion
 - **OpenAI or OpenRouter API**: Used for article summarization and tagging
 
@@ -81,7 +76,7 @@ Run the main module to process bookmarks, download new articles, extract text fo
 uv run -m src.main
 ```
 
-The automatically generated reading lists allow you to easily import article paths into @Voice or other reader apps, streamlining your reading experience.
+The automatically generated reading lists allow you to easily import article paths into @Voice or other reader apps
 
 
 ### Tag-Based Management
