@@ -320,10 +320,10 @@ def deleteDuplicateArticleFiles(urls_to_filenames):
             dir_seen_urls[directory] = {url}
         elif url in dir_seen_urls[directory] and url:
             # If url has been seen in this directory, delete the file
-            logger.info("deleting because duplicate", fileName, url)
+            logger.info(f"deleting because duplicate: {fileName} {url}")
             homeDir = os.path.expanduser("~")
             dest = os.path.join(
-                homeDir, ".local/share/Trash/files/", fileName.split("/")[-1]
+                homeDir, ".local/share/Trash/files/", "DUP_" + fileName.split("/")[-1]
             )
             shutil.move(fileName, dest)
         else:
@@ -351,7 +351,7 @@ def moveDocsToTargetFolder():
     for docPath in docPaths:
         docHash = calculate_normal_hash(docPath)
         if docHash in alreadyAddedHashes:
-            logger.info("Skipping importing duplicate file:", docPath)
+            logger.info(f"Skipping importing duplicate file: {docPath}")
             docFileName = docPath.split("/")[-1]
             homeDir = os.path.expanduser("~")
             erroDocPath = os.path.join(
@@ -435,7 +435,7 @@ def deleteDuplicateFiles(directory_path):
                 non_root_files,
             )
             for file_path in files_to_remove:
-                logger.info("removed", file_path)
+                logger.info(f"removed: {file_path}")
                 homeDir = os.path.expanduser("~")
                 dest = os.path.join(
                     homeDir, ".local/share/Trash/files/", file_path.split("/")[-1]

@@ -21,7 +21,7 @@ def process_articles_in_directory(directory):
                 if url and urlSubstring.lower() in url.lower():
                     ## move file to linux trash directory
                     trashDir = "/home/pimania/.local/share/Trash/files/"
-                    print("moving to trash: ", file_path)
+                    print(f"moving to trash: {file_path}")
                     # shutil.move(file_path, trashDir)
 
 
