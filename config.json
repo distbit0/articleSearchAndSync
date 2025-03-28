@@ -69,7 +69,7 @@
     ],
     "article_tags": {
         "infofi": {
-            "description": "Articles about prediction markets or decision markets or futarchy or which mention info-finance or which are about constructing incentive mechanisms to elicit information or using prediction markets for governance or combining prediction markets/prediction competitions and ai/ml/ai agents",
+            "description": "Articles about prediction markets or decision markets or futarchy or which mention info-finance or which are about constructing incentive mechanisms to elicit information/truth/knowledge/arguments or combining prediction markets/prediction competitions and ai/ai agents",
             "use_summary": true
         }
     },
