@@ -38,22 +38,22 @@ def process_articles_in_directory(directory):
                     if srcUrl:
                         filesToConvert.append([file_path, srcUrl, url])
 
-    print("files to convert: ", len(filesToConvert))
+    print(f"files to convert: {len(filesToConvert)}")
     for i, article in enumerate(filesToConvert):
         file_path, url, gitBookUrl = article
         print("\n\n\n\n")
-        # print("gitbook url: ", gitBookUrl)
+        # print(f"gitbook url: {gitBookUrl}")
         print(i, "of ", len(filesToConvert))  # , " ", file_path, url)
-        # print("converting url: ", url)
+        # print(f"converting url: {url}")
         newUrls = main(url, False, True)
         newUrl = newUrls[0] if newUrls else False
 
         if not newUrl:
-            print("deleting file because of issue with url: ", url, file_path, "\n\n")
+            print(f"deleting file because of issue with url: {url} {file_path}\n\n")
             # os.remove(file_path)
             continue
 
-        print("new url: ", newUrl)
+        print(f"new url: {newUrl}")
         response = requests.get(newUrl)
         soup = BeautifulSoup(response.text, "html.parser")
         html_content = str(soup)
@@ -68,7 +68,7 @@ def process_articles_in_directory(directory):
 #         filePath = mapOfFiles[url]
 #         try:
 #             os.remove(filePath)
-#             print("deleted file: ", filePath)
+#             print(f"deleted file: {filePath}")
 #         except OSError as e:
 #             print(f"Error deleting {filePath}: {e}")
 #         filePath = filePath.strip(" ")
@@ -77,7 +77,7 @@ def process_articles_in_directory(directory):
 #         html_content = str(soup)
 #         html_content = f"<!-- Hyperionics-OriginHtml {url}-->\n" + html_content
 #         with open(filePath, "w") as file:
-#             print("about to write: ", filePath, url)
+#             print(f"about to write: ", filePath, url)
 #             file.write(html_content)
 #         open(filePath, "r").read()
 

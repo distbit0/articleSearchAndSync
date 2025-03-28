@@ -38,11 +38,11 @@ def downloadNewArticles(urlsToAdd):
     for url in urlsToAdd:
         if url.endswith(".pdf"):
             continue
-        print("trying to download: ", url)
+        print(f"trying to download: {url}")
         try:
             save_mobile_article_as_mhtml(url, saveDirectory)
         except Exception as e:
-            print("Error downloading article: ", url, e)
+            print(f"Error downloading article: {url} {e}")
         else:
             addUrlToUrlFile([url], getAbsPath("../storage/alreadyAddedArticles.txt"))
 

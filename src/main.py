@@ -120,7 +120,7 @@ def calcUrlsToAdd(onlyRead=False):
                                     and url.lower() in "\n".join(allAddedUrls).lower()
                                 ):
                                     urlsToAdd[subject].append(url)
-                                    logger.info("added url: ", url)
+                                    logger.info(f"added url: {url}")
                     else:
                         if url.lower() not in "\n".join(allAddedUrls).lower():
                             url = convertLinks(url, False, True)
@@ -128,7 +128,7 @@ def calcUrlsToAdd(onlyRead=False):
                                 url = url[0]
                                 if url.lower() not in "\n".join(allAddedUrls).lower():
                                     urlsToAdd[subject].append(url)
-                                    logger.info("added url: ", url)
+                                    logger.info(f"added url: {url}")
 
     return urlsToAdd
 
@@ -374,9 +374,9 @@ def moveDocsToTargetFolder():
 
         if docHash in markedAsReadHashes:
             targetPath = os.path.join(targetFolder, "." + uniqueName)
-            logger.info("Marking as read:", docName)
+            logger.info(f"Marking as read: {docName}")
 
-        logger.info("Moving", docName, "to", targetPath, "derived from", docPath)
+        logger.info(f"Moving {docName} to {targetPath} derived from {docPath}")
         shutil.move(docPath, targetPath)
 
         utils.addUrlToUrlFile(

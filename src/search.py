@@ -68,15 +68,17 @@ def main():
     for path, url in articles.items():
         if url:
             file_name = os.path.basename(path)
-            clean_file_name = "".join(c if c.isalnum() else " " for c in file_name).strip()
+            clean_file_name = "".join(
+                c if c.isalnum() else " " for c in file_name
+            ).strip()
             print(f"{clean_file_name}:\n{url}\n")
 
     if args.returnPaths:
-        print("\n\nArticle paths:\n\n" + "\n".join(articlePaths))
+        print(f"\n\nArticle paths:\n\n" + "\n".join(articlePaths))
 
     if args.returnBlogs:
         blogUrls = utils.getBlogsFromUrls(articleUrls)
-        print("\n\nBlog URLs:\n\n" + "\n".join(blogUrls))
+        print(f"\n\nBlog URLs:\n\n" + "\n".join(blogUrls))
 
     if args.copyUrls:
         os.system(

@@ -86,7 +86,7 @@ def hideFile(f):
                 if hiddenFileName == "." or fileName[0] == ".":
                     continue
                 hiddenFilePath = os.path.join(folder, hiddenFileName)
-                print("HIDING", f, "  >>  ", hiddenFilePath)
+                print(f"HIDING {f} >> {hiddenFilePath}")
                 shutil.move(matching_file, hiddenFilePath)
                 notFound = False
         except OSError:
@@ -550,7 +550,7 @@ def deleteListIfExists(listName):
         getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"
     )
     if os.path.exists(listPath):
-        print("deleting disabled list: ", listName)
+        print(f"deleting disabled list: {listName}")
         os.remove(listPath)
 
 
@@ -561,7 +561,7 @@ def addArticlesToList(listName, articlePathsForList, overwrite=False):
     createListIfNotExists(listPath)
     articleNamesInList = getArticlesFromList(listName)
     articleNamesNoExtInList = [name.split(".")[0] for name in articleNamesInList]
-    # print("articleNamesInList", articleNamesInList, "\n\n\n")
+    # print(f"articleNamesInList: {articleNamesInList}\n\n\n")
     droidEbooksFolderPath = getConfig()["droidEbooksFolderPath"]
     articleFileFolder = getConfig()["articleFileFolder"]
     linesToAppend = []
