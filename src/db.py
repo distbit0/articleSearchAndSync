@@ -119,8 +119,9 @@ def update_article_summary(
     word_count: int,
 ) -> int:
     with get_connection() as conn:
-        article_id = get_article_by_hash(file_hash)["id"]
-        if article_id:
+        article = get_article_by_hash(file_hash)
+        if article is not None:
+            # Article exists, update it
             conn.execute(
                 """
                 UPDATE article_summaries
@@ -133,10 +134,12 @@ def update_article_summary(
                     summary,
                     extraction_method,
                     word_count,
-                    article_id,
+                    article["id"],
                 ),
             )
+            article_id = article["id"]
         else:
+            # Article doesn't exist, insert it
             cursor = conn.execute(
                 """
                 INSERT INTO article_summaries (file_hash, file_name, file_format, summary, extraction_method, word_count)
