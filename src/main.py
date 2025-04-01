@@ -451,6 +451,7 @@ def deleteDuplicateFiles(directory_path):
 
 def main():
     logger.info("remove nonexistent files from database")
+    db.remove_duplicate_file_entries()
     remove_nonexistent_files_from_database()
     logger.info("remove orphaned tags from database")
     remove_orphaned_tags_from_database()

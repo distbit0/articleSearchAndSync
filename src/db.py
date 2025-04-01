@@ -30,7 +30,7 @@ def setup_database() -> str:
             CREATE TABLE IF NOT EXISTS article_summaries (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 file_hash TEXT UNIQUE,
-                file_name TEXT,
+                file_name TEXT UNIQUE,
                 file_format TEXT,
                 summary TEXT,
                 extraction_method TEXT,
@@ -191,8 +191,22 @@ def get_all_file_hashes() -> List[str]:
 
 def get_articles_needing_summary() -> List[Tuple[str, str]]:
     with get_connection() as conn:
+        # First, let's check if there are any inconsistencies in the data
         cursor = conn.execute(
-            "SELECT file_hash, file_name FROM article_summaries WHERE summary IS NULL OR summary = ''"
+            "SELECT COUNT(*) FROM article_summaries WHERE summary IS NOT NULL AND summary != '' AND summary != 'failed_to_summarise' AND summary != 'failed_to_extract'"
+        )
+        summarized_count = cursor.fetchone()[0]
+
+        cursor = conn.execute("SELECT COUNT(*) FROM article_summaries")
+        total_count = cursor.fetchone()[0]
+
+        logger.debug(
+            f"Database has {total_count} total articles, {summarized_count} with summaries"
+        )
+
+        # Get articles that truly need summarization
+        cursor = conn.execute(
+            "SELECT file_hash, file_name FROM article_summaries WHERE summary IS NULL OR summary = '' OR (summary != 'failed_to_summarise' AND summary != 'failed_to_extract' AND summary = '')"
         )
         return cursor.fetchall()
 
@@ -217,6 +231,70 @@ def remove_nonexistent_files(existing_files: Set[str]) -> int:
             )
             conn.commit()
         return len(files_to_remove)
+
+
+def remove_duplicate_file_entries() -> int:
+    """
+    Finds entries in the summaries table with the same file name and deletes duplicates.
+    Keeps the most recently created entry for each duplicate file name.
+    
+    Returns:
+        int: Number of duplicate entries removed
+    """
+    removed_count = 0
+    with get_connection() as conn:
+        # Find file names that have multiple entries
+        cursor = conn.execute(
+            """
+            SELECT file_name, COUNT(*) as count
+            FROM article_summaries
+            GROUP BY file_name
+            HAVING count > 1
+            """
+        )
+        duplicate_files = cursor.fetchall()
+        
+        for file_name, count in duplicate_files:
+            logger.info(f"Found {count} entries for file '{file_name}'")
+            
+            # Get all records for this file name, ordered by created_at timestamp (newest first)
+            cursor = conn.execute(
+                """
+                SELECT id, file_hash, created_at
+                FROM article_summaries
+                WHERE file_name = ?
+                ORDER BY created_at DESC
+                """,
+                (file_name,)
+            )
+            entries = cursor.fetchall()
+            
+            # Keep the first (newest) entry and delete the rest
+            keep_id = entries[0][0]
+            keep_hash = entries[0][1]
+            
+            # Delete all other entries for this file name
+            for entry_id, entry_hash, _ in entries[1:]:
+                logger.info(f"Removing duplicate entry: id={entry_id}, file_hash={entry_hash}")
+                
+                # First delete related records in article_tags table
+                conn.execute(
+                    "DELETE FROM article_tags WHERE article_id = ?",
+                    (entry_id,)
+                )
+                
+                # Then delete the article summary entry
+                conn.execute(
+                    "DELETE FROM article_summaries WHERE id = ?",
+                    (entry_id,)
+                )
+                
+                removed_count += 1
+        
+        conn.commit()
+    
+    logger.info(f"Removed {removed_count} duplicate entries from the database")
+    return removed_count
 
 
 # Tag Operations

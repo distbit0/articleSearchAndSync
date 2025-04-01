@@ -9,9 +9,18 @@ from loguru import logger
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from .utils import calculate_normal_hash, getConfig, getArticlePathsForQuery
-from .textExtraction import extract_text_from_file, TextExtractionError
-from . import db
+# Handle imports for both package and direct script execution
+if __name__ == "__main__":
+    # When run directly, add parent directory to path
+    sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    from src.utils import calculate_normal_hash, getConfig, getArticlePathsForQuery
+    from src.textExtraction import extract_text_from_file, TextExtractionError
+    import src.db as db
+else:
+    # When imported as a module
+    from .utils import calculate_normal_hash, getConfig, getArticlePathsForQuery
+    from .textExtraction import extract_text_from_file, TextExtractionError
+    from . import db
 
 # Configure loguru logger
 log_file_path = os.path.join(
@@ -22,7 +31,7 @@ log_file_path = os.path.join(
 os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
 
 logger.remove()
-logger.add(sys.stdout, level="INFO")
+logger.add(sys.stdout, level="DEBUG")
 logger.add(
     log_file_path,
     rotation="5 MB",
@@ -148,26 +157,31 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
     file_name = os.path.basename(file_path)
     file_format = os.path.splitext(file_path)[1].lower().lstrip(".")
 
+    # Only check existing summary if not forcing a new one
     article = db.get_article_by_hash(file_hash)
-    if article:
+    if article and article["summary"] is not None and article["summary"] != "":
         summary = article["summary"]
-        if summary is not None and summary != "":
-            if summary == "failed_to_summarise":
-                logger.debug(
-                    f"Skipping file {file_name} due to previous insufficient text"
-                )
-                return summary, False
-            elif summary == "failed_to_extract":
-                logger.debug(
-                    f"Skipping file {file_name} due to previous extraction issues"
-                )
-                return summary, False
-            else:
-                return summary, True
+        if summary == "failed_to_summarise":
+            logger.debug(f"Skipping file {file_name} due to previous insufficient text")
+            return summary, False
+        elif summary == "failed_to_extract":
+            logger.debug(f"Skipping file {file_name} due to previous extraction issues")
+            return summary, False
         else:
-            logger.debug(
-                f"File {file_name} exists in DB but has not been summarized yet"
-            )
+            # Article has a valid summary, return it
+            logger.debug(f"Using existing summary for {file_name}")
+            # db.update_article_summary(
+            #     file_hash,
+            #     file_name,
+            #     file_format,
+            #     summary,
+            #     article["extraction_method"],
+            #     article["word_count"],
+            # )
+            return summary, True
+
+    # If we get here, the article needs a summary (either no entry, empty summary, or forcing new)
+    logger.info(f"Generating new summary for: {file_name}")
 
     try:
         config = getConfig()
@@ -176,6 +190,9 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
             file_path, max_words
         )
         summary, is_sufficient = summarize_with_openrouter(text)
+        logger.info(
+            f"Summary generated for {file_name}: is_sufficient={is_sufficient}, length={len(summary)} chars"
+        )
 
         if not is_sufficient and "[INSUFFICIENT_TEXT]" in summary:
             db_summary = "failed_to_summarise"
@@ -186,6 +203,8 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
             db_summary = summary
             logger.debug(f"Successfully created summary for file: {file_path}")
 
+        # Update the database with the new summary
+        logger.debug(f"Updating database with summary for {file_name}")
         db.update_article_summary(
             file_hash, file_name, file_format, db_summary, extraction_method, word_count
         )
@@ -221,6 +240,8 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
         articles_path: Path to the articles directory.
         query: Query string to filter articles (default: "*" for all articles).
     """
+    logger.info("====== Starting article summarization process ======")
+
     if not articles_path:
         config = getConfig()
         articles_path = config.get("articleFileFolder", "")
@@ -253,8 +274,9 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
             )
             break
         file_path = os.path.join(articles_path, file_name)
-        if file_path:
+        if os.path.exists(file_path):
             articles_to_summarize.append(file_path)
+            logger.debug(f"Added {file_path} to summarization queue")
         else:
             logger.warning(f"Could not find path for {file_name} in {articles_path}")
 
@@ -281,7 +303,7 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
                 success, message, is_sufficient, summary = future.result()
                 if success:
                     if is_sufficient:
-                        logger.debug(
+                        logger.info(
                             f"Successfully summarized: {article_path} - {message}"
                         )
                         successful += 1
@@ -289,9 +311,12 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
                         if word_count:
                             summary_word_counts.append(word_count)
                     else:
+                        logger.info(
+                            f"Insufficient text for: {article_path} - {message}"
+                        )
                         insufficient += 1
                 else:
-                    logger.debug(f"Failed to summarize: {article_path} - {message}")
+                    logger.info(f"Failed to summarize: {article_path} - {message}")
                     failed += 1
             except Exception as e:
                 logger.error(
@@ -309,6 +334,7 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
     logger.info(
         f"Summary: Processed {total_articles} articles - {successful} successful, {insufficient} insufficient text, {failed} failed"
     )
+    logger.info("====== Finished article summarization process ======")
 
 
 def process_single_article(article_path: str) -> Tuple[bool, str, bool, str]:
@@ -426,3 +452,9 @@ def remove_orphaned_tags_from_database() -> int:
     else:
         logger.info("No orphaned tags found in database")
     return removed_count
+
+
+if __name__ == "__main__":
+    db.remove_duplicate_file_entries()
+    logger.info("Running article summarization standalone")
+    summarize_articles()
