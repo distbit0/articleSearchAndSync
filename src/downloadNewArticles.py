@@ -9,7 +9,7 @@ from selenium.webdriver.common.by import By
 import requests
 from selenium import webdriver
 from urllib.parse import urlparse
-from .utils import getConfig, addUrlToUrlFile, getAbsPath
+from .utils import getConfig, addUrlToUrlFile, getAbsPath, formatUrl
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import markdown
@@ -19,7 +19,7 @@ requests.packages.urllib3.disable_warnings()
 
 
 def save_text_as_html(url):
-    response = requests.get(url, verify=ssl.CERT_NONE)
+    response = requests.get(url, verify=ssl.CERT_NONE, timeout=10)
     text_content = response.text
 
     # Convert text to HTML using markdown
@@ -36,6 +36,7 @@ def downloadNewArticles(urlsToAdd):
     saveDirectory = getConfig()["pdfSourceFolders"][0]
     print(urlsToAdd)
     for url in urlsToAdd:
+        urlCopy = str(url)
         if url.endswith(".pdf"):
             continue
         print(f"trying to download: {url}")
@@ -44,7 +45,9 @@ def downloadNewArticles(urlsToAdd):
         except Exception as e:
             print(f"Error downloading article: {url} {e}")
         else:
-            addUrlToUrlFile([url], getAbsPath("../storage/alreadyAddedArticles.txt"))
+            addUrlToUrlFile(
+                [formatUrl(urlCopy)], getAbsPath("../storage/alreadyAddedArticles.txt")
+            )
 
     # Add downloaded URLs to alreadyAddedArticles.txt
 

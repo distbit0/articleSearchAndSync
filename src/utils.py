@@ -89,10 +89,12 @@ def hideFile(f):
                 print(f"HIDING {f} >> {hiddenFilePath}")
                 shutil.move(matching_file, hiddenFilePath)
                 notFound = False
+                return hiddenFilePath
         except OSError:
             pass
     if notFound:
         print(f"File {f} not found in folder {folder}, with extensions {possibleExts}")
+    return f
 
 
 def formatUrl(url):
@@ -109,6 +111,7 @@ def formatUrl(url):
     url = re.sub(r"\&gi=.*", r"", url)
     if "discord.com" in url:
         url = url.replace("#update", "")
+    url = url.replace("###", "##")  # so that it isn't force refreshed in convertLinks
     return url
 
 
