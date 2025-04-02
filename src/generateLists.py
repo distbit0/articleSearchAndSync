@@ -604,8 +604,5 @@ def modifyListFiles():
 
 # --- Main Execution Guard --- (Same as before)
 if __name__ == "__main__":
-    logger.add("file_{time}.log", level="DEBUG")
-    logger.info("Starting list update process...")
     appendToLists()
     modifyListFiles()
-    logger.info("List update process finished.")
