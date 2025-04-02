@@ -69,11 +69,11 @@
     ],
     "article_tags": {
         "infofi": {
-            "description": "Articles about prediction markets or decision markets or futarchy; or which mention info-finance; or which are about constructing incentive mechanisms to elicit information to make decisions; or combining prediction markets and ai/ai agents; or about tools for thought involving ai/ml/info-finance",
+            "description": "About any of the following: 1) prediction markets; 2) futarchy; 3) marketplaces for intelligence; 4) ideas about how to use ai or finance to elicit knowledge and improve human decisions or discover truth",
             "use_summary": true
         },
         "impLossAndLVR": {
-            "description": "Articles about AMM/DEX impermanent loss, loss versus rebalancing (LVR) and potential mitigations",
+            "description": "About AMM/DEX impermanent loss, loss versus rebalancing (LVR) and potential mitigations",
             "use_summary": true
         }
     },

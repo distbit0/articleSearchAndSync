@@ -150,11 +150,7 @@ def hideArticlesMarkedAsRead():
     markedAsReadFiles = utils.getArticlesFromList("_READ")
     articleFileFolder = getConfig()["articleFileFolder"]
     for fileName in markedAsReadFiles:
-        filePath = os.path.join(articleFileFolder, fileName)
-        if not os.path.exists(filePath):
-            logger.warning(f"File {filePath} does not exist, skipping marked as read")
-            continue
-        newPath = utils.hideFile(filePath)
+        newPath = utils.hide_file_with_name(fileName, articleFileFolder)
         if newPath:
             utils.addUrlToUrlFile(
                 utils.getUrlOfArticle(newPath),

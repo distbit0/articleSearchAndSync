@@ -45,7 +45,7 @@ def handle_cache(file_name, key, value=None):
             json.dump(cache, f)
 
 
-def delete_files_with_name(folder, file_name):
+def delete_file_with_name(file_name, folder):
     # Find all files with the file name in the folder using our enhanced function
     # Delete all found files
     notFound = True
@@ -70,13 +70,11 @@ def delete_files_with_name(folder, file_name):
         )
 
 
-def hideFile(f):
+def hide_file_with_name(orgFileName, folder):
     possibleExts = ["pdf", "epub"]
-    currentExt = f.split(".")[1]
+    currentExt = orgFileName.split(".")[1]
     possibleExts.append(currentExt)
-    folder = os.path.dirname(f)
     notFound = True
-    orgFileName = os.path.basename(f)
     for ext in possibleExts:
         try:
             fileName = orgFileName.split(".")[0] + "." + ext
@@ -86,15 +84,17 @@ def hideFile(f):
                 if hiddenFileName == "." or fileName[0] == ".":
                     continue
                 hiddenFilePath = os.path.join(folder, hiddenFileName)
-                print(f"HIDING {f} >> {hiddenFilePath}")
+                print(f"HIDING {fileName} >> {hiddenFilePath}")
                 shutil.move(matching_file, hiddenFilePath)
                 notFound = False
                 return hiddenFilePath
         except OSError:
             pass
     if notFound:
-        print(f"File {f} not found in folder {folder}, with extensions {possibleExts}")
-    return f
+        print(
+            f"File {orgFileName} not found in folder {folder}, with extensions {possibleExts}"
+        )
+    return orgFileName
 
 
 def formatUrl(url):
@@ -140,7 +140,7 @@ def markArticlesWithUrlsAsRead(readUrls, articleFolder):
     for url in readUrls:
         if url in articleUrls:
             try:
-                hideFile(articleUrls[url])
+                hideFile(articleUrls[url].split("/")[-1])
             except OSError:
                 print(f"Error hiding {articleUrls[url]}")
         addUrlToUrlFile(url, getAbsPath("./../storage/markedAsReadArticles.txt"))
@@ -312,6 +312,7 @@ def getArticlesFromList(listName):
 
     config_path = getConfig()["atVoiceFolderPath"]
     listPath = os.path.join(config_path, ".config", listName + ".rlst")
+    rootPath = os.path.join(getConfig()["droidEbooksFolderPath"])
 
     if not os.path.exists(listPath):
         return []
@@ -354,11 +355,10 @@ def getArticlesFromList(listName):
             # The first token (split by tab) holds the path
             parts = line.split("\t")
             if parts:
-                path_parts = parts[0].split("/")
-                if path_parts:
-                    filename = path_parts[-1]
-                    if filename not in articles:
-                        articles.append(filename)
+                if parts[0]:
+                    filePathRelativeToRoot = os.path.relpath(parts[0], rootPath)
+                    if filePathRelativeToRoot not in articles:
+                        articles.append(filePathRelativeToRoot)
 
         return header_text, articles
 
@@ -403,7 +403,10 @@ def getArticlesFromList(listName):
         if mainHeader is not None:
             newText = f"{mainHeader}\n:\n" + "\n".join(mainArticles)
         else:
-            newText = "\n".join(mainArticles)
+            articlesWithRoot = [
+                os.path.join(rootPath, article) for article in mainArticles
+            ]
+            newText = "\n".join(articlesWithRoot)
 
         try:
             with open(listPath, "w", encoding="utf-8") as f:

@@ -1,4 +1,5 @@
 import random
+import re
 import traceback
 import sys
 import os
@@ -121,7 +122,6 @@ def summarize_with_openrouter(text: str) -> Tuple[str, bool]:
             ],
         )
         full_response = response.choices[0].message.content
-        import re
 
         summary_match = re.search(r"<summary>(.*?)</summary>", full_response, re.DOTALL)
         if summary_match:

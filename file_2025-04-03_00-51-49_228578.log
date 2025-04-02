@@ -1,0 +1,202 @@
+2025-04-03 00:51:49.231 | INFO     | __main__:<module>:603 - Starting list update process...
+2025-04-03 00:51:49.231 | DEBUG    | __main__:appendToLists:329 - Checking articles for list 'infofi'
+2025-04-03 00:51:49.335 | INFO     | __main__:appendToLists:356 - List 'infofi': Populated with 67 article paths.
+2025-04-03 00:51:49.335 | DEBUG    | __main__:appendToLists:329 - Checking articles for list 'lvr'
+2025-04-03 00:51:49.382 | INFO     | __main__:appendToLists:356 - List 'lvr': Populated with 10 article paths.
+2025-04-03 00:51:49.385 | INFO     | __main__:modifyListFiles:550 - Processing modifications for list 'infofi' (297 valid items)
+2025-04-03 00:51:49.385 | DEBUG    | __main__:_schedule_tasks_and_update_existing:397 - Using existing EPUB for 2212.00271v1.pdf: 2212.00271v1.epub
+2025-04-03 00:51:49.385 | DEBUG    | __main__:_schedule_tasks_and_update_existing:397 - Using existing EPUB for A Simple Decision Market Model.pdf: A Simple Decision Market Model.epub
+2025-04-03 00:51:49.385 | DEBUG    | __main__:_schedule_tasks_and_update_existing:402 - Scheduling PDF->EPUB conversion for Drift dAMM deep dive.pdf
+2025-04-03 00:51:49.385 | INFO     | __main__:_run_pdf_to_epub_conversion:266 - Starting conversion: Drift dAMM deep dive.pdf -> Drift dAMM deep dive.epub
+2025-04-03 00:51:49.385 | DEBUG    | __main__:_mineru_get_upload_info:118 - Requesting upload info for Drift dAMM deep dive.pdf
+2025-04-03 00:51:49.385 | DEBUG    | __main__:_schedule_tasks_and_update_existing:397 - Using existing EPUB for Proteus_AMM_Engine_-_Shell_v2_Part_1.pdf: Proteus_AMM_Engine_-_Shell_v2_Part_1.epub
+2025-04-03 00:51:49.385 | DEBUG    | __main__:_schedule_tasks_and_update_existing:402 - Scheduling PDF->EPUB conversion for Arbius A Decentralized Machine Learning Network w_1.pdf
+2025-04-03 00:51:49.386 | INFO     | __main__:_run_pdf_to_epub_conversion:266 - Starting conversion: Arbius A Decentralized Machine Learning Network w_1.pdf -> Arbius A Decentralized Machine Learning Network w_1.epub
+2025-04-03 00:51:49.386 | DEBUG    | __main__:_schedule_tasks_and_update_existing:397 - Using existing EPUB for Litepaper (1).pdf: Litepaper (1).epub
+2025-04-03 00:51:49.386 | DEBUG    | __main__:_mineru_get_upload_info:118 - Requesting upload info for Arbius A Decentralized Machine Learning Network w_1.pdf
+2025-04-03 00:51:49.387 | DEBUG    | __main__:_schedule_tasks_and_update_existing:402 - Scheduling PDF->EPUB conversion for AnyHedge Whitepaper.pdf
+2025-04-03 00:51:49.387 | INFO     | __main__:_run_pdf_to_epub_conversion:266 - Starting conversion: AnyHedge Whitepaper.pdf -> AnyHedge Whitepaper.epub
+2025-04-03 00:51:49.387 | DEBUG    | __main__:_schedule_tasks_and_update_existing:402 - Scheduling PDF->EPUB conversion for abernethy2013.pdf
+2025-04-03 00:51:49.387 | DEBUG    | __main__:_mineru_get_upload_info:118 - Requesting upload info for AnyHedge Whitepaper.pdf
+2025-04-03 00:51:49.388 | INFO     | __main__:_run_pdf_to_epub_conversion:266 - Starting conversion: abernethy2013.pdf -> abernethy2013.epub
+2025-04-03 00:51:49.388 | DEBUG    | __main__:_mineru_get_upload_info:118 - Requesting upload info for abernethy2013.pdf
+2025-04-03 00:51:49.388 | DEBUG    | __main__:_schedule_tasks_and_update_existing:402 - Scheduling PDF->EPUB conversion for LAMMbert.pdf
+2025-04-03 00:51:49.388 | INFO     | __main__:_run_pdf_to_epub_conversion:266 - Starting conversion: LAMMbert.pdf -> LAMMbert.epub
+2025-04-03 00:51:49.389 | DEBUG    | __main__:_schedule_tasks_and_update_existing:402 - Scheduling PDF->EPUB conversion for Panoptic the perpetual oracle-free options proto.pdf
+2025-04-03 00:51:49.389 | DEBUG    | __main__:_mineru_get_upload_info:118 - Requesting upload info for LAMMbert.pdf
+2025-04-03 00:51:49.389 | DEBUG    | __main__:_schedule_tasks_and_update_existing:402 - Scheduling PDF->EPUB conversion for vega-protocol-whitepaper.pdf
+2025-04-03 00:51:49.390 | INFO     | __main__:_process_pdf_futures:429 - Waiting for 7 PDF conversion tasks...
+2025-04-03 00:51:50.308 | DEBUG    | __main__:_mineru_get_upload_info:129 - Obtained batch_id: acb5480b-582f-411b-a48d-5fc6038684c2 for LAMMbert.pdf
+2025-04-03 00:51:50.308 | DEBUG    | __main__:_mineru_upload_file:135 - Uploading LAMMbert.pdf to Mineru pre-signed URL...
+2025-04-03 00:51:50.314 | DEBUG    | __main__:_mineru_get_upload_info:129 - Obtained batch_id: d3a3f548-2225-4b55-a5a1-af6a283af985 for Arbius A Decentralized Machine Learning Network w_1.pdf
+2025-04-03 00:51:50.314 | DEBUG    | __main__:_mineru_upload_file:135 - Uploading Arbius A Decentralized Machine Learning Network w_1.pdf to Mineru pre-signed URL...
+2025-04-03 00:51:50.317 | DEBUG    | __main__:_mineru_get_upload_info:129 - Obtained batch_id: 2981ea60-96e2-4540-9fa6-1db5f2fc2848 for Drift dAMM deep dive.pdf
+2025-04-03 00:51:50.317 | DEBUG    | __main__:_mineru_upload_file:135 - Uploading Drift dAMM deep dive.pdf to Mineru pre-signed URL...
+2025-04-03 00:51:50.325 | DEBUG    | __main__:_mineru_get_upload_info:129 - Obtained batch_id: f6887e9d-54cb-42c2-9fcf-8edecd6e73e8 for AnyHedge Whitepaper.pdf
+2025-04-03 00:51:50.325 | DEBUG    | __main__:_mineru_upload_file:135 - Uploading AnyHedge Whitepaper.pdf to Mineru pre-signed URL...
+2025-04-03 00:51:50.376 | DEBUG    | __main__:_mineru_get_upload_info:129 - Obtained batch_id: 2f4193ec-38bb-4ad4-ae99-86989e892ebc for abernethy2013.pdf
+2025-04-03 00:51:50.377 | DEBUG    | __main__:_mineru_upload_file:135 - Uploading abernethy2013.pdf to Mineru pre-signed URL...
+2025-04-03 00:51:54.056 | DEBUG    | __main__:_mineru_upload_file:151 - Successfully uploaded abernethy2013.pdf via pre-signed URL
+2025-04-03 00:51:54.057 | DEBUG    | __main__:_mineru_upload_file:151 - Successfully uploaded Arbius A Decentralized Machine Learning Network w_1.pdf via pre-signed URL
+2025-04-03 00:51:54.058 | DEBUG    | __main__:_mineru_poll_for_zip_url:165 - Polling Mineru task status for batch 2f4193ec-38bb-4ad4-ae99-86989e892ebc (abernethy2013.pdf)
+2025-04-03 00:51:54.059 | DEBUG    | __main__:_mineru_poll_for_zip_url:165 - Polling Mineru task status for batch d3a3f548-2225-4b55-a5a1-af6a283af985 (Arbius A Decentralized Machine Learning Network w_1.pdf)
+2025-04-03 00:51:54.753 | DEBUG    | __main__:_mineru_upload_file:151 - Successfully uploaded LAMMbert.pdf via pre-signed URL
+2025-04-03 00:51:54.754 | DEBUG    | __main__:_mineru_poll_for_zip_url:165 - Polling Mineru task status for batch acb5480b-582f-411b-a48d-5fc6038684c2 (LAMMbert.pdf)
+2025-04-03 00:51:55.784 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch acb5480b-582f-411b-a48d-5fc6038684c2 (attempt 1/25): state=pending
+2025-04-03 00:51:55.827 | DEBUG    | __main__:_mineru_upload_file:151 - Successfully uploaded AnyHedge Whitepaper.pdf via pre-signed URL
+2025-04-03 00:51:55.828 | DEBUG    | __main__:_mineru_poll_for_zip_url:165 - Polling Mineru task status for batch f6887e9d-54cb-42c2-9fcf-8edecd6e73e8 (AnyHedge Whitepaper.pdf)
+2025-04-03 00:51:56.046 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch d3a3f548-2225-4b55-a5a1-af6a283af985 (attempt 1/25): state=pending
+2025-04-03 00:51:56.454 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 2f4193ec-38bb-4ad4-ae99-86989e892ebc (attempt 1/25): state=pending
+2025-04-03 00:51:56.509 | DEBUG    | __main__:_mineru_upload_file:151 - Successfully uploaded Drift dAMM deep dive.pdf via pre-signed URL
+2025-04-03 00:51:56.510 | DEBUG    | __main__:_mineru_poll_for_zip_url:165 - Polling Mineru task status for batch 2981ea60-96e2-4540-9fa6-1db5f2fc2848 (Drift dAMM deep dive.pdf)
+2025-04-03 00:51:56.804 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch f6887e9d-54cb-42c2-9fcf-8edecd6e73e8 (attempt 1/25): state=waiting-file
+2025-04-03 00:51:57.533 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 2981ea60-96e2-4540-9fa6-1db5f2fc2848 (attempt 1/25): state=pending
+2025-04-03 00:52:08.821 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch acb5480b-582f-411b-a48d-5fc6038684c2 (attempt 2/25): state=running
+2025-04-03 00:52:09.189 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch d3a3f548-2225-4b55-a5a1-af6a283af985 (attempt 2/25): state=done
+2025-04-03 00:52:09.189 | INFO     | __main__:_mineru_poll_for_zip_url:181 - Mineru processing finished for batch d3a3f548-2225-4b55-a5a1-af6a283af985
+2025-04-03 00:52:09.190 | DEBUG    | __main__:_download_extract_and_convert:245 - Downloading result zip from https://cdn-mineru.openxlab.org.cn/pdf/00ff79fd-ae4e-493d-92f0-ac836d08bad3.zip
+2025-04-03 00:52:09.565 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 2f4193ec-38bb-4ad4-ae99-86989e892ebc (attempt 2/25): state=running
+2025-04-03 00:52:09.930 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch f6887e9d-54cb-42c2-9fcf-8edecd6e73e8 (attempt 2/25): state=running
+2025-04-03 00:52:10.631 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 2981ea60-96e2-4540-9fa6-1db5f2fc2848 (attempt 2/25): state=running
+2025-04-03 00:52:15.334 | DEBUG    | __main__:_download_extract_and_convert:252 - Extracting zip result.zip to /tmp/mineru_Arbius A Decentralized Machine Learning Network w_1_m5qt4zzv/extracted
+2025-04-03 00:52:15.338 | DEBUG    | __main__:_run_pandoc_conversion:206 - Preparing Pandoc conversion for Arbius A Decentralized Machine Learning Network w_1.epub
+2025-04-03 00:52:15.338 | DEBUG    | __main__:_run_pandoc_conversion:221 - Running Pandoc: pandoc /tmp/mineru_Arbius A Decentralized Machine Learning Network w_1_m5qt4zzv/temp_full.md -o /home/pimania/ebooks/epubArticles/Arbius A Decentralized Machine Learning Network w_1.epub --webtex=https://latex.codecogs.com/svg.latex? -f markdown_github+tex_math_single_backslash+tex_math_dollars --embed-resources --standalone --resource-path /tmp/mineru_Arbius A Decentralized Machine Learning Network w_1_m5qt4zzv/extracted --split-level=1 --epub-title-page=false
+2025-04-03 00:52:21.819 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch acb5480b-582f-411b-a48d-5fc6038684c2 (attempt 3/25): state=running
+2025-04-03 00:52:22.516 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 2f4193ec-38bb-4ad4-ae99-86989e892ebc (attempt 3/25): state=running
+2025-04-03 00:52:22.891 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch f6887e9d-54cb-42c2-9fcf-8edecd6e73e8 (attempt 3/25): state=running
+2025-04-03 00:52:23.555 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 2981ea60-96e2-4540-9fa6-1db5f2fc2848 (attempt 3/25): state=running
+2025-04-03 00:52:26.959 | WARNING  | __main__:_run_pandoc_conversion:230 - Pandoc stderr (warnings) for Arbius A Decentralized Machine Learning Network w_1.epub: [WARNING] Deprecated: markdown_github. Use gfm instead.
+[WARNING] This document format requires a nonempty <title> element.
+  Defaulting to 'temp_full' as the title.
+  To specify a title, use 'title' in metadata or --metadata title="...".
+2025-04-03 00:52:26.960 | DEBUG    | __main__:_run_pandoc_conversion:233 - Pandoc conversion successful for Arbius A Decentralized Machine Learning Network w_1.epub
+2025-04-03 00:52:26.961 | INFO     | __main__:_run_pdf_to_epub_conversion:273 - Successfully converted Arbius A Decentralized Machine Learning Network w_1.pdf -> Arbius A Decentralized Machine Learning Network w_1.epub
+2025-04-03 00:52:26.961 | INFO     | __main__:_run_pdf_to_epub_conversion:266 - Starting conversion: Panoptic the perpetual oracle-free options proto.pdf -> Panoptic the perpetual oracle-free options proto.epub
+2025-04-03 00:52:26.961 | DEBUG    | __main__:_mineru_get_upload_info:118 - Requesting upload info for Panoptic the perpetual oracle-free options proto.pdf
+2025-04-03 00:52:28.101 | DEBUG    | __main__:_mineru_get_upload_info:129 - Obtained batch_id: 5e6b1f10-b301-41f5-886e-fa1647f7a1c1 for Panoptic the perpetual oracle-free options proto.pdf
+2025-04-03 00:52:28.102 | DEBUG    | __main__:_mineru_upload_file:135 - Uploading Panoptic the perpetual oracle-free options proto.pdf to Mineru pre-signed URL...
+2025-04-03 00:52:34.885 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch acb5480b-582f-411b-a48d-5fc6038684c2 (attempt 4/25): state=done
+2025-04-03 00:52:34.886 | INFO     | __main__:_mineru_poll_for_zip_url:181 - Mineru processing finished for batch acb5480b-582f-411b-a48d-5fc6038684c2
+2025-04-03 00:52:34.886 | DEBUG    | __main__:_download_extract_and_convert:245 - Downloading result zip from https://cdn-mineru.openxlab.org.cn/pdf/c69d36c8-1822-49a5-9441-34bd52b90e56.zip
+2025-04-03 00:52:35.504 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 2f4193ec-38bb-4ad4-ae99-86989e892ebc (attempt 4/25): state=running
+2025-04-03 00:52:35.860 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch f6887e9d-54cb-42c2-9fcf-8edecd6e73e8 (attempt 4/25): state=done
+2025-04-03 00:52:35.861 | INFO     | __main__:_mineru_poll_for_zip_url:181 - Mineru processing finished for batch f6887e9d-54cb-42c2-9fcf-8edecd6e73e8
+2025-04-03 00:52:35.861 | DEBUG    | __main__:_download_extract_and_convert:245 - Downloading result zip from https://cdn-mineru.openxlab.org.cn/pdf/9b9a4261-58a3-45c0-8ab2-92aed08dd0e4.zip
+2025-04-03 00:52:36.511 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 2981ea60-96e2-4540-9fa6-1db5f2fc2848 (attempt 4/25): state=running
+2025-04-03 00:52:38.601 | DEBUG    | __main__:_download_extract_and_convert:252 - Extracting zip result.zip to /tmp/mineru_LAMMbert_ma2pwcvb/extracted
+2025-04-03 00:52:38.604 | DEBUG    | __main__:_run_pandoc_conversion:206 - Preparing Pandoc conversion for LAMMbert.epub
+2025-04-03 00:52:38.604 | DEBUG    | __main__:_run_pandoc_conversion:221 - Running Pandoc: pandoc /tmp/mineru_LAMMbert_ma2pwcvb/temp_full.md -o /home/pimania/ebooks/epubArticles/LAMMbert.epub --webtex=https://latex.codecogs.com/svg.latex? -f markdown_github+tex_math_single_backslash+tex_math_dollars --embed-resources --standalone --resource-path /tmp/mineru_LAMMbert_ma2pwcvb/extracted --split-level=1 --epub-title-page=false
+2025-04-03 00:52:38.969 | DEBUG    | __main__:_download_extract_and_convert:252 - Extracting zip result.zip to /tmp/mineru_AnyHedge Whitepaper_ubdlz6dk/extracted
+2025-04-03 00:52:38.976 | DEBUG    | __main__:_run_pandoc_conversion:206 - Preparing Pandoc conversion for AnyHedge Whitepaper.epub
+2025-04-03 00:52:38.977 | DEBUG    | __main__:_run_pandoc_conversion:221 - Running Pandoc: pandoc /tmp/mineru_AnyHedge Whitepaper_ubdlz6dk/temp_full.md -o /home/pimania/ebooks/epubArticles/AnyHedge Whitepaper.epub --webtex=https://latex.codecogs.com/svg.latex? -f markdown_github+tex_math_single_backslash+tex_math_dollars --embed-resources --standalone --resource-path /tmp/mineru_AnyHedge Whitepaper_ubdlz6dk/extracted --split-level=1 --epub-title-page=false
+2025-04-03 00:52:40.498 | DEBUG    | __main__:_mineru_upload_file:151 - Successfully uploaded Panoptic the perpetual oracle-free options proto.pdf via pre-signed URL
+2025-04-03 00:52:40.499 | DEBUG    | __main__:_mineru_poll_for_zip_url:165 - Polling Mineru task status for batch 5e6b1f10-b301-41f5-886e-fa1647f7a1c1 (Panoptic the perpetual oracle-free options proto.pdf)
+2025-04-03 00:52:41.506 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 5e6b1f10-b301-41f5-886e-fa1647f7a1c1 (attempt 1/25): state=pending
+2025-04-03 00:52:45.905 | WARNING  | __main__:_run_pandoc_conversion:230 - Pandoc stderr (warnings) for AnyHedge Whitepaper.epub: [WARNING] Deprecated: markdown_github. Use gfm instead.
+[WARNING] This document format requires a nonempty <title> element.
+  Defaulting to 'temp_full' as the title.
+  To specify a title, use 'title' in metadata or --metadata title="...".
+2025-04-03 00:52:45.906 | DEBUG    | __main__:_run_pandoc_conversion:233 - Pandoc conversion successful for AnyHedge Whitepaper.epub
+2025-04-03 00:52:45.906 | INFO     | __main__:_run_pdf_to_epub_conversion:273 - Successfully converted AnyHedge Whitepaper.pdf -> AnyHedge Whitepaper.epub
+2025-04-03 00:52:45.907 | INFO     | __main__:_run_pdf_to_epub_conversion:266 - Starting conversion: vega-protocol-whitepaper.pdf -> vega-protocol-whitepaper.epub
+2025-04-03 00:52:45.907 | DEBUG    | __main__:_mineru_get_upload_info:118 - Requesting upload info for vega-protocol-whitepaper.pdf
+2025-04-03 00:52:46.980 | DEBUG    | __main__:_mineru_get_upload_info:129 - Obtained batch_id: 410b6afb-576a-454b-a86c-956ed458e665 for vega-protocol-whitepaper.pdf
+2025-04-03 00:52:46.980 | DEBUG    | __main__:_mineru_upload_file:135 - Uploading vega-protocol-whitepaper.pdf to Mineru pre-signed URL...
+2025-04-03 00:52:48.475 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 2f4193ec-38bb-4ad4-ae99-86989e892ebc (attempt 5/25): state=running
+2025-04-03 00:52:49.550 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 2981ea60-96e2-4540-9fa6-1db5f2fc2848 (attempt 5/25): state=running
+2025-04-03 00:52:51.244 | DEBUG    | __main__:_mineru_upload_file:151 - Successfully uploaded vega-protocol-whitepaper.pdf via pre-signed URL
+2025-04-03 00:52:51.244 | DEBUG    | __main__:_mineru_poll_for_zip_url:165 - Polling Mineru task status for batch 410b6afb-576a-454b-a86c-956ed458e665 (vega-protocol-whitepaper.pdf)
+2025-04-03 00:52:51.838 | WARNING  | __main__:_run_pandoc_conversion:230 - Pandoc stderr (warnings) for LAMMbert.epub: [WARNING] Deprecated: markdown_github. Use gfm instead.
+[WARNING] This document format requires a nonempty <title> element.
+  Defaulting to 'temp_full' as the title.
+  To specify a title, use 'title' in metadata or --metadata title="...".
+2025-04-03 00:52:51.838 | DEBUG    | __main__:_run_pandoc_conversion:233 - Pandoc conversion successful for LAMMbert.epub
+2025-04-03 00:52:51.838 | INFO     | __main__:_run_pdf_to_epub_conversion:273 - Successfully converted LAMMbert.pdf -> LAMMbert.epub
+2025-04-03 00:52:52.201 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 410b6afb-576a-454b-a86c-956ed458e665 (attempt 1/25): state=waiting-file
+2025-04-03 00:52:54.720 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 5e6b1f10-b301-41f5-886e-fa1647f7a1c1 (attempt 2/25): state=running
+2025-04-03 00:53:01.633 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 2f4193ec-38bb-4ad4-ae99-86989e892ebc (attempt 6/25): state=running
+2025-04-03 00:53:02.632 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 2981ea60-96e2-4540-9fa6-1db5f2fc2848 (attempt 6/25): state=done
+2025-04-03 00:53:02.632 | INFO     | __main__:_mineru_poll_for_zip_url:181 - Mineru processing finished for batch 2981ea60-96e2-4540-9fa6-1db5f2fc2848
+2025-04-03 00:53:02.633 | DEBUG    | __main__:_download_extract_and_convert:245 - Downloading result zip from https://cdn-mineru.openxlab.org.cn/pdf/0d8592d3-926a-4bde-b6a8-82f2dd7f8168.zip
+2025-04-03 00:53:05.160 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 410b6afb-576a-454b-a86c-956ed458e665 (attempt 2/25): state=running
+2025-04-03 00:53:07.658 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 5e6b1f10-b301-41f5-886e-fa1647f7a1c1 (attempt 3/25): state=running
+2025-04-03 00:53:10.271 | DEBUG    | __main__:_download_extract_and_convert:252 - Extracting zip result.zip to /tmp/mineru_Drift dAMM deep dive_2i3l31io/extracted
+2025-04-03 00:53:10.298 | DEBUG    | __main__:_run_pandoc_conversion:206 - Preparing Pandoc conversion for Drift dAMM deep dive.epub
+2025-04-03 00:53:10.299 | DEBUG    | __main__:_run_pandoc_conversion:221 - Running Pandoc: pandoc /tmp/mineru_Drift dAMM deep dive_2i3l31io/temp_full.md -o /home/pimania/ebooks/epubArticles/Drift dAMM deep dive.epub --webtex=https://latex.codecogs.com/svg.latex? -f markdown_github+tex_math_single_backslash+tex_math_dollars --embed-resources --standalone --resource-path /tmp/mineru_Drift dAMM deep dive_2i3l31io/extracted --split-level=1 --epub-title-page=false
+2025-04-03 00:53:14.602 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 2f4193ec-38bb-4ad4-ae99-86989e892ebc (attempt 7/25): state=running
+2025-04-03 00:53:17.401 | WARNING  | __main__:_run_pandoc_conversion:230 - Pandoc stderr (warnings) for Drift dAMM deep dive.epub: [WARNING] Deprecated: markdown_github. Use gfm instead.
+[WARNING] This document format requires a nonempty <title> element.
+  Defaulting to 'temp_full' as the title.
+  To specify a title, use 'title' in metadata or --metadata title="...".
+2025-04-03 00:53:17.402 | DEBUG    | __main__:_run_pandoc_conversion:233 - Pandoc conversion successful for Drift dAMM deep dive.epub
+2025-04-03 00:53:17.404 | INFO     | __main__:_run_pdf_to_epub_conversion:273 - Successfully converted Drift dAMM deep dive.pdf -> Drift dAMM deep dive.epub
+2025-04-03 00:53:18.118 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 410b6afb-576a-454b-a86c-956ed458e665 (attempt 3/25): state=running
+2025-04-03 00:53:20.830 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 5e6b1f10-b301-41f5-886e-fa1647f7a1c1 (attempt 4/25): state=done
+2025-04-03 00:53:20.831 | INFO     | __main__:_mineru_poll_for_zip_url:181 - Mineru processing finished for batch 5e6b1f10-b301-41f5-886e-fa1647f7a1c1
+2025-04-03 00:53:20.831 | DEBUG    | __main__:_download_extract_and_convert:245 - Downloading result zip from https://cdn-mineru.openxlab.org.cn/pdf/ff9c4c01-46e3-40ed-b4cb-99ef504dba58.zip
+2025-04-03 00:53:27.531 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 2f4193ec-38bb-4ad4-ae99-86989e892ebc (attempt 8/25): state=done
+2025-04-03 00:53:27.531 | INFO     | __main__:_mineru_poll_for_zip_url:181 - Mineru processing finished for batch 2f4193ec-38bb-4ad4-ae99-86989e892ebc
+2025-04-03 00:53:27.532 | DEBUG    | __main__:_download_extract_and_convert:245 - Downloading result zip from https://cdn-mineru.openxlab.org.cn/pdf/550aac94-4a26-4e46-b20c-ef2030b70fd1.zip
+2025-04-03 00:53:31.040 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 410b6afb-576a-454b-a86c-956ed458e665 (attempt 4/25): state=running
+2025-04-03 00:53:33.606 | DEBUG    | __main__:_download_extract_and_convert:252 - Extracting zip result.zip to /tmp/mineru_Panoptic the perpetual oracle-free options proto_l_v8bc63/extracted
+2025-04-03 00:53:33.635 | DEBUG    | __main__:_run_pandoc_conversion:206 - Preparing Pandoc conversion for Panoptic the perpetual oracle-free options proto.epub
+2025-04-03 00:53:33.636 | DEBUG    | __main__:_run_pandoc_conversion:221 - Running Pandoc: pandoc /tmp/mineru_Panoptic the perpetual oracle-free options proto_l_v8bc63/temp_full.md -o /home/pimania/ebooks/epubArticles/Panoptic the perpetual oracle-free options proto.epub --webtex=https://latex.codecogs.com/svg.latex? -f markdown_github+tex_math_single_backslash+tex_math_dollars --embed-resources --standalone --resource-path /tmp/mineru_Panoptic the perpetual oracle-free options proto_l_v8bc63/extracted --split-level=1 --epub-title-page=false
+2025-04-03 00:53:34.209 | DEBUG    | __main__:_download_extract_and_convert:252 - Extracting zip result.zip to /tmp/mineru_abernethy2013_nnj0p79z/extracted
+2025-04-03 00:53:34.217 | DEBUG    | __main__:_run_pandoc_conversion:206 - Preparing Pandoc conversion for abernethy2013.epub
+2025-04-03 00:53:34.217 | DEBUG    | __main__:_run_pandoc_conversion:221 - Running Pandoc: pandoc /tmp/mineru_abernethy2013_nnj0p79z/temp_full.md -o /home/pimania/ebooks/epubArticles/abernethy2013.epub --webtex=https://latex.codecogs.com/svg.latex? -f markdown_github+tex_math_single_backslash+tex_math_dollars --embed-resources --standalone --resource-path /tmp/mineru_abernethy2013_nnj0p79z/extracted --split-level=1 --epub-title-page=false
+2025-04-03 00:53:44.036 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 410b6afb-576a-454b-a86c-956ed458e665 (attempt 5/25): state=running
+2025-04-03 00:53:56.976 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 410b6afb-576a-454b-a86c-956ed458e665 (attempt 6/25): state=done
+2025-04-03 00:53:56.977 | INFO     | __main__:_mineru_poll_for_zip_url:181 - Mineru processing finished for batch 410b6afb-576a-454b-a86c-956ed458e665
+2025-04-03 00:53:56.977 | DEBUG    | __main__:_download_extract_and_convert:245 - Downloading result zip from https://cdn-mineru.openxlab.org.cn/pdf/55d7268e-ef06-4357-809f-f2476a720e10.zip
+2025-04-03 00:54:02.292 | DEBUG    | __main__:_download_extract_and_convert:252 - Extracting zip result.zip to /tmp/mineru_vega-protocol-whitepaper_ca7kk2jp/extracted
+2025-04-03 00:54:02.303 | DEBUG    | __main__:_run_pandoc_conversion:206 - Preparing Pandoc conversion for vega-protocol-whitepaper.epub
+2025-04-03 00:54:02.304 | DEBUG    | __main__:_run_pandoc_conversion:221 - Running Pandoc: pandoc /tmp/mineru_vega-protocol-whitepaper_ca7kk2jp/temp_full.md -o /home/pimania/ebooks/epubArticles/vega-protocol-whitepaper.epub --webtex=https://latex.codecogs.com/svg.latex? -f markdown_github+tex_math_single_backslash+tex_math_dollars --embed-resources --standalone --resource-path /tmp/mineru_vega-protocol-whitepaper_ca7kk2jp/extracted --split-level=1 --epub-title-page=false
+2025-04-03 00:54:34.230 | WARNING  | __main__:_run_pandoc_conversion:230 - Pandoc stderr (warnings) for Panoptic the perpetual oracle-free options proto.epub: [WARNING] Deprecated: markdown_github. Use gfm instead.
+[WARNING] This document format requires a nonempty <title> element.
+  Defaulting to 'temp_full' as the title.
+  To specify a title, use 'title' in metadata or --metadata title="...".
+2025-04-03 00:54:34.231 | DEBUG    | __main__:_run_pandoc_conversion:233 - Pandoc conversion successful for Panoptic the perpetual oracle-free options proto.epub
+2025-04-03 00:54:34.233 | INFO     | __main__:_run_pdf_to_epub_conversion:273 - Successfully converted Panoptic the perpetual oracle-free options proto.pdf -> Panoptic the perpetual oracle-free options proto.epub
+2025-04-03 00:54:45.737 | WARNING  | __main__:_run_pandoc_conversion:230 - Pandoc stderr (warnings) for vega-protocol-whitepaper.epub: [WARNING] Deprecated: markdown_github. Use gfm instead.
+[WARNING] This document format requires a nonempty <title> element.
+  Defaulting to 'temp_full' as the title.
+  To specify a title, use 'title' in metadata or --metadata title="...".
+2025-04-03 00:54:45.737 | DEBUG    | __main__:_run_pandoc_conversion:233 - Pandoc conversion successful for vega-protocol-whitepaper.epub
+2025-04-03 00:54:45.739 | INFO     | __main__:_run_pdf_to_epub_conversion:273 - Successfully converted vega-protocol-whitepaper.pdf -> vega-protocol-whitepaper.epub
+2025-04-03 01:12:26.093 | WARNING  | __main__:_run_pandoc_conversion:230 - Pandoc stderr (warnings) for abernethy2013.epub: [WARNING] Deprecated: markdown_github. Use gfm instead.
+[WARNING] This document format requires a nonempty <title> element.
+  Defaulting to 'temp_full' as the title.
+  To specify a title, use 'title' in metadata or --metadata title="...".
+2025-04-03 01:12:26.095 | DEBUG    | __main__:_run_pandoc_conversion:233 - Pandoc conversion successful for abernethy2013.epub
+2025-04-03 01:12:26.096 | INFO     | __main__:_run_pdf_to_epub_conversion:273 - Successfully converted abernethy2013.pdf -> abernethy2013.epub
+2025-04-03 01:12:26.096 | INFO     | __main__:modifyListFiles:583 - Updating list 'infofi' with 297 processed paths.
+2025-04-03 01:12:26.099 | INFO     | __main__:modifyListFiles:550 - Processing modifications for list 'lvr' (10 valid items)
+2025-04-03 01:12:26.099 | DEBUG    | __main__:_schedule_tasks_and_update_existing:402 - Scheduling PDF->EPUB conversion for Measuring Arbitrage Losses and Profitability of AMM Liquidity.pdf
+2025-04-03 01:12:26.099 | INFO     | __main__:_run_pdf_to_epub_conversion:266 - Starting conversion: Measuring Arbitrage Losses and Profitability of AMM Liquidity.pdf -> Measuring Arbitrage Losses and Profitability of AMM Liquidity.epub
+2025-04-03 01:12:26.099 | DEBUG    | __main__:_schedule_tasks_and_update_existing:397 - Using existing EPUB for Litepaper (1).pdf: Litepaper (1).epub
+2025-04-03 01:12:26.100 | DEBUG    | __main__:_mineru_get_upload_info:118 - Requesting upload info for Measuring Arbitrage Losses and Profitability of AMM Liquidity.pdf
+2025-04-03 01:12:26.100 | DEBUG    | __main__:_schedule_tasks_and_update_existing:397 - Using existing EPUB for Joe v2 Liquidity Book Whitepaper.pdf: Joe v2 Liquidity Book Whitepaper.epub
+2025-04-03 01:12:26.101 | INFO     | __main__:_process_pdf_futures:429 - Waiting for 1 PDF conversion tasks...
+2025-04-03 01:12:28.174 | DEBUG    | __main__:_mineru_get_upload_info:129 - Obtained batch_id: 9b387450-ce94-446a-8053-c0b0452033bb for Measuring Arbitrage Losses and Profitability of AMM Liquidity.pdf
+2025-04-03 01:12:28.174 | DEBUG    | __main__:_mineru_upload_file:135 - Uploading Measuring Arbitrage Losses and Profitability of AMM Liquidity.pdf to Mineru pre-signed URL...
+2025-04-03 01:12:35.991 | DEBUG    | __main__:_mineru_upload_file:151 - Successfully uploaded Measuring Arbitrage Losses and Profitability of AMM Liquidity.pdf via pre-signed URL
+2025-04-03 01:12:35.991 | DEBUG    | __main__:_mineru_poll_for_zip_url:165 - Polling Mineru task status for batch 9b387450-ce94-446a-8053-c0b0452033bb (Measuring Arbitrage Losses and Profitability of AMM Liquidity.pdf)
+2025-04-03 01:12:37.154 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 9b387450-ce94-446a-8053-c0b0452033bb (attempt 1/25): state=waiting-file
+2025-04-03 01:12:50.261 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 9b387450-ce94-446a-8053-c0b0452033bb (attempt 2/25): state=running
+2025-04-03 01:13:03.226 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 9b387450-ce94-446a-8053-c0b0452033bb (attempt 3/25): state=running
+2025-04-03 01:13:16.522 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 9b387450-ce94-446a-8053-c0b0452033bb (attempt 4/25): state=running
+2025-04-03 01:13:29.633 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 9b387450-ce94-446a-8053-c0b0452033bb (attempt 5/25): state=running
+2025-04-03 01:13:42.803 | DEBUG    | __main__:_mineru_poll_for_zip_url:172 - Polling batch 9b387450-ce94-446a-8053-c0b0452033bb (attempt 6/25): state=done
+2025-04-03 01:13:42.803 | INFO     | __main__:_mineru_poll_for_zip_url:181 - Mineru processing finished for batch 9b387450-ce94-446a-8053-c0b0452033bb
+2025-04-03 01:13:42.803 | DEBUG    | __main__:_download_extract_and_convert:245 - Downloading result zip from https://cdn-mineru.openxlab.org.cn/pdf/f196e4d6-7ced-4595-a793-1add034d1d5e.zip
+2025-04-03 01:13:53.821 | DEBUG    | __main__:_download_extract_and_convert:252 - Extracting zip result.zip to /tmp/mineru_Measuring Arbitrage Losses and Profitability of AMM Liquidity_5too_3mi/extracted
+2025-04-03 01:13:53.828 | DEBUG    | __main__:_run_pandoc_conversion:206 - Preparing Pandoc conversion for Measuring Arbitrage Losses and Profitability of AMM Liquidity.epub
+2025-04-03 01:13:53.828 | DEBUG    | __main__:_run_pandoc_conversion:221 - Running Pandoc: pandoc /tmp/mineru_Measuring Arbitrage Losses and Profitability of AMM Liquidity_5too_3mi/temp_full.md -o /home/pimania/ebooks/epubArticles/Measuring Arbitrage Losses and Profitability of AMM Liquidity.epub --webtex=https://latex.codecogs.com/svg.latex? -f markdown_github+tex_math_single_backslash+tex_math_dollars --embed-resources --standalone --resource-path /tmp/mineru_Measuring Arbitrage Losses and Profitability of AMM Liquidity_5too_3mi/extracted --split-level=1 --epub-title-page=false
+2025-04-03 01:14:14.731 | WARNING  | __main__:_run_pandoc_conversion:230 - Pandoc stderr (warnings) for Measuring Arbitrage Losses and Profitability of AMM Liquidity.epub: [WARNING] Deprecated: markdown_github. Use gfm instead.
+[WARNING] This document format requires a nonempty <title> element.
+  Defaulting to 'temp_full' as the title.
+  To specify a title, use 'title' in metadata or --metadata title="...".
+2025-04-03 01:14:14.731 | DEBUG    | __main__:_run_pandoc_conversion:233 - Pandoc conversion successful for Measuring Arbitrage Losses and Profitability of AMM Liquidity.epub
+2025-04-03 01:14:14.732 | INFO     | __main__:_run_pdf_to_epub_conversion:273 - Successfully converted Measuring Arbitrage Losses and Profitability of AMM Liquidity.pdf -> Measuring Arbitrage Losses and Profitability of AMM Liquidity.epub
+2025-04-03 01:14:14.732 | INFO     | __main__:modifyListFiles:583 - Updating list 'lvr' with 10 processed paths.
+2025-04-03 01:14:14.733 | INFO     | __main__:<module>:607 - List update process finished.

@@ -85,34 +85,32 @@ class TagEvaluator:
             return {tag["id"]: False for tag in tags_to_evaluate}
         if not tags_to_evaluate:
             return {}
+
+        # Assume tags_to_evaluate has only a single element
+        tag = tags_to_evaluate[0]
         client = self._create_openai_client()
-        tag_info = "\n\n".join(
-            [
-                f"Tag {i+1}:\n- Name: {tag["name"]}\n- Description: {tag["description"]}"
-                for i, tag in enumerate(tags_to_evaluate)
-            ]
-        )
-        tag_names = [tag["name"] for tag in tags_to_evaluate]
-        logger.debug(
-            f"Evaluating article for tags: {', '.join(tag_names)} using model: {self.model}"
-        )
+
+        # Only include the description in the prompt, with no mention of tag name
+        tag_description = tag["description"]
+
+        logger.debug(f"Evaluating article for a single tag using model: {self.model}")
+
         system_prompt = (
-            "You are a helpful system that evaluates whether a text matches given tag descriptions. "
-            "Your task is to determine if the article text is described by each of the provided tag descriptions. "
-            "Interpret them literally. You MUST respond in valid JSON format only."
+            "Your task is to determine if the article text matches the provided description."
+            "Interpret the description literally. You MUST respond in valid JSON format only."
         )
-        json_format_example = (
-            "{\n"
-            + ",\n".join([f'  "{tag}": true or false' for tag in tag_names])
-            + "\n}"
-        )
+
+        # Simple JSON format with a single boolean response
+        json_format_example = '{"matches": true or false}'
+
         user_prompt = (
-            f"Please analyze the following text to determine if it matches/is described by each of the tag descriptions provided below. "
-            f"Interpret the tag descriptions literally.\n\nTags to evaluate:\n\n{tag_info}\n\n"
-            f"Text to evaluate:\n{text[:6000]}  # Limit text length to avoid token limits\n\n"
-            f"Based on the tag descriptions, determine if this text matches each tag.\n"
+            f"Please analyze the following article text to determine if it matches the description provided below.\n\n"
+            f"Interpret the description literally.\n\nDescription: {tag_description}\n\n"
+            f"Text to evaluate:\n{text[:6000]}\n\n"
+            f"Based on the description, state if this text matches the description.\n\n"
             f"Your response must be valid JSON in this exact format:\n{json_format_example}"
         )
+
         max_retries = 3
         retry_count = 0
         while retry_count < max_retries:
@@ -127,13 +125,16 @@ class TagEvaluator:
                 )
                 result_text = response.choices[0].message.content.strip()
                 result_json = json.loads(result_text)
-                results = {
-                    tag["id"]: result_json.get(tag["name"], False)
-                    for tag in tags_to_evaluate
-                }
-                logger.debug(f"Tag evaluation results: {result_json}")
-                if True in results.values():
+
+                # Map the result to the tag ID
+                match_result = result_json.get("matches", False)
+                results = {tag["id"]: match_result}
+
+                logger.debug(f"Tag evaluation result: {match_result}")
+
+                if tag["id"] == 487 and match_result == True:
                     print("\n\n\n", user_prompt, results)
+
                 return results
             except json.JSONDecodeError as e:
                 retry_count += 1
@@ -142,14 +143,14 @@ class TagEvaluator:
                 )
                 if retry_count >= max_retries:
                     logger.error(f"All {max_retries} attempts failed. Last error: {e}")
-                    return {tag["id"]: False for tag in tags_to_evaluate}
+                    return {tag["id"]: False}
                 user_prompt = (
                     f"The previous response couldn't be parsed as valid JSON. The error was: {e}\n\n{user_prompt}\n\n"
                     "IMPORTANT: YOU MUST RETURN ONLY VALID JSON. No explanations or additional text."
                 )
             except Exception as e:
                 logger.error(f"Error evaluating tags: {e}\n{traceback.format_exc()}")
-                return {tag["id"]: False for tag in tags_to_evaluate}
+                return {tag["id"]: False}
 
     def batch_evaluate_tags(
         self, article_id: int, file_name: str, text: str, tags_to_evaluate: List
