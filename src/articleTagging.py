@@ -132,6 +132,8 @@ class TagEvaluator:
                     for tag in tags_to_evaluate
                 }
                 logger.debug(f"Tag evaluation results: {result_json}")
+                if True in results.values():
+                    print("\n\n\n", user_prompt, results)
                 return results
             except json.JSONDecodeError as e:
                 retry_count += 1
