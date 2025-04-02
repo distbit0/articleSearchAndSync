@@ -181,7 +181,7 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
             return summary, True
 
     # If we get here, the article needs a summary (either no entry, empty summary, or forcing new)
-    logger.info(f"Generating new summary for: {file_name}")
+    logger.debug(f"Generating new summary for: {file_name}")
 
     try:
         config = getConfig()
@@ -190,7 +190,7 @@ def get_article_summary(file_path: str) -> Tuple[str, bool]:
             file_path, max_words
         )
         summary, is_sufficient = summarize_with_openrouter(text)
-        logger.info(
+        logger.debug(
             f"Summary generated for {file_name}: is_sufficient={is_sufficient}, length={len(summary)} chars"
         )
 
@@ -303,7 +303,7 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
                 success, message, is_sufficient, summary = future.result()
                 if success:
                     if is_sufficient:
-                        logger.info(
+                        logger.debug(
                             f"Successfully summarized: {article_path} - {message}"
                         )
                         successful += 1
@@ -311,12 +311,9 @@ def summarize_articles(articles_path: Optional[str] = None, query: str = "*") ->
                         if word_count:
                             summary_word_counts.append(word_count)
                     else:
-                        logger.info(
-                            f"Insufficient text for: {article_path} - {message}"
-                        )
                         insufficient += 1
                 else:
-                    logger.info(f"Failed to summarize: {article_path} - {message}")
+                    logger.warning(f"Failed to summarize: {article_path} - {message}")
                     failed += 1
             except Exception as e:
                 logger.error(

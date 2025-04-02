@@ -71,7 +71,7 @@ def upload_file(upload_url, file_path):
     """
     logger.debug(f"Uploading file ({file_path}) to: {upload_url}")
     with open(file_path, "rb") as f:
-        response = requests.put(upload_url, data=f, timeout=60)
+        response = requests.put(upload_url, data=f, timeout=120)
     if response.status_code != 200:
         raise Exception(f"Failed to upload file. Status code: {response.status_code}")
     return True

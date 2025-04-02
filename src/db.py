@@ -168,9 +168,33 @@ def add_file_to_database(
     word_count: int = 0,
 ) -> int:
     with get_connection() as conn:
-        existing_article = get_article_by_hash(file_hash)
+        # Check for article with matching hash or file name
+        cursor = conn.execute(
+            """
+            SELECT id FROM article_summaries 
+            WHERE file_hash = ? OR file_name = ?
+            """,
+            (file_hash, file_name),
+        )
+        existing_article = cursor.fetchone()
+        
         if existing_article:
-            return existing_article["id"]
+            article_id = existing_article[0]
+            # Update the existing article with new data
+            conn.execute(
+                """
+                UPDATE article_summaries 
+                SET file_hash = ?, file_name = ?, file_format = ?, 
+                    summary = ?, extraction_method = ?, word_count = ?
+                WHERE id = ?
+                """,
+                (file_hash, file_name, file_format, summary, extraction_method, 
+                 word_count, article_id),
+            )
+            conn.commit()
+            return article_id
+        
+        # Insert new article if no match found
         cursor = conn.execute(
             """
             INSERT INTO article_summaries (file_hash, file_name, file_format, summary, extraction_method, word_count)
