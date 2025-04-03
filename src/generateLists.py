@@ -278,7 +278,7 @@ def _run_pdf_to_epub_conversion(pdf_path: Path, epub_path: Path) -> bool:
             )
             return False
     except Exception as e:
-        logger.error(f"Conversion failed for {pdf_path.name}: {e}", exc_info=False)
+        logger.exception(f"Conversion failed for {pdf_path.name}")
         return False
 
 
@@ -304,7 +304,7 @@ def _run_html_prefixing(html_path: Path, prefixed_path: Path, summary: str) -> b
         logger.info(f"Successfully prefixed {html_path.name} -> {prefixed_path.name}")
         return True
     except Exception as e:
-        logger.error(f"Failed prefixing {html_path.name}: {e}")
+        logger.exception(f"Failed prefixing {html_path.name}", exc_info=True)
         return False
 
 
@@ -353,20 +353,29 @@ def appendToLists():
             # convert pdf paths to epub paths
             convertedPaths = []
             article_dir = Path(config.get("articleFileFolder", "."))  # Base directory
-            epub_dir = article_dir / EPUB_SUBDIR
+            epub_dir = os.path.join(article_dir, EPUB_SUBDIR)
             for path in sorted_full_paths:
-                fileName = path.split(".")[0] + ".epub"
-                convertedPaths.append(epub_dir / fileName)
+                base_name = os.path.basename(str(path))
+                extension = os.path.splitext(base_name)[1]
+                if extension == ".pdf":
+                    fileName_stem = base_name.rsplit(".", 1)[0]
+                    fileName = fileName_stem + ".epub"
+                    filePath = os.path.join(epub_dir, fileName)
+                    convertedPaths.append(filePath)
+                else:
+                    convertedPaths.append(path)
 
             # Add the list of full path strings
+            # logger.info(f"Converted paths: {convertedPaths}")
             utils.addArticlesToList(listName, convertedPaths)
             logger.info(
                 f"List '{listName}': Populated with {len(convertedPaths)} article paths."
             )
 
-        except Exception as e:
-            logger.error(
-                f"Failed processing criteria or updating list '{listName}': {e}"
+        except Exception:
+            logger.exception(
+                f"Failed processing criteria or updating list '{listName}'",
+                stacklevel=1,
             )
 
 
@@ -399,7 +408,7 @@ def _schedule_tasks_and_update_existing(
         file_ext = source_path.suffix.lower()
 
         # Handle PDF: Check existing EPUB or schedule conversion
-        if file_ext == EPUB_EXT and epub_dir in source_path:
+        if file_ext == EPUB_EXT and epub_dir == source_path.parent:
             fileName = source_path.name
             target_epub_path = epub_dir / fileName
             src_pdf_path = article_dir / fileName.replace(EPUB_EXT, PDF_EXT)
@@ -451,8 +460,10 @@ def _process_pdf_futures(pdf_futures: dict, final_paths: List[Optional[Path]]):
                 )
                 # Original Path object remains in final_paths[original_index]
         except Exception as exc:
-            logger.error(
-                f"PDF conversion future raised an unexpected exception for {source_path.name}: {exc}"
+            logger.exception(
+                f"PDF conversion future raised an unexpected exception for {source_path.name}",
+                exc_info=True,
+                stacklevel=1,
             )
             # Keep original Path object on unexpected error
 
@@ -579,26 +590,27 @@ def modifyListFiles():
                 # Convert final Path objects back to strings, filtering Nones
                 updated_paths_str = [str(p) for p in final_paths if p is not None]
 
-                # Compare sets of strings to see if changes occurred
-                original_paths_set = set(
-                    valid_current_paths_str
-                )  # Use only the valid original paths for comparison
-                updated_paths_set = set(updated_paths_str)
+                # # Compare sets of strings to see if changes occurred
+                # original_paths_set = set(
+                #     valid_current_paths_str
+                # )  # Use only the valid original paths for comparison
+                # updated_paths_set = set(updated_paths_str)
 
-                if updated_paths_set != original_paths_set:
-                    logger.info(
-                        f"Updating list '{listName}' with {len(updated_paths_str)} processed paths."
-                    )
-                    utils.addArticlesToList(listName, updated_paths_str, overwrite=True)
-                else:
-                    logger.info(
-                        f"No effective changes required for list '{listName}' after processing."
-                    )
+                # if updated_paths_set != original_paths_set:
+                #     logger.info(
+                #         f"Updating list '{listName}' with {len(updated_paths_str)} processed paths."
+                #     )
+                #     logger.info(f"Updated paths: {updated_paths_str}")
+                #     utils.addArticlesToList(listName, updated_paths_str, overwrite=True)
+                # else:
+                #     logger.info(
+                #         f"No effective changes required for list '{listName}' after processing."
+                #     )
 
             except Exception:
                 logger.exception(
                     f"Failed processing modifications for list '{listName}'",
-                    stacklevel=2,
+                    stacklevel=1,
                 )
 
 

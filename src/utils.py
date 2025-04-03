@@ -560,14 +560,12 @@ def deleteListIfExists(listName):
         os.remove(listPath)
 
 
-def addArticlesToList(listName, articlePathsForList, overwrite=False):
+def addArticlesToList(listName, articlePathsForList):
     listPath = os.path.join(
         getConfig()["atVoiceFolderPath"], ".config", listName + ".rlst"
     )
     createListIfNotExists(listPath)
-    articleNamesInList = getArticlesFromList(listName)
-    articleNamesNoExtInList = [name.split(".")[0] for name in articleNamesInList]
-    # print(f"articleNamesInList: {articleNamesInList}\n\n\n")
+    articleNamesInList = [line.split("/")[-1] for line in getArticlesFromList(listName)]
     droidEbooksFolderPath = getConfig()["droidEbooksFolderPath"]
     articleFileFolder = getConfig()["articleFileFolder"]
     linesToAppend = []
@@ -575,9 +573,7 @@ def addArticlesToList(listName, articlePathsForList, overwrite=False):
         articleName = articlePath.split("/")[-1]
         relativeArticlePath = os.path.relpath(articlePath, articleFileFolder)
         droidArticlePath = os.path.join(droidEbooksFolderPath, relativeArticlePath)
-        if (
-            overwrite or articleName.split(".")[0] not in articleNamesNoExtInList
-        ):  # since some articles might have been converted
+        if articleName not in articleNamesInList:
             displayName = articleName.split(".")[0]
             linesToAppend.append(droidArticlePath + "\t" + displayName)
     newListText = "\n".join(linesToAppend) + "\n" if linesToAppend else ""
@@ -605,18 +601,26 @@ def addArticlesToList(listName, articlePathsForList, overwrite=False):
             # Simple format with no headers
             existingArticleListText = currentListText
 
-    # If overwrite is True, discard existing articles
-    combinedListText = (
-        headers + newListText + ("" if overwrite else existingArticleListText)
-    )
-    if len(linesToAppend) > 0 and not overwrite:
+    articleList = newListText + existingArticleListText
+    # remove duplicates from existingArticleListText, deleting articles at the top of the list first and while preserving the order
+    deDupedArticleListText = []
+    seen = set()
+    for line in articleList.split("\n"):
+        fileName = line.split("\t")[0].split("/")[-1].lower()
+        if fileName not in seen:
+            seen.add(fileName)
+            deDupedArticleListText.append(line)
+    articleList = "\n".join(deDupedArticleListText)
+
+    combinedListText = headers + articleList
+    if len(linesToAppend) > 0:
         print(
             "\n\n\n\nAdding the following articles to list: " + listName,
             "\n",
             newListText,
         )
 
-    if len(linesToAppend) > 0 or overwrite:
+    if len(linesToAppend) > 0:
         with open(listPath, "w") as f:
             f.write(combinedListText)
 

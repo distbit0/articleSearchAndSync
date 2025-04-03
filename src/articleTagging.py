@@ -96,18 +96,18 @@ class TagEvaluator:
         logger.debug(f"Evaluating article for a single tag using model: {self.model}")
 
         system_prompt = (
-            "Your task is to determine if the article text matches the provided description."
-            "Interpret the description literally. You MUST respond in valid JSON format only."
+            "Your task is to determine if the article summary matches the provided description."
+            "Interpret the description literally. You must respond in valid JSON format only."
         )
 
         # Simple JSON format with a single boolean response
         json_format_example = '{"matches": true or false}'
 
         user_prompt = (
-            f"Please analyze the following article text to determine if it matches the description provided below.\n\n"
-            f"Interpret the description literally.\n\nDescription: {tag_description}\n\n"
-            f"Text to evaluate:\n{text[:6000]}\n\n"
-            f"Based on the description, state if this text matches the description.\n\n"
+            f"Please analyze the following article summary to determine if it matches the description provided below. The purpose of this is to determine whether to add the article to a reading list which I want to only contain articles which match the below description.\n\n"
+            f"Interpret the reading list description literally. Only return true if it accurately describes the article summary.\n\nDescription: {tag_description}\n\n"
+            f"Article summary:\n{text[:6000]}\n\n"
+            f"Based on the description, state if this article summary satisfies the description.\n\n"
             f"Your response must be valid JSON in this exact format:\n{json_format_example}"
         )
 
@@ -133,7 +133,7 @@ class TagEvaluator:
                 logger.debug(f"Tag evaluation result: {match_result}")
 
                 if tag["id"] == 487 and match_result == True:
-                    print("\n\n\n", user_prompt, results)
+                    logger.info("\n\n\n", user_prompt, results)
 
                 return results
             except json.JSONDecodeError as e:

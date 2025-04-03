@@ -69,11 +69,15 @@
     ],
     "article_tags": {
         "infofi": {
-            "description": "About any of the following: 1) prediction markets; 2) futarchy; 3) marketplaces for intelligence; 4) ideas about how to use ai or finance to elicit knowledge and improve human decisions or discover truth",
+            "description": "about prediction markets or futarchy or about marketplaces for intelligence or about incentive mechanisms to elicit information to improve decision making and information quality",
             "use_summary": true
         },
         "impLossAndLVR": {
             "description": "About AMM/DEX impermanent loss, loss versus rebalancing (LVR) and potential mitigations",
+            "use_summary": true
+        },
+        "austrian economics": {
+            "description": "About austrian economics",
             "use_summary": true
         }
     },

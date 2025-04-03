@@ -142,7 +142,7 @@ def deleteFilesMarkedToDelete():
     markedAsDeletedFiles = utils.getArticlesFromList("_DELETE")
     articleFileFolder = getConfig()["articleFileFolder"]
     for fileName in markedAsDeletedFiles:
-        utils.delete_files_with_name(articleFileFolder, fileName)
+        utils.delete_file_with_name(fileName, articleFileFolder)
     utils.deleteAllArticlesInList("_DELETE")
 
 
