@@ -104,7 +104,7 @@ class TagEvaluator:
         json_format_example = '{"matches": true or false}'
 
         user_prompt = (
-            f"Please analyze the following article summary to determine if it matches the description provided below. The purpose of this is to determine whether to add the article to a reading list which I want to only contain articles which match the below description.\n\n"
+            f"Please analyze the following article summary to determine if it matches the description provided below. The purpose is to decide whether to add the article to a reading list which should only contain articles which match the description.\n\n"
             f"Interpret the reading list description literally. Only return true if it accurately describes the article summary.\n\nDescription: {tag_description}\n\n"
             f"Article summary:\n{text[:6000]}\n\n"
             f"Based on the description, state if this article summary satisfies the description.\n\n"

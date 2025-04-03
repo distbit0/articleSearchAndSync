@@ -227,7 +227,7 @@ def _run_pandoc_conversion(extracted_dir: Path, epub_path: Path):
             logger.error(err_log)
             raise ChildProcessError(err_log)
         if result.stderr:
-            logger.warning(
+            logger.debug(
                 f"Pandoc stderr (warnings) for {epub_path.name}: {result.stderr.strip()}"
             )
         logger.debug(f"Pandoc conversion successful for {epub_path.name}")
