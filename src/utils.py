@@ -578,6 +578,7 @@ def addArticlesToList(listName, articlePathsForList):
         droidArticlePath = os.path.join(droidEbooksFolderPath, relativeArticlePath)
         if articleName not in articleNamesInList:
             displayName = articleName.split(".")[0]
+            # print(f"Adding {articleName} to list {listName}")
             linesToAppend.append(droidArticlePath + "\t" + displayName)
     newListText = "\n".join(linesToAppend) + "\n" if linesToAppend else ""
 

@@ -478,6 +478,23 @@ def get_tags_for_article(article_id: int) -> List[int]:
         return [row[0] for row in cursor.fetchall()]
 
 
+def get_all_article_tags() -> List[Tuple[int, str, int]]:
+    """Get all article tags with their associated file names.
+    
+    Returns:
+        List of tuples containing (article_id, file_name, tag_id)
+    """
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """
+            SELECT at.article_id, a.file_name, at.tag_id 
+            FROM article_tags at
+            JOIN article_summaries a ON at.article_id = a.id
+            """
+        )
+        return cursor.fetchall()
+
+
 def get_all_tag_details() -> Dict[int, Dict[str, Any]]:
     with get_connection() as conn:
         cursor = conn.execute(

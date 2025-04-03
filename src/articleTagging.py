@@ -192,6 +192,8 @@ class ArticleTagger:
         self.tag_evaluator = TagEvaluator()
         self.tag_article_match_cache = {}
         self.tag_details_cache = {}
+        # Cache that tracks which articles have already been tagged with which tags
+        self.article_tagged_cache = {}
         self._cache_tag_search_results()
 
     def _get_active_tag_ids(self) -> Set[int]:
@@ -210,7 +212,15 @@ class ArticleTagger:
     def _get_tags_for_article(self, file_name: str, active_tag_ids: Set[int]) -> List:
         """Get tags that need to be evaluated for an article."""
         tags_to_evaluate = []
+
+        # Get the set of tag IDs already applied to this article (empty set if none)
+        article_existing_tags = self.article_tagged_cache.get(file_name, set())
+
         for tag_id in active_tag_ids:
+            # Skip tags that have already been applied to this article
+            if tag_id in article_existing_tags:
+                continue
+
             if tag_id in self.tag_details_cache:
                 tag = self.tag_details_cache[tag_id]
                 matchingArticles = self.tag_article_match_cache.get(tag_id)
@@ -230,6 +240,16 @@ class ArticleTagger:
     def _cache_tag_search_results(self) -> None:
         """Cache tag search criteria for tags that have filtering (any/and/not)."""
         self.tag_details_cache = db.get_all_tag_details()
+
+        # Populate the article_tagged_cache with data about which articles have already been tagged
+        # This will be used to avoid re-evaluating tags that have already been applied
+        articles_with_tags = db.get_all_article_tags()
+        for article_id, file_name, tag_id in articles_with_tags:
+            if file_name not in self.article_tagged_cache:
+                self.article_tagged_cache[file_name] = set()
+            self.article_tagged_cache[file_name].add(tag_id)
+
+        # Cache for tag filtering logic
         for tag in self.tag_details_cache.values():
             if tag["any_tags"] or tag["and_tags"] or tag["not_any_tags"]:
                 articlesMatchingTag = db.searchArticlesByTags(

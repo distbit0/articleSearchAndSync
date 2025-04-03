@@ -365,10 +365,9 @@ def appendToLists():
                     convertedPaths.append(path)
 
             # Add the list of full path strings
-            # logger.info(f"Converted paths: {convertedPaths}")
             utils.addArticlesToList(listName, convertedPaths)
             logger.info(
-                f"List '{listName}': Populated with {len(convertedPaths)} article paths."
+                f"List '{listName}': Populated with {len(convertedPaths)} article paths"  # {convertedPaths}"
             )
 
         except Exception:
