@@ -93,6 +93,12 @@
             "any_tags": [
                 "impLossAndLVR"
             ]
+        },
+        "econ": {
+            "all_tags": [],
+            "any_tags": [
+                "austrian economics"
+            ]
         }
     }
 }
