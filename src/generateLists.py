@@ -32,8 +32,7 @@ MINERU_HEADERS = {
 }
 POLL_RETRIES = 25
 POLL_INTERVAL = 12
-REQ_TIMEOUT_S = 15
-REQ_TIMEOUT_M = 120
+REQ_TIMEOUT_S = 30
 REQ_TIMEOUT_L = 300
 EPUB_SUBDIR = "epubArticles"
 PREFIXED_SUBDIR = "prefixedArticles"
@@ -55,7 +54,7 @@ PANDOC_CMD = [
     "--split-level=1",
     "--epub-title-page=false",
 ]
-MAX_CONVERSION_WORKERS = 5  # Default, can be overridden by config
+MAX_CONVERSION_WORKERS = 6  # Default, can be overridden by config
 
 
 # --- Helper: Mineru API Request --- (Same as before)
@@ -67,7 +66,7 @@ def _mineru_request(
     # Ensure standard Mineru headers are used unless explicitly overridden
     headers = kwargs.pop("headers", MINERU_HEADERS)
     try:
-        kwargs.setdefault("timeout", REQ_TIMEOUT_M)
+        kwargs.setdefault("timeout", REQ_TIMEOUT_S)
         response = requests.request(method, url, headers=headers, **kwargs)
         response.raise_for_status()
         # Check for Mineru specific API errors in JSON response (if applicable)
