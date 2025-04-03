@@ -451,9 +451,10 @@ def main():
     remove_nonexistent_files_from_database()
     logger.info("remove orphaned tags from database")
     remove_orphaned_tags_from_database()
-    logger.info("download new articles")
+    logger.info("calc new urls to add")
     urlsToAdd = calcUrlsToAdd()
     urlsToAdd = urlsToAdd["AlreadyRead"] + urlsToAdd["UnRead"]
+    logger.info("download new articles")
     downloadNewArticles(urlsToAdd)
     logger.info("give files readable filenames")
     reTitlePDFs.retitleAllPDFs()

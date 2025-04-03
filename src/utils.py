@@ -48,10 +48,12 @@ def handle_cache(file_name, key, value=None):
 def delete_file_with_name(file_name, folder):
     # Find all files with the file name in the folder using our enhanced function
     # Delete all found files
+    # print(f"Deleting {file_name} from {folder}")
     notFound = True
     possibleExts = ["pdf", "epub"]
-    currentExt = file_name.split(".")[1]
+    currentExt = file_name.split(".")[-1]
     possibleExts.append(currentExt)
+    file_name = os.path.basename(file_name)
     for ext in possibleExts:
         try:
             fileName = file_name.split(".")[0] + "." + ext
@@ -72,7 +74,8 @@ def delete_file_with_name(file_name, folder):
 
 def hide_file_with_name(orgFileName, folder):
     possibleExts = ["pdf", "epub"]
-    currentExt = orgFileName.split(".")[1]
+    currentExt = orgFileName.split(".")[-1]
+    orgFileName = os.path.basename(orgFileName)
     possibleExts.append(currentExt)
     notFound = True
     for ext in possibleExts:
@@ -615,9 +618,10 @@ def addArticlesToList(listName, articlePathsForList):
     combinedListText = headers + articleList
     if len(linesToAppend) > 0:
         print(
-            "\n\n\n\nAdding the following articles to list: " + listName,
-            "\n",
-            newListText,
+            "\n\n\n\nAdding the following articles to list: "
+            + listName
+            + "\n"
+            + newListText
         )
 
     if len(linesToAppend) > 0:
