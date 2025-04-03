@@ -303,7 +303,7 @@ def _run_html_prefixing(html_path: Path, prefixed_path: Path, summary: str) -> b
         logger.info(f"Successfully prefixed {html_path.name} -> {prefixed_path.name}")
         return True
     except Exception as e:
-        logger.exception(f"Failed prefixing {html_path.name}", exc_info=True)
+        logger.exception(f"Failed prefixing {html_path.name}")
         return False
 
 
@@ -374,7 +374,6 @@ def appendToLists():
         except Exception:
             logger.exception(
                 f"Failed processing criteria or updating list '{listName}'",
-                stacklevel=1,
             )
 
 
@@ -461,8 +460,6 @@ def _process_pdf_futures(pdf_futures: dict, final_paths: List[Optional[Path]]):
         except Exception as exc:
             logger.exception(
                 f"PDF conversion future raised an unexpected exception for {source_path.name}",
-                exc_info=True,
-                stacklevel=1,
             )
             # Keep original Path object on unexpected error
 
@@ -609,7 +606,6 @@ def modifyListFiles():
             except Exception:
                 logger.exception(
                     f"Failed processing modifications for list '{listName}'",
-                    stacklevel=1,
                 )
 
 

@@ -69,15 +69,11 @@
     ],
     "article_tags": {
         "infofi": {
-            "description": "about prediction markets or futarchy or about marketplaces for intelligence or about incentive mechanisms to elicit information to improve decision making and information quality",
+            "description": "about prediction markets or futarchy or about intelligence marketplaces or about information elicitation incentive mechanisms to improve decision making or improve information quality",
             "use_summary": true
         },
         "impLossAndLVR": {
             "description": "About AMM/DEX impermanent loss, loss versus rebalancing (LVR) and potential mitigations",
-            "use_summary": true
-        },
-        "austrian economics": {
-            "description": "About austrian economics",
             "use_summary": true
         }
     },
