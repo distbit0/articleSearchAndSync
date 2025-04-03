@@ -351,7 +351,7 @@ def appendToLists():
                 )
             # convert pdf paths to epub paths
             convertedPaths = []
-            article_dir = Path(config.get("articleFileFolder", "."))  # Base directory
+            article_dir = Path(config.get("articleFileFolder", "."))
             epub_dir = os.path.join(article_dir, EPUB_SUBDIR)
             for path in sorted_full_paths:
                 base_name = os.path.basename(str(path))

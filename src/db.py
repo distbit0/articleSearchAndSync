@@ -177,7 +177,7 @@ def add_file_to_database(
             (file_hash, file_name),
         )
         existing_article = cursor.fetchone()
-        
+
         if existing_article:
             article_id = existing_article[0]
             # Update the existing article with new data
@@ -188,12 +188,19 @@ def add_file_to_database(
                     summary = ?, extraction_method = ?, word_count = ?
                 WHERE id = ?
                 """,
-                (file_hash, file_name, file_format, summary, extraction_method, 
-                 word_count, article_id),
+                (
+                    file_hash,
+                    file_name,
+                    file_format,
+                    summary,
+                    extraction_method,
+                    word_count,
+                    article_id,
+                ),
             )
             conn.commit()
             return article_id
-        
+
         # Insert new article if no match found
         cursor = conn.execute(
             """
@@ -261,7 +268,7 @@ def remove_duplicate_file_entries() -> int:
     """
     Finds entries in the summaries table with the same file name and deletes duplicates.
     Keeps the most recently created entry for each duplicate file name.
-    
+
     Returns:
         int: Number of duplicate entries removed
     """
@@ -277,10 +284,10 @@ def remove_duplicate_file_entries() -> int:
             """
         )
         duplicate_files = cursor.fetchall()
-        
+
         for file_name, count in duplicate_files:
             logger.info(f"Found {count} entries for file '{file_name}'")
-            
+
             # Get all records for this file name, ordered by created_at timestamp (newest first)
             cursor = conn.execute(
                 """
@@ -289,34 +296,32 @@ def remove_duplicate_file_entries() -> int:
                 WHERE file_name = ?
                 ORDER BY created_at DESC
                 """,
-                (file_name,)
+                (file_name,),
             )
             entries = cursor.fetchall()
-            
+
             # Keep the first (newest) entry and delete the rest
             keep_id = entries[0][0]
             keep_hash = entries[0][1]
-            
+
             # Delete all other entries for this file name
             for entry_id, entry_hash, _ in entries[1:]:
-                logger.info(f"Removing duplicate entry: id={entry_id}, file_hash={entry_hash}")
-                
+                logger.info(
+                    f"Removing duplicate entry: id={entry_id}, file_hash={entry_hash}"
+                )
+
                 # First delete related records in article_tags table
                 conn.execute(
-                    "DELETE FROM article_tags WHERE article_id = ?",
-                    (entry_id,)
+                    "DELETE FROM article_tags WHERE article_id = ?", (entry_id,)
                 )
-                
+
                 # Then delete the article summary entry
-                conn.execute(
-                    "DELETE FROM article_summaries WHERE id = ?",
-                    (entry_id,)
-                )
-                
+                conn.execute("DELETE FROM article_summaries WHERE id = ?", (entry_id,))
+
                 removed_count += 1
-        
+
         conn.commit()
-    
+
     logger.info(f"Removed {removed_count} duplicate entries from the database")
     return removed_count
 
@@ -540,17 +545,38 @@ def get_articles_not_matching_tag(tag_name: str) -> List[str]:
 def get_articles_needing_tagging(
     max_articles: Optional[int] = None,
 ) -> List[Tuple[int, str, str, str]]:
-    query = """
-        SELECT a.id, a.file_hash, a.file_name, a.summary 
-        FROM article_summaries a
-        WHERE NOT EXISTS (SELECT 1 FROM article_tags WHERE article_id = a.id)
-        AND a.summary IS NOT NULL AND a.summary != ''
-        ORDER BY RANDOM()
-    """
+    # Get all active tags
+    all_tags = get_all_tag_details()
+
+    # If there are no tags, use the original approach
+    if not all_tags:
+        query = """
+            SELECT a.id, a.file_hash, a.file_name, a.summary 
+            FROM article_summaries a
+            WHERE NOT EXISTS (SELECT 1 FROM article_tags WHERE article_id = a.id)
+            AND a.summary IS NOT NULL AND a.summary != ''
+            ORDER BY RANDOM()
+        """
+    else:
+        # Count how many tags each article has and compare to the total number of tags
+        query = """
+            SELECT a.id, a.file_hash, a.file_name, a.summary 
+            FROM article_summaries a
+            WHERE a.summary IS NOT NULL AND a.summary != ''
+            AND (
+                (SELECT COUNT(DISTINCT tag_id) FROM article_tags WHERE article_id = a.id) < ?
+            )
+            ORDER BY RANDOM()
+        """
+
     if max_articles:
         query += f" LIMIT {max_articles}"
+
     with get_connection() as conn:
-        cursor = conn.execute(query)
+        if all_tags:
+            cursor = conn.execute(query, (len(all_tags),))
+        else:
+            cursor = conn.execute(query)
         return cursor.fetchall()
 
 
