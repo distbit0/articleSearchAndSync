@@ -59,7 +59,7 @@ def delete_file_with_name(file_name, folder):
             fileName = file_name.split(".")[0] + "." + ext
             matching_file = os.path.join(folder, fileName)
             homeDir = os.path.expanduser("~")
-            dest = os.path.join(homeDir, ".local/share/Trash/files/", file_name)
+            dest = os.path.join(homeDir, ".local/share/Trash/files/", fileName)
             if os.path.exists(matching_file):
                 shutil.move(matching_file, dest)
                 print(f"Deleted {matching_file}")
