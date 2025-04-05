@@ -143,7 +143,9 @@ def markArticlesWithUrlsAsRead(readUrls, articleFolder):
     for url in readUrls:
         if url in articleUrls:
             try:
-                hideFile(articleUrls[url].split("/")[-1])
+                hide_file_with_name(
+                    articleUrls[url].split("/")[-1], getConfig()["articleFileFolder"]
+                )
             except OSError:
                 print(f"Error hiding {articleUrls[url]}")
         addUrlToUrlFile(url, getAbsPath("./../storage/markedAsReadArticles.txt"))
