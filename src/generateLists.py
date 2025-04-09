@@ -177,7 +177,9 @@ def _mineru_poll_for_zip_url(batch_id: str, filename: str) -> str:
                     raise ValueError(
                         f"Missing full_zip_url in 'done' state for batch {batch_id}"
                     )
-                logger.info(f"Mineru processing finished for batch {batch_id}")
+                logger.info(
+                    f"Mineru processing finished for batch ({filename}) {full_zip_url}"
+                )
                 return full_zip_url
             elif state == "failed":
                 err_msg = extract_result.get("err_msg", "Unknown failure")
