@@ -207,8 +207,68 @@ class ArticleTagger:
         return active_tag_ids
 
     def _get_articles_needing_tagging(self) -> List[Tuple[int, str, str, str]]:
-        """Get articles that need tagging."""
-        return db.get_articles_needing_tagging(self.max_articles_per_session)
+        """
+        Get articles that need tagging and are eligible to be tagged with at least one active tag.
+        This method ensures we get enough eligible articles up to max_articles_per_session.
+        """
+        # Get active tag IDs first
+        active_tag_ids = self._get_active_tag_ids()
+        
+        # Initialize variables for article collection
+        collected_articles = []
+        current_limit = self.max_articles_per_session
+        
+        # Keep fetching articles until we have enough taggable ones or no more are available
+        while len(collected_articles) < self.max_articles_per_session:
+            # Get a batch of articles from the database
+            batch_articles = db.get_articles_needing_tagging(current_limit)
+            
+            # If no more articles are available, break the loop
+            if not batch_articles:
+                break
+                
+            # Filter articles that are taggable with at least one active tag
+            for article in batch_articles:
+                article_id, file_hash, file_name, text = article
+                
+                # Skip articles we've already collected
+                if any(a[0] == article_id for a in collected_articles):
+                    continue
+                
+                # Check if this article can be tagged with at least one active tag
+                is_taggable = False
+                for tag_id in active_tag_ids:
+                    # Skip checking tags already applied to this article
+                    article_existing_tags = self.article_tagged_cache.get(file_name, set())
+                    if tag_id in article_existing_tags:
+                        continue
+                        
+                    # Check if tag is applicable to this article based on filename filtering
+                    if tag_id in self.tag_details_cache:
+                        matchingArticles = self.tag_article_match_cache.get(tag_id)
+                        if matchingArticles is None or file_name.lower() in matchingArticles:
+                            # This article can be tagged with at least one tag
+                            is_taggable = True
+                            break
+                
+                # If this article is taggable, add it to our collection
+                if is_taggable:
+                    collected_articles.append(article)
+                    
+                # If we've collected enough articles, stop processing this batch
+                if len(collected_articles) >= self.max_articles_per_session:
+                    break
+            
+            # If we've processed all available articles and still need more,
+            # increase the limit for the next fetch
+            if len(collected_articles) < self.max_articles_per_session and len(batch_articles) < current_limit:
+                # No more articles available
+                break
+            
+            # Increase the limit for the next fetch
+            current_limit *= 2
+        
+        return collected_articles
 
     def _get_tags_for_article(self, file_name: str, active_tag_ids: Set[int]) -> List:
         """Get tags that need to be evaluated for an article."""
@@ -226,17 +286,17 @@ class ArticleTagger:
                 tag = self.tag_details_cache[tag_id]
                 matchingArticles = self.tag_article_match_cache.get(tag_id)
                 if (
-                    matchingArticles is None or file_name in matchingArticles
+                    matchingArticles is None or file_name.lower() in matchingArticles
                 ):  # if tag not in dict, tag has no filters
                     tags_to_evaluate.append(tag)
         return tags_to_evaluate
 
-    def _get_tag_criteria_cache_key(self, any_tags, and_tags, not_any_tags) -> str:
+    def _get_tag_criteria_cache_key(self, any_tags, all_tags, not_any_tags) -> str:
         """Create a cache key for tag search criteria."""
         any_tags_str = "|".join(sorted(any_tags)) if any_tags else ""
-        and_tags_str = "|".join(sorted(and_tags)) if and_tags else ""
+        all_tags_str = "|".join(sorted(all_tags)) if all_tags else ""
         not_any_tags_str = "|".join(sorted(not_any_tags)) if not_any_tags else ""
-        return f"{any_tags_str}#{and_tags_str}#{not_any_tags_str}"
+        return f"{any_tags_str}#{all_tags_str}#{not_any_tags_str}"
 
     def _cache_tag_search_results(self) -> None:
         """Cache tag search criteria for tags that have filtering (any/and/not)."""
@@ -252,13 +312,14 @@ class ArticleTagger:
 
         # Cache for tag filtering logic
         for tag in self.tag_details_cache.values():
-            if tag["any_tags"] or tag["and_tags"] or tag["not_any_tags"]:
+            if tag["any_tags"] or tag["all_tags"] or tag["not_any_tags"]:
                 articlesMatchingTag = db.searchArticlesByTags(
-                    any_tags=tag["any_tags"],
-                    and_tags=tag["and_tags"],
-                    not_any_tags=tag["not_any_tags"],
+                    any_tags=tag.get("any_tags"),
+                    all_tags=tag.get("all_tags"),
+                    not_any_tags=tag.get("not_any_tags"),
                 )
-                self.tag_article_match_cache[tag["id"]] = articlesMatchingTag
+                logger.info("Tag", tag["name"], "has", len(articlesMatchingTag), "potential articles")
+                self.tag_article_match_cache[tag["id"]] = [os.path.basename(fileName).lower() for fileName in articlesMatchingTag]
 
     def _prepare_article_work_units(
         self, article: Tuple[int, str, str, str], active_tag_ids: Set[int]

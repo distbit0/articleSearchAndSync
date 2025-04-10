@@ -5,7 +5,7 @@
     "backupFolderPath": "/home/pimania/miscSyncs/ebooksBackup/",
     "convertLinksDir": "/home/pimania/dev/convertLinks",
     "maxSummariesPerSession": 300,
-    "maxArticlesToTagPerSession": 1200,
+    "maxArticlesToTagPerSession": 2000,
     "droidEbooksFolderPath": "/storage/emulated/0/ebooks/",
     "summary_in_max_words": 8000,
     "enable_article_summarization": true,
@@ -74,6 +74,11 @@
         },
         "impLossAndLVR": {
             "description": "About AMM/DEX impermanent loss, loss versus rebalancing (LVR) and potential mitigations",
+            "use_summary": true
+        },
+        "futarchy": {
+            "any_tags": ["infofi"],
+            "description": "About futarchy or decision markets",
             "use_summary": true
         }
     },

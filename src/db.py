@@ -43,7 +43,7 @@ def setup_database() -> str:
                 description TEXT,
                 use_summary BOOLEAN,
                 any_tags TEXT,
-                and_tags TEXT,
+                all_tags TEXT,
                 not_any_tags TEXT,
                 last_updated TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
@@ -333,13 +333,13 @@ def get_tag_property_hash(
     description: str,
     use_summary: bool,
     any_tags: List[str] = None,
-    and_tags: List[str] = None,
+    all_tags: List[str] = None,
     not_any_tags: List[str] = None,
 ) -> str:
     any_tags = any_tags or []
-    and_tags = and_tags or []
+    all_tags = all_tags or []
     not_any_tags = not_any_tags or []
-    property_string = f"{description}|{use_summary}|{'|'.join(sorted(any_tags))}|{'|'.join(sorted(and_tags))}|{'|'.join(sorted(not_any_tags))}"
+    property_string = f"{description}|{use_summary}|{'|'.join(sorted(any_tags))}|{'|'.join(sorted(all_tags))}|{'|'.join(sorted(not_any_tags))}"
     return hashlib.md5(property_string.encode()).hexdigest()
 
 
@@ -353,12 +353,12 @@ def sync_tags_from_config(config: Dict[str, Any]) -> None:
         cursor = conn.cursor()
         cursor.execute("PRAGMA table_info(tags)")
         columns = {row[1] for row in cursor.fetchall()}
-        for col in ("any_tags", "and_tags", "not_any_tags"):
+        for col in ("any_tags", "all_tags", "not_any_tags"):
             if col not in columns:
                 cursor.execute(f"ALTER TABLE tags ADD COLUMN {col} TEXT")
 
         cursor.execute(
-            "SELECT id, name, description, use_summary, any_tags, and_tags, not_any_tags FROM tags"
+            "SELECT id, name, description, use_summary, any_tags, all_tags, not_any_tags FROM tags"
         )
         existing_tags = {
             row[1]: {
@@ -366,7 +366,7 @@ def sync_tags_from_config(config: Dict[str, Any]) -> None:
                 "description": row[2],
                 "use_summary": bool(row[3]),
                 "any_tags": json.loads(row[4]) if row[4] else [],
-                "and_tags": json.loads(row[5]) if row[5] else [],
+                "all_tags": json.loads(row[5]) if row[5] else [],
                 "not_any_tags": json.loads(row[6]) if row[6] else [],
             }
             for row in cursor.fetchall()
@@ -387,24 +387,24 @@ def sync_tags_from_config(config: Dict[str, Any]) -> None:
             description = tag_data.get("description", "")
             use_summary = tag_data.get("use_summary", True)
             any_tags = tag_data.get("any_tags", [])
-            and_tags = tag_data.get("and_tags", [])
+            all_tags = tag_data.get("all_tags", [])
             not_any_tags = tag_data.get("not_any_tags", [])
             new_hash = get_tag_property_hash(
-                description, use_summary, any_tags, and_tags, not_any_tags
+                description, use_summary, any_tags, all_tags, not_any_tags
             )
             if tag_name in existing_tags:
                 tag_id = existing_tags[tag_name]["id"]
                 if property_hashes.get(tag_id) != new_hash:
                     cursor.execute(
                         """
-                        UPDATE tags SET description = ?, use_summary = ?, any_tags = ?, and_tags = ?, not_any_tags = ?, last_updated = CURRENT_TIMESTAMP
+                        UPDATE tags SET description = ?, use_summary = ?, any_tags = ?, all_tags = ?, not_any_tags = ?, last_updated = CURRENT_TIMESTAMP
                         WHERE id = ?
                         """,
                         (
                             description,
                             use_summary,
                             json.dumps(any_tags) if any_tags else None,
-                            json.dumps(and_tags) if and_tags else None,
+                            json.dumps(all_tags) if all_tags else None,
                             json.dumps(not_any_tags) if not_any_tags else None,
                             tag_id,
                         ),
@@ -428,7 +428,7 @@ def sync_tags_from_config(config: Dict[str, Any]) -> None:
             else:
                 cursor.execute(
                     """
-                    INSERT INTO tags (name, description, use_summary, any_tags, and_tags, not_any_tags)
+                    INSERT INTO tags (name, description, use_summary, any_tags, all_tags, not_any_tags)
                     VALUES (?, ?, ?, ?, ?, ?)
                     """,
                     (
@@ -436,7 +436,7 @@ def sync_tags_from_config(config: Dict[str, Any]) -> None:
                         description,
                         use_summary,
                         json.dumps(any_tags) if any_tags else None,
-                        json.dumps(and_tags) if and_tags else None,
+                        json.dumps(all_tags) if all_tags else None,
                         json.dumps(not_any_tags) if not_any_tags else None,
                     ),
                 )
@@ -498,7 +498,7 @@ def get_all_article_tags() -> List[Tuple[int, str, int]]:
 def get_all_tag_details() -> Dict[int, Dict[str, Any]]:
     with get_connection() as conn:
         cursor = conn.execute(
-            "SELECT id, name, description, use_summary, any_tags, and_tags, not_any_tags FROM tags"
+            "SELECT id, name, description, use_summary, any_tags, all_tags, not_any_tags FROM tags"
         )
         return {
             row[0]: {
@@ -507,7 +507,7 @@ def get_all_tag_details() -> Dict[int, Dict[str, Any]]:
                 "description": row[2],
                 "use_summary": bool(row[3]),
                 "any_tags": json.loads(row[4]) if row[4] else [],
-                "and_tags": json.loads(row[5]) if row[5] else [],
+                "all_tags": json.loads(row[5]) if row[5] else [],
                 "not_any_tags": json.loads(row[6]) if row[6] else [],
             }
             for row in cursor.fetchall()
