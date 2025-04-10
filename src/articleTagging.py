@@ -12,6 +12,7 @@ from openai import OpenAI
 from .utils import getConfig
 from . import db
 from . import textExtraction
+from . import utils
 
 # Constants
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -424,13 +425,66 @@ def analyze_tag_results(tag_name: str) -> None:
         return
     matching_articles = db.get_articles_by_tag(tag_name)
     non_matching_articles = db.get_articles_not_matching_tag(tag_name)
-    report = f"# Tag Analysis: {tag_name}\n\n"
-    report += f"## Matching Articles ({len(matching_articles)})\n\n"
+    
+    # Separate matching articles into URLs and non-URLs
+    matching_urls = []
+    matching_files = []
+    
     for file_name in matching_articles:
-        report += f"- {file_name}\n"
-    report += f"\n## Non-Matching Articles ({len(non_matching_articles)})\n\n"
+        filePath = os.path.join(getConfig()["articleFileFolder"], file_name)
+        # For HTML and MHTML files, try to get the URL
+        if file_name.lower().endswith(('.html', '.mhtml')) and os.path.exists(filePath):
+            url = utils.getUrlOfArticle(filePath)
+            if url:  # Only use URL if one was found
+                matching_urls.append(url)
+                continue
+        # If no URL found or not an HTML/MHTML file, add to files list
+        matching_files.append(file_name)
+    
+    # Separate non-matching articles into URLs and non-URLs
+    non_matching_urls = []
+    non_matching_files = []
+    
     for file_name in non_matching_articles:
+        filePath = os.path.join(getConfig()["articleFileFolder"], file_name)
+        # For HTML and MHTML files, try to get the URL
+        if file_name.lower().endswith(('.html', '.mhtml')) and os.path.exists(filePath):
+            url = utils.getUrlOfArticle(filePath)
+            if url:  # Only use URL if one was found
+                non_matching_urls.append(url)
+                continue
+        # If no URL found or not an HTML/MHTML file, add to files list
+        non_matching_files.append(file_name)
+    
+    # Create the report with separate sections
+    report = f"# Tag Analysis: {tag_name}\n\n"
+    
+    # Matching Articles section
+    report += f"## Matching Articles ({len(matching_articles)})\n\n"
+    
+    # URLs subsection
+    report += f"### URLs ({len(matching_urls)})\n\n"
+    for url in matching_urls:
+        report += f"- {url}\n"
+    
+    # Files subsection
+    report += f"\n### Files ({len(matching_files)})\n\n"
+    for file_name in matching_files:
         report += f"- {file_name}\n"
+    
+    # Non-Matching Articles section
+    report += f"\n## Non-Matching Articles ({len(non_matching_articles)})\n\n"
+    
+    # URLs subsection
+    report += f"### URLs ({len(non_matching_urls)})\n\n"
+    for url in non_matching_urls:
+        report += f"- {url}\n"
+    
+    # Files subsection
+    report += f"\n### Files ({len(non_matching_files)})\n\n"
+    for file_name in non_matching_files:
+        report += f"- {file_name}\n"
+    
     report_path = os.path.join(
         os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
         "storage",

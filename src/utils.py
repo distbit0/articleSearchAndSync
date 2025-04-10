@@ -80,7 +80,7 @@ def hide_file_with_name(orgFileName, folder):
     notFound = True
     for ext in possibleExts:
         try:
-            fileName = orgFileName.split(".")[0] + "." + ext
+            fileName = ".".join(orgFileName.split(".")[:-1]) + "." + ext
             matching_file = os.path.join(folder, fileName)
             if os.path.exists(matching_file):
                 hiddenFileName = "." + fileName
@@ -380,10 +380,15 @@ def getArticlesFromList(listName):
     # -------------------------------------------------------
     conflict_files = []
     if listName.startswith("_"):
+        print("looking for sync conflict files")
         baseName = os.path.basename(listPath)
+        extension = os.path.splitext(baseName)[1]
+        fileName = os.path.splitext(baseName)[0]
         dirName = os.path.dirname(listPath)
-        pattern = baseName + ".sync-conflict-*"
-        conflict_files = glob.glob(os.path.join(dirName, pattern))
+        pattern = fileName + ".sync-conflict-*" + extension
+        path = os.path.join(dirName, pattern)
+        print(f"Checking for conflict files in: {path}")
+        conflict_files = glob.glob(path)
 
     # -------------------------------------------------------
     # 3. Merge conflict articles (excluding their headers)

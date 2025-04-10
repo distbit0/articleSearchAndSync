@@ -152,10 +152,13 @@ def hideArticlesMarkedAsRead():
     for fileName in markedAsReadFiles:
         newPath = utils.hide_file_with_name(fileName, articleFileFolder)
         if newPath:
-            utils.addUrlToUrlFile(
-                utils.getUrlOfArticle(newPath),
-                utils.getAbsPath("../storage/markedAsReadArticles.txt"),
-            )
+            try:    
+                utils.addUrlToUrlFile(
+                    utils.getUrlOfArticle(newPath),
+                    utils.getAbsPath("../storage/markedAsReadArticles.txt"),
+                )
+            except FileNotFoundError:
+                logger.error(f"Failed to mark {fileName} as read")
     utils.deleteAllArticlesInList("_READ")
 
 
