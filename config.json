@@ -10,7 +10,7 @@
     "summary_in_max_words": 8000,
     "enable_article_summarization": true,
     "tag_batch_size": 1,
-    "llm_api_batch_size": 15,
+    "llm_api_batch_size": 35,
     "ai_model": "google/gemini-2.0-flash-001",
     "fileNamesToSkip": [
         "fileNamesAndHashes.txt",
@@ -84,6 +84,10 @@
         "epistech": {
             "description": "about using technology to improve epistemics, decision making, knowledge acquisition, truth discovery etc. e.g. via knowledge graphs, incentives or any other mechanism",
             "use_summary": true
+        },
+        "instofailures": {
+            "description": "about any major failure/error/misallocation which could have been easily avoided with the right information which was available at the time",
+            "use_summary": true
         }
     },
     "listToTagMappings": {
@@ -103,6 +107,12 @@
             "all_tags": [],
             "any_tags": [
                 "epistech"
+            ]
+        },
+        "instofailures": {
+            "all_tags": [],
+            "any_tags": [
+                "instofailures"
             ]
         }
     }
