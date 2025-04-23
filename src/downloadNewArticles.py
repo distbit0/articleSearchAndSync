@@ -53,6 +53,13 @@ def downloadNewArticles(urlsToAdd):
 
 
 def save_webpage_as_mhtml(url, timeout=10, min_load_time=5):
+    try:
+        resp = requests.get(url, verify=False, timeout=timeout)
+    except requests.exceptions.RequestException as e:
+        raise Exception(f"Failed to fetch {url}: {e}")
+    if resp.status_code != 200:
+        raise Exception(f"Failed to download {url}, status code {resp.status_code}")
+
     chrome_options = Options()
     user_agent = "Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.0 Mobile/15E148 Safari/604.1"
     chrome_options.add_argument(f"user-agent={user_agent}")
@@ -90,6 +97,8 @@ def save_mobile_article_as_mhtml(url, saveDirectory, timeout=10, min_load_time=5
     except requests.exceptions.SSLError:
         url = url.replace("https", "http")
         response = requests.get(url, verify=False, timeout=timeout)
+    if response.status_code != 200:
+        raise Exception(f"Failed to download {url}, status code {response.status_code}")
 
     content_type = response.headers.get("Content-Type")
     content_disposition = response.headers.get("Content-Disposition")
